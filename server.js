@@ -444,7 +444,7 @@ const distPath = path.join(__dirname, "client", "dist");
 app.use(express.static(distPath));
 
 // IMPORTANT: fallback to React app for all non-API routes
-app.get("*", (req, res) => {
+app.get(/.*/, (req, res) => {
   res.sendFile(path.join(distPath, "index.html"));
 });
 
