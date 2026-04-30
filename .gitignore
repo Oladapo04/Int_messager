@@ -1,0 +1,9 @@
+node_modules/
+uploads/
+backend/uploads/
+dist/
+build/
+.env
+*.log
+*.mp4
+*.exe
