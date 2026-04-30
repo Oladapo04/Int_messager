@@ -444,7 +444,7 @@ const distPath = path.join(__dirname, "client", "dist");
 app.use(express.static(distPath));
 
 // IMPORTANT: fallback to React app for all non-API routes
-app.get(/.*/, (req, res) => {
+app.get(/^(?!\/api(?:\/|$)|\/socket\.io(?:\/|$)|\/uploads(?:\/|$)).*/, (req, res) => {
   res.sendFile(path.join(distPath, "index.html"));
 });
 
@@ -729,7 +729,7 @@ function buildChatExportText(room, messages) {
 ========================= */
 
 app.get("/api", (req, res) => {
-  res.send("Server is working");
+  res.json({ success: true, message: "Server is working" });
 });
 
 app.post("/api/session/init", async (req, res) => {
@@ -2315,10 +2315,6 @@ socket.on("call:start", async ({ roomSlug, profileId, name, callType = "audio" }
 /* =========================
    SPA FALLBACK + STARTUP
 ========================= */
-
-app.get(/.*/, (req, res) => {
-  res.sendFile(path.join(distPath, "index.html"));
-});
 
 (async () => {
   try {
