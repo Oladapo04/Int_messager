@@ -301,10 +301,15 @@ const profileSchema = new mongoose.Schema(
     avatarUrl: { type: String, default: "" },
     nameLocked: { type: Boolean, default: false },
     activeChat: { type: Boolean, default: false },
+
+    // ADD THIS HERE
+    pushSubscription: {
+      type: Object,
+      default: null,
+    },
   },
   { timestamps: true }
 );
-
 const Room = mongoose.model("Room", roomSchema);
 const Message = mongoose.model("Message", messageSchema);
 const Profile = mongoose.model("Profile", profileSchema);
@@ -1801,6 +1806,48 @@ app.post("/upload", (req, res) => {
   });
 });
 
+app.get("/api/push/public-key", (req, res) => {
+  res.json({
+    success: true,
+    publicKey: process.env.VAPID_PUBLIC_KEY,
+  });
+});
+
+app.post("/api/push/subscribe", async (req, res) => {
+  try {
+    const installId = getInstallId(req);
+    const { subscription } = req.body;
+
+    if (!installId || !subscription) {
+      return res.status(400).json({
+        success: false,
+        error: "installId and subscription are required",
+      });
+    }
+
+    const profile = await getProfileByInstallId(installId);
+
+    if (!profile) {
+      return res.status(404).json({
+        success: false,
+        error: "Profile not found",
+      });
+    }
+
+    profile.pushSubscription = subscription;
+    await profile.save();
+
+    return res.json({
+      success: true,
+    });
+  } catch (error) {
+    console.error("push subscribe error:", error);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to save push subscription",
+    });
+  }
+});
 
 app.get("/api/calls", async (req, res) => {
   try {
