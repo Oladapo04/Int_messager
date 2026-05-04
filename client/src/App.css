@@ -757,18 +757,10 @@ textarea {
 
 
 /* =========================
-   HARD FIX: PHONE STATUS BAR / NOTIFICATION AREA
-   This creates a real top inset even when env(safe-area-inset-top) returns 0.
-   It supports both old class names (.chat-*) and newer .wa-* class names.
+   CLEAN MOBILE APP FIX
+   Use this instead of the previous hard status-bar fix.
+   The real fix is also changing iPhone status bar from black-translucent to default.
 ========================= */
-
-:root {
-  --phone-status-fallback: 44px;
-  --phone-safe-top: max(env(safe-area-inset-top, 0px), var(--phone-status-fallback));
-  --phone-safe-bottom: max(env(safe-area-inset-bottom, 0px), 10px);
-  --phone-safe-left: env(safe-area-inset-left, 0px);
-  --phone-safe-right: env(safe-area-inset-right, 0px);
-}
 
 html,
 body,
@@ -776,159 +768,105 @@ body,
   width: 100%;
   height: 100%;
   margin: 0;
-  overflow: hidden !important;
-  overscroll-behavior: none;
+  overflow: hidden;
 }
 
 body {
-  position: fixed;
-  inset: 0;
-  width: 100vw;
-  height: 100dvh;
   background: #111b21;
+  overscroll-behavior: none;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
-/* Keep the whole app fixed */
-.app-shell,
-.wa-app,
-.wa-shell {
-  position: fixed !important;
-  inset: 0 !important;
-  width: 100vw !important;
-  height: 100dvh !important;
-  min-height: 100dvh !important;
-  max-height: 100dvh !important;
-  overflow: hidden !important;
-  padding: 0 !important;
+.app-shell {
+  width: 100%;
+  height: 100dvh;
+  min-height: 100dvh;
+  overflow: hidden;
+  padding: 0;
+  align-items: stretch;
+  justify-content: stretch;
 }
 
-/* Main layout should occupy the viewport but not scroll as a page */
-.chat-layout,
-.wa-layout,
-.wa-main,
-.wa-container {
-  width: 100vw !important;
-  height: 100dvh !important;
-  min-height: 100dvh !important;
-  max-height: 100dvh !important;
-  max-width: none !important;
-  max-height: none !important;
-  overflow: hidden !important;
-  border-radius: 0 !important;
+.chat-layout {
+  width: 100%;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  overflow: hidden;
 }
 
-/* Chat panel fixed full screen */
-.chat-window,
-.wa-chat,
-.wa-chat-panel,
-.wa-conversation {
-  height: 100dvh !important;
-  min-height: 0 !important;
-  max-height: 100dvh !important;
-  display: flex !important;
-  flex-direction: column !important;
-  overflow: hidden !important;
+.chat-window {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
-/*
-  Critical fix:
-  Push header content below phone time/battery/status bar.
-*/
-.chat-header,
-.wa-chat-header,
-.wa-header {
-  flex: 0 0 auto !important;
-  min-height: calc(64px + var(--phone-safe-top)) !important;
-  padding-top: calc(10px + var(--phone-safe-top)) !important;
-  padding-left: max(12px, var(--phone-safe-left)) !important;
-  padding-right: max(12px, var(--phone-safe-right)) !important;
-  box-sizing: border-box !important;
-  z-index: 20 !important;
+.chat-header {
+  flex-shrink: 0;
 }
 
-/* Sidebar header also needs top inset */
-.sidebar-header,
-.wa-sidebar-header {
-  flex: 0 0 auto !important;
-  min-height: calc(64px + var(--phone-safe-top)) !important;
-  padding-top: calc(10px + var(--phone-safe-top)) !important;
-  padding-left: max(16px, var(--phone-safe-left)) !important;
-  padding-right: max(16px, var(--phone-safe-right)) !important;
-  box-sizing: border-box !important;
-}
-
-/* Only message content scrolls */
-.chat-body,
-.wa-messages,
-.wa-message-list,
-.wa-chat-body {
-  flex: 1 1 auto !important;
-  min-height: 0 !important;
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
+.chat-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
 }
 
-/* Composer stays above home indicator / bottom safe area */
-.chat-composer,
-.wa-composer,
-.wa-message-composer {
-  flex: 0 0 auto !important;
-  padding-bottom: max(12px, calc(8px + var(--phone-safe-bottom))) !important;
-  padding-left: max(10px, var(--phone-safe-left)) !important;
-  padding-right: max(10px, var(--phone-safe-right)) !important;
-  box-sizing: border-box !important;
-  z-index: 20 !important;
+.chat-composer {
+  flex-shrink: 0;
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
 }
 
-/* Prevent input-focus zoom */
 input,
 textarea,
 select,
 .message-input,
-.wa-input {
+.name-screen-input {
   font-size: 16px !important;
 }
 
-/* Mobile-specific hard override */
 @media (max-width: 768px) {
-  .chat-layout,
-  .wa-layout,
-  .wa-main,
-  .wa-container {
-    display: block !important;
+  .app-shell {
+    height: 100dvh;
+    min-height: 100dvh;
   }
 
-  .sidebar,
-  .wa-sidebar {
-    height: 100dvh !important;
-    max-height: 100dvh !important;
-    padding-top: 0 !important;
+  .chat-layout {
+    width: 100vw;
+    height: 100dvh;
+    min-height: 100dvh;
+    display: block;
+    border-radius: 0;
+    box-shadow: none;
   }
 
-  .mobile-sidebar-backdrop,
-  .wa-sidebar-backdrop {
-    height: 100dvh !important;
+  .chat-window {
+    height: 100dvh;
+    min-height: 100dvh;
   }
-}
 
-/*
-  If the app is opened in normal Safari/Chrome instead of installed PWA,
-  a smaller top inset is usually enough because the browser already reserves space.
-*/
-@media (max-width: 768px) and (display-mode: browser) {
-  :root {
-    --phone-status-fallback: 20px;
+  .chat-header {
+    min-height: 64px;
+    padding-top: 10px;
   }
-}
 
-/*
-  Installed PWA / standalone mode needs the larger inset.
-*/
-@media (max-width: 768px) and (display-mode: standalone) {
-  :root {
-    --phone-status-fallback: 44px;
+  .sidebar {
+    height: 100dvh;
+    max-height: 100dvh;
+  }
+
+  .mobile-sidebar-backdrop {
+    height: 100dvh;
+  }
+
+  .message-bubble {
+    max-width: 90%;
   }
 }
 
