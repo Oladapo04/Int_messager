@@ -8,6 +8,7 @@ const fs = require("fs");
 const multer = require("multer");
 const { Server } = require("socket.io");
 const mongoose = require("mongoose");
+const webPush = require("web-push");
 
 const app = express();
 
@@ -18,6 +19,15 @@ app.use(express.urlencoded({ extended: true, limit: "1gb" }));
 const PORT = process.env.PORT || 3001;
 const MONGODB_URI =
   process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/int_messager";
+
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || "";
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || "";
+const VAPID_SUBJECT = process.env.VAPID_SUBJECT || "mailto:admin@example.com";
+
+if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
+  webPush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+}
+
 
 const MAX_FILE_SIZE = 1024 * 1024 * 1024;
 const CALL_RING_TIMEOUT_MS = 30000; // 30 seconds before an unanswered call is marked missed
@@ -301,15 +311,14 @@ const profileSchema = new mongoose.Schema(
     avatarUrl: { type: String, default: "" },
     nameLocked: { type: Boolean, default: false },
     activeChat: { type: Boolean, default: false },
-
-    // ADD THIS HERE
-    pushSubscription: {
-      type: Object,
-      default: null,
+    pushSubscriptions: {
+      type: [Object],
+      default: [],
     },
   },
   { timestamps: true }
 );
+
 const Room = mongoose.model("Room", roomSchema);
 const Message = mongoose.model("Message", messageSchema);
 const Profile = mongoose.model("Profile", profileSchema);
@@ -445,15 +454,14 @@ const upload = multer({
 app.use("/uploads", express.static(uploadsDir));
 
 const distPath = path.join(__dirname, "client", "dist");
-
 app.use(express.static(distPath));
 
-// IMPORTANT: fallback to React app for all non-API routes
 app.get(
   /^(?!\/api(?:\/|$)|\/socket\.io(?:\/|$)|\/uploads(?:\/|$)|\/manifest\.webmanifest$|\/sw\.js$|\/icons(?:\/|$)).*/,
   (req, res) => {
-  res.sendFile(path.join(distPath, "index.html"));
-});
+    res.sendFile(path.join(distPath, "index.html"));
+  }
+);
 
 /* =========================
    HELPERS
@@ -683,6 +691,107 @@ async function emitUnreadCountsForRoom(roomSlug, ioInstance) {
 }
 
 
+
+async function sendPushToProfile(profileId, payload = {}) {
+  if (!profileId || !VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) return;
+
+  const profile = await Profile.findById(profileId);
+  if (!profile?.pushSubscriptions?.length) return;
+
+  const subscriptions = profile.pushSubscriptions || [];
+  const nextSubscriptions = [];
+
+  await Promise.all(
+    subscriptions.map(async (subscription) => {
+      try {
+        await webPush.sendNotification(subscription, JSON.stringify(payload));
+        nextSubscriptions.push(subscription);
+      } catch (error) {
+        const statusCode = error?.statusCode || 0;
+        if (![404, 410].includes(statusCode)) {
+          nextSubscriptions.push(subscription);
+          console.error("push send error:", error?.message || error);
+        }
+      }
+    })
+  );
+
+  if (nextSubscriptions.length !== subscriptions.length) {
+    profile.pushSubscriptions = nextSubscriptions;
+    await profile.save();
+  }
+}
+
+async function emitMessageToRoomParticipants(roomSlug, message, ioInstance) {
+  if (!roomSlug || !message) return;
+
+  const room = await Room.findOne({ slug: roomSlug }).lean();
+
+  if (room?.isDirect && Array.isArray(room.participants)) {
+    room.participants.forEach((profileId) => {
+      const socketIds = profileSockets[String(profileId)];
+      if (!socketIds) return;
+      socketIds.forEach((socketId) => {
+        ioInstance.to(socketId).emit("receive_message", message);
+      });
+    });
+    return;
+  }
+
+  ioInstance.to(roomSlug).emit("receive_message", message);
+}
+
+async function notifyMessagePush(roomSlug, message, senderProfileId) {
+  const room = await Room.findOne({ slug: roomSlug }).lean();
+  if (!room) return;
+
+  const recipientIds = room.isDirect
+    ? (room.participants || []).filter((id) => String(id) !== String(senderProfileId || ""))
+    : Object.keys(profileSockets).filter((id) => String(id) !== String(senderProfileId || ""));
+
+  const body =
+    message.type === "audio"
+      ? `${message.sender || "Someone"}: Voice note`
+      : message.type === "file"
+        ? `${message.sender || "Someone"}: ${message.fileName || "Attachment"}`
+        : `${message.sender || "Someone"}: ${message.content || "New message"}`;
+
+  await Promise.all(
+    recipientIds.map((profileId) =>
+      sendPushToProfile(profileId, {
+        type: "message",
+        title: room.name || "New message",
+        body,
+        roomSlug,
+        url: `/?room=${encodeURIComponent(roomSlug)}`,
+        tag: `message-${roomSlug}`,
+      })
+    )
+  );
+}
+
+async function notifyCallPush(roomSlug, callerProfileId, callerName, callType = "audio") {
+  const room = await Room.findOne({ slug: roomSlug }).lean();
+  if (!room) return;
+
+  const recipientIds = room.isDirect
+    ? (room.participants || []).filter((id) => String(id) !== String(callerProfileId || ""))
+    : Object.keys(profileSockets).filter((id) => String(id) !== String(callerProfileId || ""));
+
+  await Promise.all(
+    recipientIds.map((profileId) =>
+      sendPushToProfile(profileId, {
+        type: "call",
+        title: `${callerName || "Someone"} is calling`,
+        body: callType === "video" ? "Incoming video call" : "Incoming audio call",
+        roomSlug,
+        url: `/?room=${encodeURIComponent(roomSlug)}&call=1`,
+        tag: `call-${roomSlug}`,
+      })
+    )
+  );
+}
+
 function safeExportFileName(name) {
   return (name || "chat-export")
     .toString()
@@ -736,7 +845,7 @@ function buildChatExportText(room, messages) {
 ========================= */
 
 app.get("/api", (req, res) => {
-  res.json({ success: true, message: "Server is working" });
+  res.send("Server is working");
 });
 
 app.post("/api/session/init", async (req, res) => {
@@ -889,6 +998,42 @@ app.post("/api/profile", (req, res) => {
       return res.status(500).json({ success: false, error: "Failed to update profile" });
     }
   });
+});
+
+app.get("/api/push/public-key", (req, res) => {
+  if (!VAPID_PUBLIC_KEY) {
+    return res.status(500).json({ success: false, error: "VAPID_PUBLIC_KEY is not configured" });
+  }
+
+  return res.json({ success: true, publicKey: VAPID_PUBLIC_KEY });
+});
+
+app.post("/api/push/subscribe", async (req, res) => {
+  try {
+    const installId = getInstallId(req);
+    const { subscription } = req.body || {};
+
+    if (!installId || !subscription?.endpoint) {
+      return res.status(400).json({ success: false, error: "installId and subscription are required" });
+    }
+
+    const profile = await getProfileByInstallId(installId);
+    if (!profile) {
+      return res.status(404).json({ success: false, error: "Profile not found" });
+    }
+
+    const current = profile.pushSubscriptions || [];
+    const exists = current.some((item) => item?.endpoint === subscription.endpoint);
+    if (!exists) {
+      profile.pushSubscriptions = [...current, subscription];
+      await profile.save();
+    }
+
+    return res.json({ success: true });
+  } catch (error) {
+    console.error("push subscribe error:", error);
+    return res.status(500).json({ success: false, error: "Failed to save push subscription" });
+  }
 });
 
 app.get("/api/unread-counts", async (req, res) => {
@@ -1559,11 +1704,10 @@ app.post("/api/messages/:messageId/forward", async (req, res) => {
       }
     );
 
-    io.to(targetRoomSlug).emit(
-      "receive_message",
-      forwardedMessage.toObject({ flattenMaps: true })
-    );
+    const plainForwardedMessage = forwardedMessage.toObject({ flattenMaps: true });
+    await emitMessageToRoomParticipants(targetRoomSlug, plainForwardedMessage, io);
     await emitUnreadCountsForRoom(targetRoomSlug, io);
+    await notifyMessagePush(targetRoomSlug, plainForwardedMessage, currentProfile._id);
     io.emit("rooms_updated");
 
     return res.status(201).json({
@@ -1785,11 +1929,10 @@ app.post("/upload", (req, res) => {
         }
       );
 
-      io.to(roomSlug).emit(
-        "receive_message",
-        message.toObject({ flattenMaps: true })
-      );
+      const plainMessage = message.toObject({ flattenMaps: true });
+      await emitMessageToRoomParticipants(roomSlug, plainMessage, io);
       await emitUnreadCountsForRoom(roomSlug, io);
+      await notifyMessagePush(roomSlug, plainMessage, profile._id);
       io.emit("rooms_updated");
 
       return res.status(201).json({
@@ -1806,48 +1949,6 @@ app.post("/upload", (req, res) => {
   });
 });
 
-app.get("/api/push/public-key", (req, res) => {
-  res.json({
-    success: true,
-    publicKey: process.env.VAPID_PUBLIC_KEY,
-  });
-});
-
-app.post("/api/push/subscribe", async (req, res) => {
-  try {
-    const installId = getInstallId(req);
-    const { subscription } = req.body;
-
-    if (!installId || !subscription) {
-      return res.status(400).json({
-        success: false,
-        error: "installId and subscription are required",
-      });
-    }
-
-    const profile = await getProfileByInstallId(installId);
-
-    if (!profile) {
-      return res.status(404).json({
-        success: false,
-        error: "Profile not found",
-      });
-    }
-
-    profile.pushSubscription = subscription;
-    await profile.save();
-
-    return res.json({
-      success: true,
-    });
-  } catch (error) {
-    console.error("push subscribe error:", error);
-    return res.status(500).json({
-      success: false,
-      error: "Failed to save push subscription",
-    });
-  }
-});
 
 app.get("/api/calls", async (req, res) => {
   try {
@@ -1989,6 +2090,7 @@ socket.on("call:start", async ({ roomSlug, profileId, name, callType = "audio" }
     });
 
     await notifyIncomingCall(socket, roomSlug, profileId, callName, io, callType);
+    await notifyCallPush(roomSlug, profileId, callName, callType);
 
     emitCallState(roomSlug, io);
   } catch (error) {
@@ -2232,11 +2334,10 @@ socket.on("call:start", async ({ roomSlug, profileId, name, callType = "audio" }
         }
       );
 
-      io.to(roomSlug).emit(
-        "receive_message",
-        message.toObject({ flattenMaps: true })
-      );
+      const plainMessage = message.toObject({ flattenMaps: true });
+      await emitMessageToRoomParticipants(roomSlug, plainMessage, io);
       await emitUnreadCountsForRoom(roomSlug, io);
+      await notifyMessagePush(roomSlug, plainMessage, profile._id);
       io.emit("rooms_updated");
     } catch (error) {
       console.error("send_message error:", error);
@@ -2285,7 +2386,11 @@ socket.on("call:start", async ({ roomSlug, profileId, name, callType = "audio" }
       const room = await Room.findOne({ slug: roomSlug });
       if (!room || !profileCanAccessRoom(profile, room)) return;
 
-      socket.to(roomSlug).emit("user_typing", profile.displayName);
+      socket.to(roomSlug).emit("user_typing", {
+        roomSlug,
+        profileId: String(profile._id),
+        name: profile.displayName,
+      });
     } catch (error) {
       console.error("typing error:", error);
     }
@@ -2301,7 +2406,11 @@ socket.on("call:start", async ({ roomSlug, profileId, name, callType = "audio" }
       const room = await Room.findOne({ slug: roomSlug });
       if (!room || !profileCanAccessRoom(profile, room)) return;
 
-      socket.to(roomSlug).emit("user_stop_typing", profile.displayName);
+      socket.to(roomSlug).emit("user_stop_typing", {
+        roomSlug,
+        profileId: String(profile._id),
+        name: profile.displayName,
+      });
     } catch (error) {
       console.error("stop_typing error:", error);
     }
@@ -2364,6 +2473,10 @@ socket.on("call:start", async ({ roomSlug, profileId, name, callType = "audio" }
 /* =========================
    SPA FALLBACK + STARTUP
 ========================= */
+
+app.get(/.*/, (req, res) => {
+  res.sendFile(path.join(distPath, "index.html"));
+});
 
 (async () => {
   try {

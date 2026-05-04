@@ -5,6 +5,16 @@ import io from "socket.io-client";
 const API_BASE = "";
 const socket = io(API_BASE, { autoConnect: true });
 
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; i += 1) outputArray[i] = rawData.charCodeAt(i);
+  return outputArray;
+}
+
+
 const INSTALL_ID_KEY = "int_messager_install_id";
 const PLAYED_KEY = "wa_voice_played_map";
 const REACTION_OPTIONS = ["❤️", "👍", "😂", "😮", "😢", "🙏", "🔥", "🎉", "👏", "💯", "😆", "😎", "🤔", "😡", "💔", "✅", "👀", "🙌"];
@@ -30,21 +40,6 @@ function registerPwaServiceWorker() {
   });
 }
 
-function urlBase64ToUint8Array(base64String) {
-  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding)
-    .replace(/-/g, "+")
-    .replace(/_/g, "/");
-
-  const rawData = window.atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-
-  for (let i = 0; i < rawData.length; ++i) {
-    outputArray[i] = rawData.charCodeAt(i);
-  }
-
-  return outputArray;
-}
 
 function readJsonStorage(key, fallback = {}) {
   try { return JSON.parse(localStorage.getItem(key) || "null") || fallback; } catch { return fallback; }
@@ -2785,10 +2780,62 @@ export default function App() {
 
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
-    navigator.serviceWorker.register("/notification-sw.js").catch((err) => {
+    navigator.serviceWorker.register("/sw.js").catch((err) => {
       console.warn("Notification service worker registration failed:", err);
     });
   }, []);
+
+
+  async function enablePushNotifications() {
+    try {
+      if (!("Notification" in window)) {
+        alert("Notifications are not supported on this device.");
+        return;
+      }
+      if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+        alert("Push notifications are not supported on this browser.");
+        return;
+      }
+
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        alert("Notifications were not allowed.");
+        return;
+      }
+
+      const registration = await navigator.serviceWorker.ready;
+      const existingSubscription = await registration.pushManager.getSubscription();
+      if (existingSubscription) {
+        alert("Notifications are already enabled.");
+        return;
+      }
+
+      const keyRes = await fetch(`${API_BASE}/api/push/public-key`);
+      const keyPayload = await keyRes.json();
+      if (!keyRes.ok || !keyPayload.publicKey) throw new Error(keyPayload.error || "Push public key is not configured.");
+
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(keyPayload.publicKey),
+      });
+
+      const saveRes = await fetch(`${API_BASE}/api/push/subscribe`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-install-id": installId,
+        },
+        body: JSON.stringify({ installId, subscription }),
+      });
+      const savePayload = await saveRes.json();
+      if (!saveRes.ok || savePayload.success === false) throw new Error(savePayload.error || "Failed to save notification subscription.");
+
+      alert("Notifications enabled.");
+    } catch (error) {
+      console.error("Enable notifications error:", error);
+      alert(error.message || "Failed to enable notifications.");
+    }
+  }
 
   function getAudioContext() {
     const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
@@ -3313,6 +3360,31 @@ export default function App() {
   }, [canChat, installId, currentProfileId, profile?.profileId]);
 
   useEffect(() => {
+    if (!canChat || !installId) return;
+
+    const rejoinActiveRoom = () => {
+      socket.emit("profile:register", {
+        installId,
+        profileId: currentProfileId || profile?.profileId || null,
+      });
+
+      if (activeRoomSlugRef.current) {
+        socket.emit("join_room", { roomSlug: activeRoomSlugRef.current, installId });
+      }
+    };
+
+    socket.on("connect", rejoinActiveRoom);
+    socket.io?.on?.("reconnect", rejoinActiveRoom);
+    window.addEventListener("online", rejoinActiveRoom);
+
+    return () => {
+      socket.off("connect", rejoinActiveRoom);
+      socket.io?.off?.("reconnect", rejoinActiveRoom);
+      window.removeEventListener("online", rejoinActiveRoom);
+    };
+  }, [canChat, installId, currentProfileId, profile?.profileId]);
+
+  useEffect(() => {
     if (!canChat) return;
 
     async function loadRoomsAndProfiles() {
@@ -3569,8 +3641,26 @@ export default function App() {
       }
     };
 
-    const handleUserTyping = (name) => setTypingName(name || "");
-    const handleUserStopTyping = () => setTypingName("");
+    const handleUserTyping = (payload) => {
+      const payloadRoomSlug = typeof payload === "object" && payload !== null ? payload.roomSlug : activeRoomSlug;
+      const payloadProfileId = typeof payload === "object" && payload !== null ? String(payload.profileId || "") : "";
+      const payloadName = typeof payload === "object" && payload !== null ? payload.name : payload;
+
+      if (payloadRoomSlug !== activeRoomSlug) return;
+      if (payloadProfileId && payloadProfileId === String(currentProfileId || "")) return;
+
+      setTypingName(payloadName || "");
+    };
+
+    const handleUserStopTyping = (payload) => {
+      const payloadRoomSlug = typeof payload === "object" && payload !== null ? payload.roomSlug : activeRoomSlug;
+      const payloadProfileId = typeof payload === "object" && payload !== null ? String(payload.profileId || "") : "";
+
+      if (payloadRoomSlug !== activeRoomSlug) return;
+      if (payloadProfileId && payloadProfileId === String(currentProfileId || "")) return;
+
+      setTypingName("");
+    };
     const handleUserRecordingAudio = (payload) => {
       const payloadRoomSlug =
         typeof payload === "object" && payload !== null ? payload.roomSlug : activeRoomSlug;
@@ -3649,6 +3739,37 @@ export default function App() {
       document.removeEventListener("visibilitychange", markActiveRoomSeenIfVisible);
     };
   }, [activeRoomSlug, canChat, installId, currentProfileId]);
+
+  useEffect(() => {
+    if (!canChat || !activeRoomSlug || !installId) return;
+
+    async function refreshActiveRoomMessagesForMobile() {
+      if (document.hidden) return;
+      try {
+        const res = await fetch(`${API_BASE}/api/messages/${encodeURIComponent(activeRoomSlug)}`, {
+          headers: { "x-install-id": installId },
+        });
+        const incoming = await res.json();
+        if (!Array.isArray(incoming)) return;
+        setMessagesByRoom((current) => ({
+          ...current,
+          [activeRoomSlug]: incoming.map((msg) => ({ ...msg, reactions: normalizeReactions(msg.reactions) })),
+        }));
+      } catch {
+        // socket remains primary; this is only an iPhone/PWA resilience fallback
+      }
+    }
+
+    const interval = window.setInterval(refreshActiveRoomMessagesForMobile, 5000);
+    document.addEventListener("visibilitychange", refreshActiveRoomMessagesForMobile);
+    window.addEventListener("focus", refreshActiveRoomMessagesForMobile);
+
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", refreshActiveRoomMessagesForMobile);
+      window.removeEventListener("focus", refreshActiveRoomMessagesForMobile);
+    };
+  }, [activeRoomSlug, canChat, installId]);
 
   useEffect(() => {
     const handleParticipants = ({ participants, roomSlug }) => {
@@ -5226,59 +5347,6 @@ export default function App() {
       setError(err.message || "Forward failed");
     }
   }
-async function enablePushNotifications() {
-  try {
-    if (!("serviceWorker" in navigator)) {
-      alert("Service workers are not supported on this device.");
-      return;
-    }
-
-    if (!("PushManager" in window)) {
-      alert("Push notifications are not supported on this browser.");
-      return;
-    }
-
-    const permission = await Notification.requestPermission();
-
-    if (permission !== "granted") {
-      alert("Notifications were not allowed.");
-      return;
-    }
-
-    const registration = await navigator.serviceWorker.ready;
-
-    const publicKeyRes = await fetch("/api/push/public-key");
-    const publicKeyData = await publicKeyRes.json();
-
-    const subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(publicKeyData.publicKey),
-    });
-
-    const res = await fetch("/api/push/subscribe", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-install-id": installId,
-      },
-      body: JSON.stringify({
-        installId,
-        subscription,
-      }),
-    });
-
-    const data = await res.json();
-
-    if (!res.ok || !data.success) {
-      throw new Error(data.error || "Failed to save push subscription");
-    }
-
-    alert("Notifications enabled.");
-  } catch (error) {
-    console.error("Enable notifications error:", error);
-    alert(error.message || "Failed to enable notifications.");
-  }
-}
 
   function openReactionPicker(message, position) {
     setReactionPicker({
