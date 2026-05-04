@@ -870,3 +870,64 @@ select,
   }
 }
 
+
+/* =========================
+   MOBILE INPUT ZOOM FIX
+   Stops app zooming when typing without using viewport-fit=cover.
+========================= */
+
+input,
+textarea,
+select,
+button,
+.message-input,
+.name-screen-input,
+.wa-input,
+.wa-search-input,
+.wa-composer input,
+.wa-composer textarea,
+.chat-composer input,
+.chat-composer textarea {
+  font-size: 16px !important;
+}
+
+/* Prevent accidental double-tap zoom behavior */
+button,
+input,
+textarea,
+select,
+a {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Keep typed input stable on iPhone/Android */
+.message-input,
+.name-screen-input,
+.wa-input,
+.wa-composer input,
+.wa-composer textarea,
+.chat-composer input,
+.chat-composer textarea {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+}
+
+/* Keep the fixed shell stable while keyboard opens */
+html,
+body,
+#root {
+  overflow: hidden !important;
+}
+
+.app-shell,
+.chat-layout,
+.chat-window {
+  overflow: hidden !important;
+}
+
+.chat-body {
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch;
+}
+
