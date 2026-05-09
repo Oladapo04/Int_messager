@@ -4,7 +4,6 @@ const express = require("express");
 const cors = require("cors");
 const http = require("http");
 const path = require("path");
-const fs = require("fs");
 const multer = require("multer");
 const { Server } = require("socket.io");
 const mongoose = require("mongoose");
@@ -27,8 +26,32 @@ const VAPID_SUBJECT = process.env.VAPID_SUBJECT || "mailto:admin@example.com";
 if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
   webPush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 }
+const cloudinary = require("cloudinary").v2;
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
 
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
+const storage = new CloudinaryStorage({
+  cloudinary,
+  params: async (req, file) => {
+    const isAudio = file.mimetype.startsWith("audio/");
+    const isImage = file.mimetype.startsWith("image/");
+
+    return {
+      folder: "int-messager",
+      resource_type: "auto",
+      allowed_formats: isImage
+        ? ["jpg", "jpeg", "png", "gif", "webp"]
+        : undefined,
+    };
+  },
+});
+
+module.exports = { cloudinary, storage };
 const MAX_FILE_SIZE = 1024 * 1024 * 1024;
 const CALL_RING_TIMEOUT_MS = 30000; // 30 seconds before an unanswered call is marked missed
 const ALLOWED_REACTIONS = ["❤️", "👍", "😂", "😮", "😢", "🙏", "🔥", "🎉", "👏", "💯", "😆", "😎", "🤔", "😡", "💔", "✅", "👀", "🙌"];
@@ -427,32 +450,6 @@ async function finishCallLog(roomSlug, statusOverride) {
 /* =========================
    UPLOADS
 ========================= */
-
-const uploadsDir = path.join(__dirname, "uploads");
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadsDir),
-  filename: (req, file, cb) => {
-    const safeName = (file.originalname || "file")
-      .replace(/[^a-zA-Z0-9.\-_]/g, "_")
-      .replace(/\s+/g, "_");
-    cb(null, `${Date.now()}-${safeName}`);
-  },
-});
-
-const upload = multer({
-  storage,
-  limits: {
-    fileSize: MAX_FILE_SIZE,
-    files: 1,
-  },
-});
-
-app.use("/uploads", express.static(uploadsDir));
-
 const distPath = path.join(__dirname, "client", "dist");
 app.use(express.static(distPath));
 
@@ -987,7 +984,7 @@ app.post("/api/profile", (req, res) => {
       if (duplicateName) return res.status(409).json({ success: false, error: "That name is already in use right now" });
 
       const update = { displayName, profileStatus: profileStatus || "Available now", nameLocked: true, activeChat: true };
-      if (req.file) update.avatarUrl = `/uploads/${req.file.filename}`;
+      if (req.file) update.avatarUrl = req.file.path;
 
       const profile = await Profile.findOneAndUpdate({ installId }, { $set: update, $setOnInsert: { installId } }, { upsert: true, returnDocument: "after" });
       io.emit("profiles_updated");
@@ -1909,7 +1906,7 @@ app.post("/upload", (req, res) => {
         type,
         content,
         fileName: originalFileName || req.file.originalname,
-        fileUrl: `/uploads/${req.file.filename}`,
+        fileUrl: req.file.path,,
         fileSize: Number(req.body.originalFileSize || req.file.size || 0),
         mimeType,
         encryptedFile: false,
@@ -1948,7 +1945,6 @@ app.post("/upload", (req, res) => {
     }
   });
 });
-
 
 app.get("/api/calls", async (req, res) => {
   try {
