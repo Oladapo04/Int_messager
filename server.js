@@ -1906,7 +1906,7 @@ app.post("/upload", (req, res) => {
         type,
         content,
         fileName: originalFileName || req.file.originalname,
-        fileUrl: req.file.path,,
+        fileUrl: req.file.path,
         fileSize: Number(req.body.originalFileSize || req.file.size || 0),
         mimeType,
         encryptedFile: false,
