@@ -448,19 +448,6 @@ async function finishCallLog(roomSlug, statusOverride) {
 }
 
 /* =========================
-   UPLOADS
-========================= */
-const distPath = path.join(__dirname, "client", "dist");
-app.use(express.static(distPath));
-
-app.get(
-  /^(?!\/api(?:\/|$)|\/socket\.io(?:\/|$)|\/uploads(?:\/|$)|\/manifest\.webmanifest$|\/sw\.js$|\/icons(?:\/|$)).*/,
-  (req, res) => {
-    res.sendFile(path.join(distPath, "index.html"));
-  }
-);
-
-/* =========================
    HELPERS
 ========================= */
 
@@ -2474,6 +2461,21 @@ app.get(/.*/, (req, res) => {
   res.sendFile(path.join(distPath, "index.html"));
 });
 
+/* =========================
+   REACT APP
+========================= */
+
+const distPath = path.join(__dirname, "client", "dist");
+
+app.use(express.static(distPath));
+
+app.get(
+  /^(?!\/api(?:\/|$)|\/socket\.io(?:\/|$)|\/manifest\.webmanifest$|\/sw\.js$|\/icons(?:\/|$)).*/,
+  (req, res) => {
+    res.sendFile(path.join(distPath, "index.html"));
+  }
+);
+
 (async () => {
   try {
     await connectDB();
@@ -2485,7 +2487,7 @@ app.get(/.*/, (req, res) => {
         slug: "general",
         isDirect: false,
       });
-    }
+ }
 
     server.listen(PORT, "0.0.0.0", () => {
       console.log(`Server running on http://localhost:${PORT}`);
