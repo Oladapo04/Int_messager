@@ -9,10 +9,19 @@ cloudinary.config({
 
 const storage = new CloudinaryStorage({
   cloudinary,
-  params: {
-    folder: "int-messager",
-    allowed_formats: ["jpg", "jpeg", "png", "gif", "webp"],
+
+  params: async (req, file) => {
+    return {
+      folder: "int-messager",
+      resource_type: "auto",
+      public_id: `${Date.now()}-${file.originalname
+        .replace(/\s+/g, "-")
+        .replace(/[^a-zA-Z0-9.-]/g, "")}`,
+    };
   },
 });
 
-module.exports = { cloudinary, storage };
+module.exports = {
+  cloudinary,
+  storage,
+};

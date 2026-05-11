@@ -5,6 +5,14 @@ const cors = require("cors");
 const http = require("http");
 const path = require("path");
 const multer = require("multer");
+const { storage } = require("./config/cloudinary");
+
+const upload = multer({
+  storage,
+  limits: {
+    fileSize: 1024 * 1024 * 1024, // 1 GB
+  },
+});
 const { Server } = require("socket.io");
 const mongoose = require("mongoose");
 const webPush = require("web-push");
@@ -26,32 +34,6 @@ const VAPID_SUBJECT = process.env.VAPID_SUBJECT || "mailto:admin@example.com";
 if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
   webPush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 }
-const cloudinary = require("cloudinary").v2;
-const { CloudinaryStorage } = require("multer-storage-cloudinary");
-
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
-
-const storage = new CloudinaryStorage({
-  cloudinary,
-  params: async (req, file) => {
-    const isAudio = file.mimetype.startsWith("audio/");
-    const isImage = file.mimetype.startsWith("image/");
-
-    return {
-      folder: "int-messager",
-      resource_type: "auto",
-      allowed_formats: isImage
-        ? ["jpg", "jpeg", "png", "gif", "webp"]
-        : undefined,
-    };
-  },
-});
-
-module.exports = { cloudinary, storage };
 const MAX_FILE_SIZE = 1024 * 1024 * 1024;
 const CALL_RING_TIMEOUT_MS = 30000; // 30 seconds before an unanswered call is marked missed
 const ALLOWED_REACTIONS = ["❤️", "👍", "😂", "😮", "😢", "🙏", "🔥", "🎉", "👏", "💯", "😆", "😎", "🤔", "😡", "💔", "✅", "👀", "🙌"];
@@ -957,29 +939,64 @@ app.post("/api/session/set-name", async (req, res) => {
 app.post("/api/profile", (req, res) => {
   upload.single("avatar")(req, res, async (err) => {
     try {
-      if (err) return res.status(400).json({ success: false, error: err.message || "Profile upload failed" });
+      if (err) {
+        console.error("Profile upload middleware error:", err);
+
+        return res.status(500).json({
+          success: false,
+          error: err.message || "Upload failed",
+        });
+      }
 
       const installId = getInstallId(req);
-      const displayName = (req.body.displayName || "").trim();
-      const profileStatus = (req.body.profileStatus || "Available now").trim().slice(0, 80);
 
-      if (!installId) return res.status(400).json({ success: false, error: "installId is required" });
-      if (!displayName) return res.status(400).json({ success: false, error: "displayName is required" });
-      if (displayName.length > 30) return res.status(400).json({ success: false, error: "Name must be 30 characters or fewer" });
+      if (!installId) {
+        return res.status(400).json({
+          success: false,
+          error: "installId is required",
+        });
+      }
 
-      const duplicateName = await Profile.findOne({ displayName, activeChat: true, nameLocked: true, installId: { $ne: installId } });
-      if (duplicateName) return res.status(409).json({ success: false, error: "That name is already in use right now" });
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          error: "No image uploaded",
+        });
+      }
 
-      const update = { displayName, profileStatus: profileStatus || "Available now", nameLocked: true, activeChat: true };
-      if (req.file) update.avatarUrl = req.file.path;
+      const profile = await Profile.findOne({ installId });
 
-      const profile = await Profile.findOneAndUpdate({ installId }, { $set: update, $setOnInsert: { installId } }, { upsert: true, returnDocument: "after" });
+      if (!profile) {
+        return res.status(404).json({
+          success: false,
+          error: "Profile not found",
+        });
+      }
+
+      profile.avatarUrl = req.file.path;
+      await profile.save();
+
       io.emit("profiles_updated");
 
-      return res.json({ success: true, data: { installId: profile.installId, profileId: profile._id, displayName: profile.displayName, profileStatus: profile.profileStatus || "Available now", avatarUrl: profile.avatarUrl || "", nameLocked: profile.nameLocked, activeChat: profile.activeChat } });
+      return res.json({
+        success: true,
+        data: {
+          installId: profile.installId,
+          profileId: profile._id,
+          displayName: profile.displayName,
+          profileStatus: profile.profileStatus || "Available now",
+          avatarUrl: profile.avatarUrl || "",
+          nameLocked: profile.nameLocked,
+          activeChat: profile.activeChat,
+        },
+      });
     } catch (error) {
-      console.error("profile update error:", error);
-      return res.status(500).json({ success: false, error: "Failed to update profile" });
+      console.error("Profile upload failed:", error);
+
+      return res.status(500).json({
+        success: false,
+        error: "Profile upload failed",
+      });
     }
   });
 });
