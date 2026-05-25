@@ -30,7 +30,6 @@ const storage = new CloudinaryStorage({
   cloudinary,
   params: async (req, file) => {
     const originalName = file.originalname || "file";
-
     const safeName = sanitizeFileName(originalName);
 
     const isImage = file.mimetype.startsWith("image/");
@@ -38,7 +37,6 @@ const storage = new CloudinaryStorage({
     const isVideo = file.mimetype.startsWith("video/");
 
     let resourceType = "raw";
-
     if (isImage) resourceType = "image";
     if (isAudio || isVideo) resourceType = "video";
 
@@ -2492,14 +2490,6 @@ socket.on("call:start", async ({ roomSlug, profileId, name, callType = "audio" }
       console.error("disconnect error:", error);
     }
   });
-});
-
-/* =========================
-   SPA FALLBACK + STARTUP
-========================= */
-
-app.get(/.*/, (req, res) => {
-  res.sendFile(path.join(distPath, "index.html"));
 });
 
 /* =========================
