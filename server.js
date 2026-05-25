@@ -5,17 +5,68 @@ const cors = require("cors");
 const http = require("http");
 const path = require("path");
 const multer = require("multer");
-const { storage } = require("./config/cloudinary");
+
+const cloudinary = require("cloudinary").v2;
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
+
+const { Server } = require("socket.io");
+const mongoose = require("mongoose");
+const webPush = require("web-push");
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+function sanitizeFileName(name = "file") {
+  return name
+    .replace(/\.[^/.]+$/, "")
+    .replace(/[^a-zA-Z0-9-_]/g, "_")
+    .replace(/_+/g, "_")
+    .slice(0, 60);
+}
+
+const storage = new CloudinaryStorage({
+  cloudinary,
+  params: async (req, file) => {
+    const originalName = file.originalname || "file";
+
+    const safeName = sanitizeFileName(originalName);
+
+    const isImage = file.mimetype.startsWith("image/");
+    const isAudio = file.mimetype.startsWith("audio/");
+    const isVideo = file.mimetype.startsWith("video/");
+
+    let resourceType = "raw";
+
+    if (isImage) resourceType = "image";
+    if (isAudio || isVideo) resourceType = "video";
+
+    return {
+      folder: "int-messager",
+      resource_type: resourceType,
+      public_id: `${Date.now()}_${safeName}`,
+      overwrite: false,
+      invalidate: true,
+      use_filename: false,
+      unique_filename: true,
+    };
+  },
+});
 
 const upload = multer({
   storage,
   limits: {
-    fileSize: 1024 * 1024 * 1024, // 1 GB
+    fileSize: 1024 * 1024 * 1024,
+  },
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype) {
+      return cb(new Error("Invalid file type"));
+    }
+
+    cb(null, true);
   },
 });
-const { Server } = require("socket.io");
-const mongoose = require("mongoose");
-const webPush = require("web-push");
 
 const app = express();
 
@@ -940,60 +991,29 @@ app.post("/api/profile", (req, res) => {
   upload.single("avatar")(req, res, async (err) => {
     try {
       if (err) {
-        console.error("Profile upload middleware error:", err);
+        console.error(err);
 
         return res.status(500).json({
           success: false,
-          error: err.message || "Upload failed",
+          error: err.message,
         });
       }
 
-      const installId = getInstallId(req);
+      const update = {};
 
-      if (!installId) {
-        return res.status(400).json({
-          success: false,
-          error: "installId is required",
-        });
+      if (req.file) {
+        update.avatarUrl = req.file.path;
       }
 
-      if (!req.file) {
-        return res.status(400).json({
-          success: false,
-          error: "No image uploaded",
-        });
-      }
-
-      const profile = await Profile.findOne({ installId });
-
-      if (!profile) {
-        return res.status(404).json({
-          success: false,
-          error: "Profile not found",
-        });
-      }
-
-      profile.avatarUrl = req.file.path;
-      await profile.save();
-
-      io.emit("profiles_updated");
-
-      return res.json({
+      res.json({
         success: true,
-        data: {
-          installId: profile.installId,
-          profileId: profile._id,
-          displayName: profile.displayName,
-          profileStatus: profile.profileStatus || "Available now",
-          avatarUrl: profile.avatarUrl || "",
-          nameLocked: profile.nameLocked,
-          activeChat: profile.activeChat,
-        },
+        avatarUrl: update.avatarUrl,
       });
-    } catch (error) {
-      console.error("Profile upload failed:", error);
 
-      return res.status(500).json({
+    } catch (error) {
+      console.error(error);
+
+      res.status(500).json({
         success: false,
         error: "Profile upload failed",
       });
@@ -1839,7 +1859,11 @@ app.post("/upload", (req, res) => {
           });
         }
 
-        console.error("Upload middleware error:", err);
+        console.error("Upload middleware error:", {
+  message: err.message,
+  stack: err.stack,
+  name: err.name,
+});
         return res.status(500).json({
           success: false,
           error: err.message || "File upload failed",
@@ -1910,7 +1934,7 @@ app.post("/upload", (req, res) => {
         type,
         content,
         fileName: originalFileName || req.file.originalname,
-        fileUrl: req.file.path,
+        fileUrl: req.file.secure_url || req.file.path,
         fileSize: Number(req.body.originalFileSize || req.file.size || 0),
         mimeType,
         encryptedFile: false,
@@ -2486,12 +2510,9 @@ const distPath = path.join(__dirname, "client", "dist");
 
 app.use(express.static(distPath));
 
-app.get(
-  /^(?!\/api(?:\/|$)|\/socket\.io(?:\/|$)|\/manifest\.webmanifest$|\/sw\.js$|\/icons(?:\/|$)).*/,
-  (req, res) => {
-    res.sendFile(path.join(distPath, "index.html"));
-  }
-);
+app.get(/.*/, (req, res) => {
+  res.sendFile(path.join(distPath, "index.html"));
+});
 
 (async () => {
   try {
