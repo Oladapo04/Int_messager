@@ -989,31 +989,69 @@ app.post("/api/profile", (req, res) => {
   upload.single("avatar")(req, res, async (err) => {
     try {
       if (err) {
-        console.error(err);
-
         return res.status(500).json({
           success: false,
           error: err.message,
         });
       }
 
-      const update = {};
+      const installId = getInstallId(req);
+      const displayName = (req.body.displayName || "").trim();
+      const profileStatus = (req.body.profileStatus || "Available now").trim();
+
+      if (!installId) {
+        return res.status(400).json({
+          success: false,
+          error: "installId is required",
+        });
+      }
+
+      if (!displayName) {
+        return res.status(400).json({
+          success: false,
+          error: "displayName is required",
+        });
+      }
+
+      const update = {
+        displayName,
+        profileStatus,
+        nameLocked: true,
+        activeChat: true,
+      };
 
       if (req.file) {
         update.avatarUrl = req.file.path;
       }
 
-      res.json({
+      const profile = await Profile.findOneAndUpdate(
+        { installId },
+        {
+          $set: update,
+          $setOnInsert: { installId },
+        },
+        { upsert: true, returnDocument: "after" }
+      );
+
+      io.emit("profiles_updated");
+
+      return res.json({
         success: true,
-        avatarUrl: update.avatarUrl,
+        data: {
+          installId: profile.installId,
+          profileId: profile._id,
+          displayName: profile.displayName,
+          profileStatus: profile.profileStatus || "Available now",
+          avatarUrl: profile.avatarUrl || "",
+          nameLocked: profile.nameLocked,
+          activeChat: profile.activeChat,
+        },
       });
-
     } catch (error) {
-      console.error(error);
-
-      res.status(500).json({
+      console.error("profile update error:", error);
+      return res.status(500).json({
         success: false,
-        error: "Profile upload failed",
+        error: "Profile update failed",
       });
     }
   });
