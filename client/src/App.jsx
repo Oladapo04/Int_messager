@@ -845,6 +845,97 @@ function StyleTag() {
         margin-top: 2px;
       }
 
+      .wa-launch-screen {
+        position: fixed;
+        inset: 0;
+        z-index: 99999;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 18px;
+        background: #0f172a;
+      }
+
+      .wa-launch-logo {
+        width: 132px;
+        height: 132px;
+        object-fit: contain;
+        border-radius: 30px;
+        animation: wa-launch-pop 0.65s ease-out;
+      }
+
+      .wa-launch-name {
+        color: #ffffff;
+        font-size: 24px;
+        font-weight: 900;
+        letter-spacing: 0.02em;
+        animation: wa-launch-fade 0.8s ease-out;
+      }
+
+      .wa-header-app-logo {
+        width: 38px;
+        height: 38px;
+        flex: 0 0 auto;
+        object-fit: contain;
+        border-radius: 10px;
+      }
+
+      .wa-welcome-screen {
+        min-height: 0;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 30px;
+        text-align: center;
+        background:
+          radial-gradient(circle at top, rgba(14, 165, 233, 0.10), transparent 35%),
+          linear-gradient(180deg, #eff6ff 0%, #f8fafc 100%);
+      }
+
+      .wa-welcome-logo {
+        width: 88px;
+        height: 88px;
+        object-fit: contain;
+        border-radius: 22px;
+        margin-bottom: 18px;
+        box-shadow: 0 18px 40px rgba(15, 23, 42, 0.16);
+      }
+
+      .wa-welcome-screen h1 {
+        margin: 0;
+        font-size: 28px;
+        font-weight: 900;
+        color: #0f172a;
+      }
+
+      .wa-welcome-screen p {
+        margin: 8px 0 0;
+        font-size: 16px;
+        font-weight: 700;
+        color: #0ea5e9;
+      }
+
+      .wa-welcome-screen span {
+        max-width: 380px;
+        margin-top: 12px;
+        color: #64748b;
+        font-size: 14px;
+        line-height: 1.5;
+      }
+
+      @keyframes wa-launch-pop {
+        from { opacity: 0; transform: scale(0.72); }
+        to { opacity: 1; transform: scale(1); }
+      }
+
+      @keyframes wa-launch-fade {
+        from { opacity: 0; transform: translateY(8px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+
       .wa-main {
         display: grid;
         grid-template-rows: auto auto 1fr auto;
@@ -2679,7 +2770,8 @@ export default function App() {
   const [showProfileEditor, setShowProfileEditor] = useState(false);
   const [rooms, setRooms] = useState([]);
   const [profiles, setProfiles] = useState([]);
-  const [activeRoomSlug, setActiveRoomSlug] = useState("general");
+  const [activeRoomSlug, setActiveRoomSlug] = useState("");
+  const [showLaunchScreen, setShowLaunchScreen] = useState(true);
   const [messagesByRoom, setMessagesByRoom] = useState({});
   const [messageInput, setMessageInput] = useState("");
   const [error, setError] = useState("");
@@ -3636,7 +3728,7 @@ export default function App() {
       setRooms((current) => current.filter((room) => room.slug !== roomSlug));
       if (roomSlug === activeRoomSlug) {
         const nextRoom = roomsSorted.find((room) => room.slug !== roomSlug);
-        setActiveRoomSlug(nextRoom?.slug || "general");
+        setActiveRoomSlug(nextRoom?.slug || "");
         setShowChatDetails(false);
       }
     };
@@ -4325,7 +4417,7 @@ export default function App() {
       setRooms((current) => current.filter((item) => item.slug !== roomSlug));
       if (roomSlug === activeRoomSlug) {
         const nextRoom = roomsSorted.find((item) => item.slug !== roomSlug);
-        setActiveRoomSlug(nextRoom?.slug || "general");
+        setActiveRoomSlug(nextRoom?.slug || "");
         setShowChatDetails(false);
       }
     } catch (err) {
@@ -5396,6 +5488,26 @@ export default function App() {
     });
   }
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setShowLaunchScreen(false);
+    }, 1800);
+
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  if (showLaunchScreen) {
+    return (
+      <>
+        <StyleTag />
+        <div className="wa-launch-screen" role="status" aria-label="Launching Int-Messager">
+          <img src="/icons/icon-512.png" alt="Int-Messager" className="wa-launch-logo" />
+          <div className="wa-launch-name">Int-Messager</div>
+        </div>
+      </>
+    );
+  }
+
   if (!session) {
     return (
       <>
@@ -5763,27 +5875,40 @@ export default function App() {
                 ☰
               </button>
 
-              <Avatar label={getRoomDisplayName(activeRoom, profile?.displayName, currentProfileId, profiles)} src={getRoomAvatarSrc(activeRoom)} className="header" />
+              {activeRoom ? (
+                <>
+                  <Avatar label={getRoomDisplayName(activeRoom, profile?.displayName, currentProfileId, profiles)} src={getRoomAvatarSrc(activeRoom)} className="header" />
 
-              <button type="button" className="wa-header-title-wrap clickable" onClick={() => setShowChatDetails(true)} title="View chat details">
-                <div className="wa-header-title">
-                  {getRoomDisplayName(activeRoom, profile?.displayName, currentProfileId, profiles)}
-                </div>
-                <div className="wa-header-sub">
-                  {recordingName
-                    ? `${recordingName} is recording audio…`
-                    : typingName
-                      ? `${typingName} is typing…`
-                      : activeRoomHasCall
-                        ? `${callParticipants.length || activeRoom?.activeCallParticipants?.length || 1} in call`
-                        : activeRoom?.isDirect
-                          ? "Private chat"
-                          : "Group chat"}
-                </div>
-              </button>
+                  <button type="button" className="wa-header-title-wrap clickable" onClick={() => setShowChatDetails(true)} title="View chat details">
+                    <div className="wa-header-title">
+                      {getRoomDisplayName(activeRoom, profile?.displayName, currentProfileId, profiles)}
+                    </div>
+                    <div className="wa-header-sub">
+                      {recordingName
+                        ? `${recordingName} is recording audio…`
+                        : typingName
+                          ? `${typingName} is typing…`
+                          : activeRoomHasCall
+                            ? `${callParticipants.length || activeRoom?.activeCallParticipants?.length || 1} in call`
+                            : activeRoom.isDirect
+                              ? "Private chat"
+                              : "Group chat"}
+                    </div>
+                  </button>
+                </>
+              ) : (
+                <>
+                  <img src="/icons/icon-192.png" alt="Int-Messager" className="wa-header-app-logo" />
+                  <div className="wa-header-title-wrap">
+                    <div className="wa-header-title">Int-Messager</div>
+                    <div className="wa-header-sub">Connecting with love</div>
+                  </div>
+                </>
+              )}
             </div>
 
-            <div className="wa-header-right">
+            {activeRoom ? (
+              <div className="wa-header-right">
               <button
                 type="button"
                 className={`wa-icon-btn call-action `}
@@ -5819,10 +5944,11 @@ export default function App() {
               >
                 🔍
               </button>
-            </div>
+              </div>
+            ) : null}
           </header>
 
-          {showMessageSearch ? (
+          {activeRoom && showMessageSearch ? (
             <div className="wa-message-search-wrap">
               <input
                 className="wa-search-input"
@@ -5838,7 +5964,7 @@ export default function App() {
           {recordingError ? <div className="wa-error">{recordingError}</div> : null}
           {callError ? <div className="wa-error">{callError}</div> : null}
 
-          {showChatDetails ? (
+          {activeRoom && showChatDetails ? (
             <main className="wa-details-page">
               <div className="wa-details-topbar">
                 <button type="button" className="wa-details-back" onClick={() => setShowChatDetails(false)} title="Back to chat">← Back</button>
@@ -5891,7 +6017,7 @@ export default function App() {
                 <button type="button" className="wa-danger-text-btn" onClick={() => hideChatForMe(activeRoomSlug)}>Delete chat from my list</button>
               </section>
             </main>
-          ) : (
+          ) : activeRoom ? (
             <>
           <main
             ref={messageListRef}
@@ -6118,6 +6244,13 @@ export default function App() {
             </button>
           </footer>
             </>
+          ) : (
+            <main className="wa-welcome-screen">
+              <img src="/icons/icon-192.png" alt="Int-Messager" className="wa-welcome-logo" />
+              <h1>Int-Messager</h1>
+              <p>Connecting with love</p>
+              <span>Select a conversation from the Chats tab to start messaging.</span>
+            </main>
           )}
         </section>
       </div>
