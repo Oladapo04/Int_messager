@@ -672,3 +672,102 @@ button { color: inherit; }
 .v4-auth-card{background:rgba(7,20,38,.92);border:1px solid rgba(191,219,254,.24);border-radius:28px;padding:28px;box-shadow:0 28px 80px rgba(0,0,0,.42);backdrop-filter:blur(22px)}.v4-auth-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:5px;background:#111f35;border-radius:16px;margin-bottom:24px}.v4-auth-tabs button{border:0;background:transparent;color:#bfdbfe;padding:12px;border-radius:12px;font-weight:800}.v4-auth-tabs button.active{background:#2563eb;color:#fff;box-shadow:0 8px 24px rgba(37,99,235,.32)}
 .v4-auth-card label{display:grid;gap:8px;margin:15px 0;color:#f8fafc;font-weight:750}.v4-auth-card label span{color:#94a3b8;font-weight:500}.v4-auth-card input{width:100%;border:1px solid #38506f;background:#0b1729;color:#fff;border-radius:14px;padding:14px 15px;font:inherit;outline:none}.v4-auth-card input:focus{border-color:#60a5fa;box-shadow:0 0 0 4px rgba(59,130,246,.18)}.v4-auth-submit{width:100%;margin-top:12px;border:0;border-radius:15px;padding:15px;background:linear-gradient(135deg,#2563eb,#0ea5e9);color:#fff;font-weight:900;font-size:16px}.v4-auth-error{background:#451a1a;color:#fecaca;border:1px solid #7f1d1d;border-radius:12px;padding:11px 13px}.v4-claim-note{background:#0c4a6e;color:#e0f2fe;border:1px solid #0284c7;border-radius:12px;padding:11px 13px;line-height:1.45}.v4-account-card{border-color:rgba(96,165,250,.35)!important}.v4-logout-btn{margin-top:14px!important;background:#7f1d1d!important;color:#fff!important;border-color:#ef4444!important}
 @media(max-width:760px){.v4-auth-shell{grid-template-columns:1fr;align-content:center;padding:22px}.v4-auth-brand{text-align:center}.v4-auth-brand img{width:74px;height:74px}.v4-auth-brand h1{margin-top:14px;font-size:36px}.v4-auth-brand p{font-size:16px}.v4-auth-card{padding:20px;border-radius:22px}}
+
+/* Int-Messager Version 4.1 password recovery */
+.v41-auth-heading{display:flex;align-items:flex-start;gap:13px;margin-bottom:20px}.v41-auth-heading h2{margin:0 0 5px;color:#fff;font-size:24px;line-height:1.2}.v41-auth-heading p{margin:0;color:#cbd5e1;line-height:1.45}.v41-back-link{flex:0 0 42px;width:42px;height:42px;border:1px solid #36516f;border-radius:50%;background:#10213a;color:#fff;font-size:24px;display:grid;place-items:center;cursor:pointer}.v41-back-link:hover{background:#1d4ed8;border-color:#60a5fa}.v41-forgot-link{display:block;margin:-3px 0 12px auto;border:0;background:transparent;color:#7dd3fc;font-weight:800;padding:5px 0;cursor:pointer}.v41-forgot-link:hover{text-decoration:underline;color:#bae6fd}.v41-auth-success{margin:12px 0;background:#073b2b;color:#bbf7d0;border:1px solid #16a34a;border-radius:12px;padding:12px 13px;line-height:1.45}.v41-dev-reset-link{display:block;margin:10px 0;padding:12px 13px;border-radius:12px;background:#172554;border:1px solid #3b82f6;color:#dbeafe;font-weight:800;text-align:center;text-decoration:none}.v41-dev-reset-link:hover{background:#1e3a8a;color:#fff}.v41-secondary-auth-btn{width:100%;margin-top:10px;border:1px solid #3b526f;border-radius:14px;padding:13px;background:#0d1d32;color:#e2e8f0;font-weight:800;cursor:pointer}.v41-secondary-auth-btn:hover{background:#162a45;border-color:#60a5fa}.v41-reset-account{margin:8px 0 14px;padding:12px 13px;border-radius:12px;background:#0c2742;border:1px solid #315578;color:#dbeafe}.v41-reset-account strong{color:#fff;overflow-wrap:anywhere}
+
+/* Int-Messager Version 4.2: scrollable authentication, visible settings and high-contrast surfaces */
+:root{
+  --v42-page:#071321;
+  --v42-panel:#10243a;
+  --v42-panel-strong:#152d47;
+  --v42-panel-soft:#1b3653;
+  --v42-text:#f8fafc;
+  --v42-text-secondary:#d6e3ef;
+  --v42-text-muted:#a9bfd2;
+  --v42-border:#395875;
+  --v42-accent:#38bdf8;
+  --v42-accent-strong:#2563eb;
+}
+html,body,#root{width:100%;height:100%;min-height:100%;margin:0;background:var(--v42-page);color:var(--v42-text)}
+body{overflow:hidden}
+
+/* Authentication screens must scroll on short desktop and mobile screens. */
+.v4-auth-shell{
+  height:100dvh!important;
+  min-height:100dvh!important;
+  overflow-y:auto!important;
+  overflow-x:hidden!important;
+  align-items:start!important;
+  padding-top:max(28px,env(safe-area-inset-top))!important;
+  padding-bottom:max(36px,env(safe-area-inset-bottom))!important;
+  background:
+    radial-gradient(circle at 12% 8%,rgba(14,165,233,.23),transparent 31%),
+    radial-gradient(circle at 88% 92%,rgba(79,70,229,.25),transparent 35%),
+    linear-gradient(145deg,#06111f 0%,#0b2136 45%,#102943 100%)!important;
+  color:var(--v42-text)!important;
+  scrollbar-gutter:stable;
+}
+.v4-auth-brand,.v4-auth-card{align-self:center}
+.v4-auth-card{max-height:none!important;overflow:visible!important;background:#0d2035!important;border:1px solid var(--v42-border)!important;color:var(--v42-text)!important}
+.v4-auth-card label,.v4-auth-card h1,.v4-auth-card h2,.v4-auth-card strong{color:var(--v42-text)!important}
+.v4-auth-card label span,.v41-auth-heading p{color:var(--v42-text-secondary)!important}
+.v4-auth-card input{background:#071827!important;border-color:#496985!important;color:#fff!important}
+.v4-auth-card input::placeholder{color:#a9bfd2!important;opacity:1!important}
+.v4-auth-tabs{background:#071827!important}.v4-auth-tabs button{color:#dbeafe!important}
+
+/* App backdrop: gradients are decorative only; readable content sits on opaque panels. */
+.wa-app{
+  background:
+    radial-gradient(circle at 90% 8%,rgba(37,99,235,.18),transparent 31%),
+    radial-gradient(circle at 15% 90%,rgba(14,165,233,.16),transparent 35%),
+    linear-gradient(135deg,#06111f,#0b2034 48%,#102a43)!important;
+  color:var(--v42-text)!important;
+}
+.wa-sidebar-panel,.wa-nav-rail,.wa-header,.wa-composer,.wa-settings-card,.wa-profile-card,.wa-room-card,.wa-user-card,.wa-call-log-card,.wa-home-card,.wa-details-card{
+  border-color:var(--v42-border)!important;
+}
+.wa-sidebar-panel{background:#0b1d30!important}
+.wa-nav-rail{background:#061421!important}
+.wa-header{background:#10243a!important}
+.wa-composer{background:#0b1d30!important}
+.wa-settings-card,.wa-profile-card,.wa-room-card,.wa-user-card,.wa-call-log-card,.wa-home-card,.wa-details-card{background:var(--v42-panel)!important;color:var(--v42-text)!important}
+.wa-room-card:hover,.wa-user-card:hover,.wa-call-log-card:hover,.wa-settings-btn:hover{background:var(--v42-panel-soft)!important}
+.wa-room-card.active{background:#174b73!important;border-color:#53c8ff!important}
+
+/* Explicit text contrast across every major app surface. */
+.wa-app h1,.wa-app h2,.wa-app h3,.wa-app h4,
+.wa-brand,.wa-brand span,.wa-room-title,.wa-user-name,.wa-header-title,
+.wa-settings-title,.wa-section-label,.wa-home-room-name,.wa-home-profile-name,
+.wa-details-card-title,.wa-profile-text,.wa-call-person-name,.wa-bubble,
+.wa-message-sender,.wa-modal-title,.wa-account-title{color:var(--v42-text)!important}
+.wa-room-sub,.wa-user-sub,.wa-header-sub,.wa-profile-sub,.wa-settings-note,
+.wa-home-room-preview,.wa-home-profile-status,.wa-message-meta,.wa-call-log-status,
+.wa-empty,.wa-empty.dark,.wa-details-card p{color:var(--v42-text-secondary)!important}
+.wa-search-input,.wa-select,.wa-message-input,.wa-composer textarea,.wa-modal input,.wa-modal select{
+  background:#071827!important;color:#fff!important;border-color:#496985!important;
+}
+.wa-search-input::placeholder,.wa-message-input::placeholder,.wa-composer textarea::placeholder,.wa-modal input::placeholder{color:#b6c8d8!important;opacity:1!important}
+.wa-icon-btn,.wa-settings-btn,.wa-side-tab,.wa-rail-btn,.wa-home-action,.wa-details-actions button{color:#f8fafc!important;border-color:#496985!important}
+.wa-settings-label{color:#f8fafc!important;font-weight:750!important}
+.wa-settings-label option,.wa-select option{background:#0b1d30!important;color:#fff!important}
+.wa-bubble:not(.mine){background:#f8fafc!important;color:#122033!important;border:1px solid #d7e3ee!important}
+.wa-message-row.mine .wa-bubble,.wa-bubble.mine{background:#2878c8!important;color:#fff!important;border:1px solid #57a8ef!important}
+.wa-message-row.mine .wa-message-meta,.wa-message-row.mine .wa-message-action{color:#eaf5ff!important}
+.wa-message-action{color:#173451!important;font-weight:700!important}
+
+/* Clearly discoverable profile editor in Settings. */
+.v42-profile-summary{display:flex;align-items:center;gap:14px;margin-bottom:14px}
+.v42-profile-summary-copy{min-width:0;display:grid;gap:4px}
+.v42-profile-summary .wa-avatar.large{width:72px!important;height:72px!important;flex:0 0 72px!important}
+.v42-edit-profile-btn{width:100%!important;margin:4px 0 12px!important;background:#175b91!important;border-color:#53c8ff!important;font-weight:850!important}
+.v42-edit-profile-btn:hover{background:#1e73b2!important}
+.wa-avatar-upload{color:#fff!important;background:#102b46!important;border:1px dashed #64c8f5!important}
+.wa-avatar-upload span{color:#e7f7ff!important;font-weight:800!important}
+
+@media(max-width:760px){
+  .v4-auth-shell{display:block!important;padding:18px 14px calc(32px + env(safe-area-inset-bottom))!important}
+  .v4-auth-brand{padding-top:4px;margin-bottom:18px}
+  .v4-auth-card{width:100%!important;margin:0 auto 24px!important;padding:19px!important}
+  .v42-profile-summary .wa-avatar.large{width:62px!important;height:62px!important;flex-basis:62px!important}
+}

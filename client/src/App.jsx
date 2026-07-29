@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { buildRtcConfig, safeSetRemoteDescription, safeRestartIce, replaceOutgoingVideoTrack } from "./call/webrtcUtils";
 import io from "socket.io-client";
 import "./Version3.css";
+import "./themes.css";
 
 const API_BASE = "";
 const socket = io(API_BASE, { autoConnect: true });
@@ -24,6 +25,7 @@ const CHAT_PREFS_KEY = "int_messager_chat_prefs_v1";
 const PWA_BEFORE_INSTALL_PROMPT = "beforeinstallprompt";
 const AUTH_TOKEN_KEY = "int_messager_auth_token_v4";
 const ACCOUNT_INSTALL_ID_KEY = "int_messager_account_install_id_v4";
+const DESKTOP_SIDEBAR_WIDTH_KEY = "int_messager_desktop_sidebar_width_v44";
 
 function getAuthToken() { return localStorage.getItem(AUTH_TOKEN_KEY) || ""; }
 function authFetch(input, init = {}) {
@@ -59,10 +61,11 @@ function readJsonStorage(key, fallback = {}) {
 function writeJsonStorage(key, value) { localStorage.setItem(key, JSON.stringify(value || {})); }
 function loadChatPrefs() {
   return {
-    appColor: "#0f172a",
-    accentColor: "#22c55e",
-    wallpaper: "#dbe4ea",
-    chatColor: "#dcfce7",
+    theme: "light-grey",
+    appColor: "#f1f3f5",
+    accentColor: "#1d4ed8",
+    wallpaper: "#e9edf2",
+    chatColor: "#dbeafe",
     bubbleShape: "rounded",
     fontSize: "normal",
     ...readJsonStorage(CHAT_PREFS_KEY, {}),
@@ -3193,42 +3196,92 @@ function MessageBubble({
 }
 
 function AuthScreen({ onAuthenticated, legacyInstallId }) {
-  const [mode, setMode] = useState("login");
+  const initialResetToken = useMemo(() => new URLSearchParams(window.location.search).get("resetToken") || "", []);
+  const initialResetEmail = useMemo(() => new URLSearchParams(window.location.search).get("email") || "", []);
+  const [mode, setMode] = useState(initialResetToken ? "reset" : "login");
   const [displayName, setDisplayName] = useState("");
-  const [identifier, setIdentifier] = useState("");
+  const [identifier, setIdentifier] = useState(initialResetEmail);
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [authError, setAuthError] = useState("");
+  const [authMessage, setAuthMessage] = useState("");
+  const [developmentResetUrl, setDevelopmentResetUrl] = useState("");
+
+  function changeMode(nextMode) {
+    setMode(nextMode);
+    setAuthError("");
+    setAuthMessage("");
+    setPassword("");
+    setConfirmPassword("");
+    setDevelopmentResetUrl("");
+  }
 
   async function submit(event) {
     event.preventDefault();
     setAuthError("");
-    if (mode === "register" && password !== confirmPassword) {
+    setAuthMessage("");
+    setDevelopmentResetUrl("");
+
+    if ((mode === "register" || mode === "reset") && password !== confirmPassword) {
       setAuthError("Passwords do not match");
       return;
     }
+
     setBusy(true);
     try {
-      const endpoint = mode === "register" ? "/api/auth/register" : "/api/auth/login";
-      const body = mode === "register"
-        ? { displayName, email: identifier, phone, password, legacyInstallId }
-        : { identifier, password };
+      let endpoint = "/api/auth/login";
+      let body = { identifier, password };
+
+      if (mode === "register") {
+        endpoint = "/api/auth/register";
+        body = { displayName, email: identifier, phone, password, legacyInstallId };
+      } else if (mode === "forgot") {
+        endpoint = "/api/auth/forgot-password";
+        body = { identifier };
+      } else if (mode === "reset") {
+        endpoint = "/api/auth/reset-password";
+        body = { token: initialResetToken, newPassword: password };
+      }
+
       const response = await window.fetch(`${API_BASE}${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
       const payload = await response.json();
-      if (!response.ok || !payload.success) throw new Error(payload.error || "Authentication failed");
+      if (!response.ok || !payload.success) throw new Error(payload.error || "Request failed");
+
+      if (mode === "forgot") {
+        setAuthMessage(payload.message || "Check your email for password reset instructions.");
+        setDevelopmentResetUrl(payload.developmentResetUrl || "");
+        return;
+      }
+
+      if (mode === "reset") {
+        window.history.replaceState({}, "", window.location.pathname);
+        setIdentifier(initialResetEmail);
+        setPassword("");
+        setConfirmPassword("");
+        setMode("login");
+        setAuthMessage(payload.message || "Password reset successful. You can now sign in.");
+        return;
+      }
+
       onAuthenticated(payload.data);
     } catch (error) {
-      setAuthError(error.message || "Authentication failed");
+      setAuthError(error.message || "Request failed");
     } finally {
       setBusy(false);
     }
   }
+
+  const title = mode === "forgot"
+    ? "Recover your account"
+    : mode === "reset"
+      ? "Choose a new password"
+      : "";
 
   return (
     <div className="v4-auth-shell">
@@ -3238,20 +3291,45 @@ function AuthScreen({ onAuthenticated, legacyInstallId }) {
         <p>Connecting with love, on every device.</p>
       </div>
       <form className="v4-auth-card" onSubmit={submit}>
-        <div className="v4-auth-tabs">
-          <button type="button" className={mode === "login" ? "active" : ""} onClick={() => setMode("login")}>Sign in</button>
-          <button type="button" className={mode === "register" ? "active" : ""} onClick={() => setMode("register")}>Create account</button>
-        </div>
+        {mode === "login" || mode === "register" ? (
+          <div className="v4-auth-tabs">
+            <button type="button" className={mode === "login" ? "active" : ""} onClick={() => changeMode("login")}>Sign in</button>
+            <button type="button" className={mode === "register" ? "active" : ""} onClick={() => changeMode("register")}>Create account</button>
+          </div>
+        ) : (
+          <div className="v41-auth-heading">
+            <button type="button" className="v41-back-link" onClick={() => changeMode("login")} aria-label="Back to sign in">←</button>
+            <div><h2>{title}</h2><p>{mode === "forgot" ? "Enter the email address or phone number connected to your account." : "Your new password must contain at least eight characters."}</p></div>
+          </div>
+        )}
+
         {mode === "register" ? (
           <label>Display name<input value={displayName} onChange={(e) => setDisplayName(e.target.value)} required maxLength={30} autoComplete="name" /></label>
         ) : null}
-        <label>{mode === "login" ? "Email or phone number" : "Email address"}<input type={mode === "register" ? "email" : "text"} value={identifier} onChange={(e) => setIdentifier(e.target.value)} required autoComplete={mode === "login" ? "username" : "email"} /></label>
+
+        {mode !== "reset" ? (
+          <label>{mode === "login" || mode === "forgot" ? "Email or phone number" : "Email address"}<input type={mode === "register" ? "email" : "text"} value={identifier} onChange={(e) => setIdentifier(e.target.value)} required autoComplete={mode === "login" ? "username" : "email"} /></label>
+        ) : initialResetEmail ? <div className="v41-reset-account">Resetting password for <strong>{initialResetEmail}</strong></div> : null}
+
         {mode === "register" ? <label>Phone number <span>(optional)</span><input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel" /></label> : null}
-        <label>Password<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} autoComplete={mode === "login" ? "current-password" : "new-password"} /></label>
-        {mode === "register" ? <label>Confirm password<input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required minLength={8} autoComplete="new-password" /></label> : null}
+
+        {mode === "login" || mode === "register" || mode === "reset" ? (
+          <label>{mode === "reset" ? "New password" : "Password"}<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} autoComplete={mode === "login" ? "current-password" : "new-password"} /></label>
+        ) : null}
+
+        {mode === "register" || mode === "reset" ? <label>Confirm password<input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required minLength={8} autoComplete="new-password" /></label> : null}
+
+        {mode === "login" ? <button type="button" className="v41-forgot-link" onClick={() => changeMode("forgot")}>Forgot password?</button> : null}
         {mode === "register" && legacyInstallId ? <div className="v4-claim-note">Your current device profile and chat history will be linked to this account.</div> : null}
-        {authError ? <div className="v4-auth-error">{authError}</div> : null}
-        <button className="v4-auth-submit" type="submit" disabled={busy}>{busy ? "Please wait…" : mode === "login" ? "Sign in" : "Create account"}</button>
+        {authError ? <div className="v4-auth-error" role="alert">{authError}</div> : null}
+        {authMessage ? <div className="v41-auth-success" role="status">{authMessage}</div> : null}
+        {developmentResetUrl ? <a className="v41-dev-reset-link" href={developmentResetUrl}>Open development reset link</a> : null}
+
+        <button className="v4-auth-submit" type="submit" disabled={busy}>
+          {busy ? "Please wait…" : mode === "login" ? "Sign in" : mode === "register" ? "Create account" : mode === "forgot" ? "Send reset instructions" : "Reset password"}
+        </button>
+
+        {mode === "forgot" ? <button type="button" className="v41-secondary-auth-btn" onClick={() => changeMode("login")}>Return to sign in</button> : null}
       </form>
     </div>
   );
@@ -3299,6 +3377,11 @@ export default function App() {
   const [showChatDetails, setShowChatDetails] = useState(false);
   const [unreadCounts, setUnreadCounts] = useState({});
   const [sidebarMode, setSidebarMode] = useState("chats");
+  const [desktopSidebarWidth, setDesktopSidebarWidth] = useState(() => {
+    const savedWidth = Number(localStorage.getItem(DESKTOP_SIDEBAR_WIDTH_KEY));
+    return Number.isFinite(savedWidth) && savedWidth >= 440 && savedWidth <= 620 ? savedWidth : 520;
+  });
+  const [isResizingSidebar, setIsResizingSidebar] = useState(false);
   const [chatPrefs, setChatPrefs] = useState(loadChatPrefs);
   const [roomContextMenu, setRoomContextMenu] = useState(null);
 
@@ -6048,6 +6131,31 @@ export default function App() {
     return () => window.clearTimeout(timer);
   }, []);
 
+  useEffect(() => {
+    if (!isResizingSidebar) return undefined;
+
+    const handlePointerMove = (event) => {
+      setDesktopSidebarWidth(Math.min(620, Math.max(440, event.clientX)));
+    };
+    const stopResizing = () => {
+      setIsResizingSidebar(false);
+      document.body.classList.remove("wa-resizing-sidebar");
+    };
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", stopResizing, { once: true });
+    window.addEventListener("pointercancel", stopResizing, { once: true });
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", stopResizing);
+      window.removeEventListener("pointercancel", stopResizing);
+    };
+  }, [isResizingSidebar]);
+
+  useEffect(() => {
+    localStorage.setItem(DESKTOP_SIDEBAR_WIDTH_KEY, String(Math.round(desktopSidebarWidth)));
+  }, [desktopSidebarWidth]);
+
   if (showLaunchScreen) {
     return (
       <>
@@ -6936,7 +7044,7 @@ export default function App() {
 
       {showSidebar ? <div className="wa-mobile-overlay" onClick={() => setShowSidebar(false)} /> : null}
 
-      <div className={`wa-app ${activeRoom ? "has-active-chat" : "no-active-chat"} bubble-${chatPrefs.bubbleShape} font-${chatPrefs.fontSize}`} style={{ "--app-color": chatPrefs.appColor, "--accent-color": chatPrefs.accentColor, "--chat-wallpaper": chatPrefs.wallpaper, "--chat-color": chatPrefs.chatColor }}>
+      <div data-theme={chatPrefs.theme || "light-grey"} className={`wa-app ${activeRoom ? "has-active-chat" : "no-active-chat"} bubble-${chatPrefs.bubbleShape} font-${chatPrefs.fontSize}`} style={{ "--app-color": chatPrefs.appColor, "--accent-color": chatPrefs.accentColor, "--chat-wallpaper": chatPrefs.wallpaper, "--chat-color": chatPrefs.chatColor, "--desktop-sidebar-width": `${desktopSidebarWidth}px` }}>
         <aside className={`wa-sidebar ${showSidebar ? "open" : ""}`}>
           <nav className="wa-nav-rail" aria-label="Main navigation">
             <button type="button" className="wa-rail-logo" title="Home" onClick={() => { setActiveRoomSlug(""); setShowChatDetails(false); }}>
@@ -7174,8 +7282,21 @@ export default function App() {
             <>
               <div className="wa-section-label">Account</div>
               <div className="wa-settings-card v4-account-card">
-                <div className="wa-settings-title">{profile?.displayName}</div>
-                <div className="wa-settings-note">{profile?.email || profile?.phone || "Signed-in account"}</div>
+                <div className="v42-profile-summary">
+                  <Avatar label={profile?.displayName || "Profile"} src={profile?.avatarUrl} className="large" />
+                  <div className="v42-profile-summary-copy">
+                    <div className="wa-settings-title">{profile?.displayName}</div>
+                    <div className="wa-settings-note">{profile?.email || profile?.phone || "Signed-in account"}</div>
+                    <div className="wa-settings-note">{profile?.profileStatus || "Available now"}</div>
+                  </div>
+                </div>
+                <button className="wa-settings-btn v42-edit-profile-btn" type="button" onClick={() => {
+                  setDisplayNameInput(profile?.displayName || "");
+                  setProfileStatusInput(profile?.profileStatus || "Available now");
+                  setProfileAvatarPreview(profile?.avatarUrl || "");
+                  setProfileAvatarFile(null);
+                  setShowProfileEditor(true);
+                }}>Change profile picture and details</button>
                 <div className="wa-settings-note">This profile is synced and can be recovered by signing in on another device.</div>
                 <button className="wa-settings-btn v4-logout-btn" type="button" onClick={handleLogout}>Sign out on this device</button>
               </div>
@@ -7184,10 +7305,27 @@ export default function App() {
                 <div className="wa-settings-title">Personalize this device</div>
                 <button className="wa-settings-btn" type="button" onClick={requestBrowserNotifications}>Enable call/message notifications</button>
                 <div className="wa-settings-note">Allows call and message alerts while this app is minimized, in another tab, or behind another window.</div>
-                <label className="wa-settings-label">App color <input className="wa-color-input" type="color" value={chatPrefs.appColor} onChange={(e) => updateChatPref("appColor", e.target.value)} /></label>
-                <label className="wa-settings-label">Accent color <input className="wa-color-input" type="color" value={chatPrefs.accentColor} onChange={(e) => updateChatPref("accentColor", e.target.value)} /></label>
-                <label className="wa-settings-label">Chat color <input className="wa-color-input" type="color" value={chatPrefs.chatColor} onChange={(e) => updateChatPref("chatColor", e.target.value)} /></label>
-                <label className="wa-settings-label">Wallpaper <input className="wa-color-input" type="color" value={chatPrefs.wallpaper} onChange={(e) => updateChatPref("wallpaper", e.target.value)} /></label>
+                <label className="wa-settings-label">Theme
+                  <select className="wa-select" value={chatPrefs.theme || "light-grey"} onChange={(e) => updateChatPref("theme", e.target.value)}>
+                    <option value="light-grey">Light Grey — recommended</option>
+                    <option value="bright-white">Bright White</option>
+                    <option value="soft-blue">Soft Blue</option>
+                    <option value="high-contrast">High Contrast</option>
+                  </select>
+                </label>
+                <div className="theme-preview-grid" aria-label="Theme previews">
+                  {[
+                    ["light-grey", "Light Grey", "#eef1f4", "#ffffff", "#111827"],
+                    ["bright-white", "Bright White", "#ffffff", "#f3f4f6", "#0b1220"],
+                    ["soft-blue", "Soft Blue", "#eaf2fb", "#ffffff", "#10233f"],
+                    ["high-contrast", "High Contrast", "#e5e7eb", "#ffffff", "#000000"],
+                  ].map(([value, label, page, card, text]) => (
+                    <button key={value} type="button" className={`theme-preview ${chatPrefs.theme === value ? "active" : ""}`} onClick={() => updateChatPref("theme", value)} aria-pressed={chatPrefs.theme === value}>
+                      <span className="theme-preview-swatch" style={{ background: page }}><i style={{ background: card, color: text }}>Aa</i></span>
+                      <strong>{label}</strong>
+                    </button>
+                  ))}
+                </div>
                 <label className="wa-settings-label">Bubble style <select className="wa-select" value={chatPrefs.bubbleShape} onChange={(e) => updateChatPref("bubbleShape", e.target.value)}><option value="rounded">Rounded</option><option value="soft">Soft</option><option value="square">Compact square</option></select></label>
                 <label className="wa-settings-label">Font size <select className="wa-select" value={chatPrefs.fontSize} onChange={(e) => updateChatPref("fontSize", e.target.value)}><option value="small">Small</option><option value="normal">Normal</option><option value="large">Large</option></select></label>
               </div>
@@ -7213,6 +7351,21 @@ export default function App() {
           )}
           </div>
         </aside>
+
+        <button
+          type="button"
+          className={`wa-desktop-resizer ${isResizingSidebar ? "active" : ""}`}
+          aria-label="Resize navigation and settings panel"
+          title="Drag to resize panel. Double-click to reset."
+          onPointerDown={(event) => {
+            if (window.innerWidth <= 900) return;
+            event.preventDefault();
+            setIsResizingSidebar(true);
+            document.body.classList.add("wa-resizing-sidebar");
+            event.currentTarget.setPointerCapture?.(event.pointerId);
+          }}
+          onDoubleClick={() => setDesktopSidebarWidth(520)}
+        />
 
         <section className="wa-main">
           <header className="wa-header">

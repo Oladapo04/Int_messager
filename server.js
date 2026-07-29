@@ -8,6 +8,7 @@ const multer = require("multer");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
+const nodemailer = require("nodemailer");
 
 const cloudinary = require("cloudinary").v2;
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
@@ -86,6 +87,14 @@ const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || "";
 const VAPID_SUBJECT = process.env.VAPID_SUBJECT || "mailto:admin@example.com";
 const JWT_SECRET = process.env.JWT_SECRET || "change-this-in-production";
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "30d";
+const APP_BASE_URL = String(process.env.APP_BASE_URL || `http://localhost:${PORT}`).replace(/\/$/, "");
+const PASSWORD_RESET_EXPIRES_MINUTES = Math.max(5, Number(process.env.PASSWORD_RESET_EXPIRES_MINUTES || 20));
+const SMTP_HOST = process.env.SMTP_HOST || "";
+const SMTP_PORT = Number(process.env.SMTP_PORT || 587);
+const SMTP_SECURE = String(process.env.SMTP_SECURE || "false").toLowerCase() === "true";
+const SMTP_USER = process.env.SMTP_USER || "";
+const SMTP_PASS = process.env.SMTP_PASS || "";
+const SMTP_FROM = process.env.SMTP_FROM || "Int-Messager <no-reply@int-messager.local>";
 
 if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
   webPush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
@@ -372,6 +381,10 @@ const profileSchema = new mongoose.Schema(
     passwordHash: { type: String, default: "" },
     accountVerified: { type: Boolean, default: true },
     lastLoginAt: { type: Date, default: null },
+    passwordResetTokenHash: { type: String, default: "", select: false },
+    passwordResetExpiresAt: { type: Date, default: null, select: false },
+    passwordResetRequestedAt: { type: Date, default: null },
+    passwordChangedAt: { type: Date, default: null },
     displayName: { type: String, default: "", trim: true },
     profileStatus: { type: String, default: "Available now", trim: true },
     avatarUrl: { type: String, default: "" },
@@ -526,6 +539,86 @@ function normalizeEmail(value) {
 
 function normalizePhone(value) {
   return String(value || "").replace(/[^+\d]/g, "").trim();
+}
+
+const passwordResetAttempts = new Map();
+
+function passwordResetRateKey(req, identifier = "") {
+  return `${req.ip || req.socket?.remoteAddress || "unknown"}:${normalizeEmail(identifier) || normalizePhone(identifier)}`;
+}
+
+function consumePasswordResetAttempt(req, identifier) {
+  const key = passwordResetRateKey(req, identifier);
+  const now = Date.now();
+  const windowMs = 15 * 60 * 1000;
+  const maxAttempts = 5;
+  const current = passwordResetAttempts.get(key);
+  if (!current || now - current.startedAt > windowMs) {
+    passwordResetAttempts.set(key, { startedAt: now, count: 1 });
+    return true;
+  }
+  if (current.count >= maxAttempts) return false;
+  current.count += 1;
+  return true;
+}
+
+function createPasswordResetToken() {
+  const token = crypto.randomBytes(32).toString("hex");
+  return {
+    token,
+    tokenHash: crypto.createHash("sha256").update(token).digest("hex"),
+  };
+}
+
+function hashPasswordResetToken(token) {
+  return crypto.createHash("sha256").update(String(token || "")).digest("hex");
+}
+
+function hasUsableSmtpConfiguration() {
+  const host = String(SMTP_HOST || "").trim().toLowerCase();
+  const user = String(SMTP_USER || "").trim().toLowerCase();
+  const pass = String(SMTP_PASS || "").trim();
+  if (!host || !user || !pass) return false;
+  if (host === "smtp.example.com" || host.endsWith(".example.com")) return false;
+  if (user.includes("your-smtp") || user.includes("example.com")) return false;
+  if (pass === "your-smtp-password" || pass.toLowerCase().includes("replace")) return false;
+  return true;
+}
+
+function getMailTransporter() {
+  if (!hasUsableSmtpConfiguration()) return null;
+  return nodemailer.createTransport({
+    host: SMTP_HOST,
+    port: SMTP_PORT,
+    secure: SMTP_SECURE,
+    auth: { user: SMTP_USER, pass: SMTP_PASS },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
+  });
+}
+
+async function sendPasswordResetEmail(profile, resetUrl) {
+  const transporter = getMailTransporter();
+  const displayName = profile.displayName || "there";
+  const subject = "Reset your Int-Messager password";
+  const text = `Hello ${displayName},\n\nUse this link to reset your Int-Messager password:\n${resetUrl}\n\nThis link expires in ${PASSWORD_RESET_EXPIRES_MINUTES} minutes. If you did not request this, you can ignore this email.`;
+  const html = `<div style="font-family:Arial,sans-serif;line-height:1.6;color:#0f172a"><h2>Reset your Int-Messager password</h2><p>Hello ${displayName},</p><p>Use the button below to choose a new password.</p><p><a href="${resetUrl}" style="display:inline-block;padding:12px 18px;background:#2563eb;color:#fff;text-decoration:none;border-radius:10px;font-weight:700">Reset password</a></p><p>This link expires in ${PASSWORD_RESET_EXPIRES_MINUTES} minutes.</p><p>If you did not request this, you can ignore this email.</p></div>`;
+  if (!transporter) {
+    console.log("\n[DEV PASSWORD RESET LINK]\n" + resetUrl + "\n");
+    return { delivered: false, developmentPreview: true };
+  }
+  try {
+    await transporter.sendMail({ from: SMTP_FROM, to: profile.email, subject, text, html });
+    return { delivered: true, developmentPreview: false };
+  } catch (error) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("SMTP delivery failed; using development reset link instead:", error.message);
+      console.log("\n[DEV PASSWORD RESET LINK]\n" + resetUrl + "\n");
+      return { delivered: false, developmentPreview: true };
+    }
+    throw error;
+  }
 }
 
 function authResponse(profile) {
@@ -947,6 +1040,68 @@ app.post("/api/auth/register", async (req, res) => {
   }
 });
 
+app.post("/api/auth/forgot-password", async (req, res) => {
+  const genericMessage = "If an account matches those details, password reset instructions have been sent.";
+  try {
+    const identifier = String(req.body.identifier || "").trim();
+    if (!identifier) return res.status(400).json({ success: false, error: "Email or phone number is required" });
+    if (!consumePasswordResetAttempt(req, identifier)) {
+      return res.status(429).json({ success: false, error: "Too many reset attempts. Please wait 15 minutes and try again." });
+    }
+
+    const email = normalizeEmail(identifier);
+    const phone = normalizePhone(identifier);
+    const profile = await Profile.findOne({ $or: [{ email }, { phone }] }).select("+passwordResetTokenHash +passwordResetExpiresAt");
+
+    if (!profile || !profile.email) {
+      return res.json({ success: true, message: genericMessage });
+    }
+
+    const { token, tokenHash } = createPasswordResetToken();
+    profile.passwordResetTokenHash = tokenHash;
+    profile.passwordResetExpiresAt = new Date(Date.now() + PASSWORD_RESET_EXPIRES_MINUTES * 60 * 1000);
+    profile.passwordResetRequestedAt = new Date();
+    await profile.save();
+
+    const resetUrl = `${APP_BASE_URL}/?resetToken=${encodeURIComponent(token)}&email=${encodeURIComponent(profile.email)}`;
+    const delivery = await sendPasswordResetEmail(profile, resetUrl);
+    const payload = { success: true, message: genericMessage };
+    if (process.env.NODE_ENV !== "production" && delivery.developmentPreview) payload.developmentResetUrl = resetUrl;
+    return res.json(payload);
+  } catch (error) {
+    console.error("auth/forgot-password error:", error);
+    return res.json({ success: true, message: genericMessage });
+  }
+});
+
+app.post("/api/auth/reset-password", async (req, res) => {
+  try {
+    const token = String(req.body.token || "").trim();
+    const newPassword = String(req.body.newPassword || "");
+    if (!token) return res.status(400).json({ success: false, error: "Reset token is required" });
+    if (newPassword.length < 8) return res.status(400).json({ success: false, error: "Password must be at least 8 characters" });
+
+    const tokenHash = hashPasswordResetToken(token);
+    const profile = await Profile.findOne({
+      passwordResetTokenHash: tokenHash,
+      passwordResetExpiresAt: { $gt: new Date() },
+    }).select("+passwordResetTokenHash +passwordResetExpiresAt");
+
+    if (!profile) return res.status(400).json({ success: false, error: "This reset link is invalid or has expired" });
+
+    profile.passwordHash = await bcrypt.hash(newPassword, 12);
+    profile.passwordResetTokenHash = "";
+    profile.passwordResetExpiresAt = null;
+    profile.passwordChangedAt = new Date();
+    await profile.save();
+
+    return res.json({ success: true, message: "Password reset successful. You can now sign in." });
+  } catch (error) {
+    console.error("auth/reset-password error:", error);
+    return res.status(500).json({ success: false, error: "Failed to reset password" });
+  }
+});
+
 app.post("/api/auth/login", async (req, res) => {
   try {
     const identifier = String(req.body.identifier || "").trim();
@@ -989,6 +1144,9 @@ app.post("/api/auth/change-password", async (req, res) => {
     }
     if (newPassword.length < 8) return res.status(400).json({ success: false, error: "New password must be at least 8 characters" });
     profile.passwordHash = await bcrypt.hash(newPassword, 12);
+    profile.passwordResetTokenHash = "";
+    profile.passwordResetExpiresAt = null;
+    profile.passwordChangedAt = new Date();
     await profile.save();
     return res.json({ success: true });
   } catch (error) {
