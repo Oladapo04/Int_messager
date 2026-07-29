@@ -6724,6 +6724,78 @@ export default function App() {
             background: transparent !important;
           }
         }
+
+
+        /* Desktop conversation alignment: full workspace, not a centred feed */
+        @media (min-width: 901px) {
+          .wa-main {
+            display: grid !important;
+            grid-template-rows: auto minmax(0, 1fr) auto !important;
+            overflow: hidden !important;
+          }
+          .wa-header { grid-row: 1 !important; }
+          .wa-chat,
+          .wa-messages {
+            grid-row: 2 !important;
+            width: 100% !important;
+            max-width: none !important;
+            min-width: 0 !important;
+            padding: 24px 34px 112px !important;
+          }
+          .wa-message-row {
+            width: 100% !important;
+            max-width: none !important;
+            margin-left: 0 !important;
+            margin-right: 0 !important;
+          }
+          .wa-message-row:not(.mine) {
+            justify-content: flex-start !important;
+            padding-right: 24% !important;
+          }
+          .wa-message-row.mine {
+            justify-content: flex-end !important;
+            padding-left: 24% !important;
+          }
+          .wa-bubble {
+            width: auto !important;
+            max-width: min(720px, 72%) !important;
+          }
+          .wa-message-row.mine .wa-bubble { margin-left: auto !important; }
+          .wa-message-row:not(.mine) .wa-bubble { margin-right: auto !important; }
+          .wa-composer {
+            left: 24px !important;
+            right: 24px !important;
+            bottom: 18px !important;
+            transform: none !important;
+            width: auto !important;
+            max-width: none !important;
+          }
+          .wa-mobile-back-btn { display: none !important; }
+          .wa-close-chat-btn { display: grid !important; }
+        }
+
+        /* Mobile chat navigation: back replaces the menu icon */
+        @media (max-width: 900px) {
+          .wa-app.has-active-chat .wa-desktop-menu-btn { display: none !important; }
+          .wa-app.has-active-chat .wa-mobile-back-btn {
+            display: grid !important;
+            flex: 0 0 40px !important;
+            width: 40px !important;
+            height: 40px !important;
+            place-items: center !important;
+            padding: 0 !important;
+            border: 0 !important;
+            background: transparent !important;
+            color: #0f172a !important;
+            font-size: 27px !important;
+            line-height: 1 !important;
+          }
+          .wa-app.has-active-chat .wa-mobile-back-btn:hover,
+          .wa-app.has-active-chat .wa-mobile-back-btn:active {
+            background: #eef2f7 !important;
+          }
+          .wa-app.has-active-chat .wa-close-chat-btn { display: none !important; }
+        }
       `}</style>
 
       {showSidebar ? <div className="wa-mobile-overlay" onClick={() => setShowSidebar(false)} /> : null}
@@ -7004,12 +7076,32 @@ export default function App() {
             <div className="wa-header-left">
               <button
                 type="button"
-                className="wa-icon-btn"
+                className="wa-icon-btn wa-desktop-menu-btn"
                 onClick={() => setShowSidebar((v) => !v)}
                 title="Open sidebar"
+                aria-label="Open sidebar"
               >
                 ☰
               </button>
+
+              {activeRoom ? (
+                <button
+                  type="button"
+                  className="wa-icon-btn wa-mobile-back-btn"
+                  onClick={() => {
+                    setActiveRoomSlug("");
+                    setReplyTo(null);
+                    setShowChatDetails(false);
+                    setShowMessageSearch(false);
+                    setSidebarMode("chats");
+                    setShowSidebar(false);
+                  }}
+                  title="Back to chats"
+                  aria-label="Back to chats"
+                >
+                  ←
+                </button>
+              ) : null}
 
               {activeRoom ? (
                 <>
