@@ -884,15 +884,22 @@ function StyleTag() {
       .wa-welcome-screen {
         min-height: 0;
         height: 100%;
+        overflow-y: auto;
+        padding: 28px;
+        background:
+          radial-gradient(circle at top, rgba(14, 165, 233, 0.10), transparent 35%),
+          linear-gradient(180deg, #eff6ff 0%, #f8fafc 100%);
+      }
+
+      .wa-welcome-content {
+        width: min(100%, 760px);
+        min-height: 100%;
+        margin: 0 auto;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        padding: 30px;
         text-align: center;
-        background:
-          radial-gradient(circle at top, rgba(14, 165, 233, 0.10), transparent 35%),
-          linear-gradient(180deg, #eff6ff 0%, #f8fafc 100%);
       }
 
       .wa-welcome-logo {
@@ -902,6 +909,7 @@ function StyleTag() {
         border-radius: 22px;
         margin-bottom: 18px;
         box-shadow: 0 18px 40px rgba(15, 23, 42, 0.16);
+        animation: wa-welcome-arrive 0.7s cubic-bezier(.2,.8,.2,1);
       }
 
       .wa-welcome-screen h1 {
@@ -911,19 +919,123 @@ function StyleTag() {
         color: #0f172a;
       }
 
-      .wa-welcome-screen p {
+      .wa-welcome-tagline {
         margin: 8px 0 0;
         font-size: 16px;
         font-weight: 700;
         color: #0ea5e9;
       }
 
-      .wa-welcome-screen span {
-        max-width: 380px;
-        margin-top: 12px;
+      .wa-welcome-intro {
+        max-width: 430px;
+        margin: 12px 0 0;
         color: #64748b;
         font-size: 14px;
         line-height: 1.5;
+      }
+
+      .wa-home-profile {
+        width: min(100%, 540px);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-top: 22px;
+        padding: 12px 14px;
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.88);
+        box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+        text-align: left;
+      }
+
+      .wa-home-profile-copy { min-width: 0; flex: 1; }
+      .wa-home-profile-name { font-weight: 900; color: #0f172a; }
+      .wa-home-profile-status { margin-top: 3px; color: #64748b; font-size: 13px; }
+
+      .wa-home-actions {
+        width: min(100%, 540px);
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+        margin-top: 16px;
+      }
+
+      .wa-home-action {
+        min-height: 72px;
+        border: 0;
+        border-radius: 16px;
+        padding: 12px 10px;
+        background: #ffffff;
+        color: #0f172a;
+        box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
+        cursor: pointer;
+        font-weight: 800;
+      }
+
+      .wa-home-action:hover { transform: translateY(-1px); }
+      .wa-home-action-icon { display: block; margin-bottom: 6px; font-size: 20px; }
+
+      .wa-home-section {
+        width: min(100%, 540px);
+        margin-top: 20px;
+        text-align: left;
+      }
+
+      .wa-home-section-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 9px;
+        color: #334155;
+        font-size: 13px;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+
+      .wa-home-count {
+        min-width: 24px;
+        padding: 3px 8px;
+        border-radius: 999px;
+        background: var(--accent-color, #22c55e);
+        color: #fff;
+        text-align: center;
+        font-size: 12px;
+      }
+
+      .wa-home-room-list { display: grid; gap: 8px; }
+
+      .wa-home-room {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        border: 1px solid rgba(148, 163, 184, 0.20);
+        border-radius: 16px;
+        padding: 10px 12px;
+        background: rgba(255,255,255,0.9);
+        cursor: pointer;
+        text-align: left;
+      }
+
+      .wa-home-room:hover { background: #fff; }
+      .wa-home-room-copy { min-width: 0; flex: 1; }
+      .wa-home-room-name { color: #0f172a; font-weight: 850; }
+      .wa-home-room-preview { margin-top: 3px; overflow: hidden; color: #64748b; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+      .wa-home-room-unread { min-width: 24px; padding: 4px 7px; border-radius: 999px; background: var(--accent-color, #22c55e); color: white; font-size: 11px; font-weight: 900; text-align: center; }
+      .wa-home-empty { padding: 14px; border-radius: 16px; background: rgba(255,255,255,0.72); color: #64748b; font-size: 13px; text-align: center; }
+
+      @keyframes wa-welcome-arrive {
+        from { opacity: 0; transform: translateY(-24px) scale(1.18); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
+      }
+
+      @media (max-width: 560px) {
+        .wa-welcome-screen { padding: 20px 14px; }
+        .wa-welcome-content { justify-content: flex-start; padding-top: 30px; }
+        .wa-home-actions { grid-template-columns: 1fr; }
+        .wa-home-action { min-height: 54px; }
       }
 
       @keyframes wa-launch-pop {
@@ -3153,6 +3265,25 @@ export default function App() {
     () => Object.values(unreadCounts || {}).reduce((total, count) => total + Number(count || 0), 0),
     [unreadCounts]
   );
+
+  const unreadRooms = useMemo(
+    () => roomsSorted.filter((room) => Number(unreadCounts[room.slug] || 0) > 0).slice(0, 3),
+    [roomsSorted, unreadCounts]
+  );
+
+  const recentRooms = useMemo(
+    () => roomsSorted.filter((room) => Number(unreadCounts[room.slug] || 0) === 0).slice(0, 3),
+    [roomsSorted, unreadCounts]
+  );
+
+  function openHomeRoom(roomSlug) {
+    if (!roomSlug) return;
+    setSidebarMode("chats");
+    setActiveRoomSlug(roomSlug);
+    setReplyTo(null);
+    setShowChatDetails(false);
+    setShowSidebar(false);
+  }
 
   const filteredRooms = useMemo(
     () =>
@@ -6246,10 +6377,73 @@ export default function App() {
             </>
           ) : (
             <main className="wa-welcome-screen">
-              <img src="/icons/icon-192.png" alt="Int-Messager" className="wa-welcome-logo" />
-              <h1>Int-Messager</h1>
-              <p>Connecting with love</p>
-              <span>Select a conversation from the Chats tab to start messaging.</span>
+              <div className="wa-welcome-content">
+                <img src="/icons/icon-192.png" alt="Int-Messager" className="wa-welcome-logo" />
+                <h1>Int-Messager</h1>
+                <p className="wa-welcome-tagline">Connecting with love</p>
+                <div className="wa-welcome-intro">Choose a conversation, reconnect with someone, or open the General group when you are ready.</div>
+
+                <div className="wa-home-profile">
+                  <Avatar label={profile?.displayName || "Me"} src={profile?.avatarUrl} />
+                  <div className="wa-home-profile-copy">
+                    <div className="wa-home-profile-name">{profile?.displayName || "Your profile"}</div>
+                    <div className="wa-home-profile-status">{profile?.profileStatus || "Available now"}</div>
+                  </div>
+                </div>
+
+                <div className="wa-home-actions">
+                  <button type="button" className="wa-home-action" onClick={() => { setSidebarMode("people"); setShowSidebar(true); }}>
+                    <span className="wa-home-action-icon">✚</span>
+                    New chat
+                  </button>
+                  <button type="button" className="wa-home-action" onClick={() => openHomeRoom("general")}>
+                    <span className="wa-home-action-icon">💬</span>
+                    Open General
+                  </button>
+                  <button type="button" className="wa-home-action" onClick={() => { setSidebarMode("chats"); setShowSidebar(true); }}>
+                    <span className="wa-home-action-icon">🔍</span>
+                    Find a chat
+                  </button>
+                </div>
+
+                {unreadRooms.length ? (
+                  <section className="wa-home-section">
+                    <div className="wa-home-section-title">
+                      <span>Unread conversations</span>
+                      <span className="wa-home-count">{totalUnreadCount}</span>
+                    </div>
+                    <div className="wa-home-room-list">
+                      {unreadRooms.map((room) => (
+                        <button key={room.slug} type="button" className="wa-home-room" onClick={() => openHomeRoom(room.slug)}>
+                          <Avatar label={getRoomDisplayName(room, profile?.displayName, currentProfileId, profiles)} src={getRoomAvatarSrc(room)} />
+                          <div className="wa-home-room-copy">
+                            <div className="wa-home-room-name">{getRoomDisplayName(room, profile?.displayName, currentProfileId, profiles)}</div>
+                            <div className="wa-home-room-preview">{room.lastMessageText || (room.slug === "general" ? "Public room" : "New conversation")}</div>
+                          </div>
+                          <span className="wa-home-room-unread">{unreadCounts[room.slug]}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
+
+                <section className="wa-home-section">
+                  <div className="wa-home-section-title"><span>Recent chats</span></div>
+                  {recentRooms.length ? (
+                    <div className="wa-home-room-list">
+                      {recentRooms.map((room) => (
+                        <button key={room.slug} type="button" className="wa-home-room" onClick={() => openHomeRoom(room.slug)}>
+                          <Avatar label={getRoomDisplayName(room, profile?.displayName, currentProfileId, profiles)} src={getRoomAvatarSrc(room)} />
+                          <div className="wa-home-room-copy">
+                            <div className="wa-home-room-name">{getRoomDisplayName(room, profile?.displayName, currentProfileId, profiles)}</div>
+                            <div className="wa-home-room-preview">{room.lastMessageText || (room.slug === "general" ? "Public room" : "New conversation")}</div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  ) : <div className="wa-home-empty">Your recent conversations will appear here.</div>}
+                </section>
+              </div>
             </main>
           )}
         </section>
