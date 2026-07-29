@@ -4628,11 +4628,9 @@ export default function App() {
     };
   }, []);
 
-  useEffect(() => {
-    const listEl = messageListRef.current;
-    if (!listEl) return;
-    listEl.scrollTop = listEl.scrollHeight;
-  }, [groupedMessages, pendingUploadsForRoom.length, typingName]);
+  // Automatic message-list scrolling is intentionally disabled.
+  // Users keep their current reading position when messages, uploads,
+  // or typing indicators update.
 
   function markPlayed(messageId) {
     setListenedMap((current) => {
