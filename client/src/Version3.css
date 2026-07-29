@@ -667,270 +667,154 @@ button { color: inherit; }
 }
 
 
-/* ================================================================
-   Version 3.1 — high-contrast gradient and readability correction
-   ================================================================ */
-:root {
-  --v3-bg-deep: #071426;
-  --v3-bg-mid: #102a43;
-  --v3-bg-soft: #243b67;
-  --v3-panel: #10263d;
-  --v3-panel-solid: #10263d;
-  --v3-panel-soft: #183653;
-  --v3-card: #1c4262;
-  --v3-card-hover: #28567a;
-  --v3-text: #ffffff;
-  --v3-text-soft: #e8f2fb;
-  --v3-muted: #bfd1e1;
-  --v3-border: rgba(217, 235, 250, .28);
-  --v3-border-strong: rgba(235, 246, 255, .50);
-}
+/* Version 3.2 — definitive header, desktop typography and contrast correction */
+.wa-desktop-menu-btn { display: none !important; }
 
-html,
-body,
-#root,
-.wa-app {
-  background:
-    radial-gradient(circle at 8% 3%, rgba(42, 171, 238, .34), transparent 31%),
-    radial-gradient(circle at 93% 92%, rgba(117, 89, 211, .32), transparent 34%),
-    linear-gradient(135deg, #071426 0%, #102a43 48%, #243b67 100%) !important;
-}
-
-/* Keep text on solid, high-contrast surfaces rather than directly on gradients. */
-.wa-sidebar,
-.wa-sidebar-panel,
-.wa-header,
-.wa-composer,
-.wa-details-page,
-.wa-details-topbar {
-  color: #fff !important;
-}
-
-.wa-sidebar-panel {
-  background: linear-gradient(180deg, #132f49 0%, #0e2439 100%) !important;
-}
-
-.wa-nav-rail {
-  background: linear-gradient(180deg, #081828 0%, #0c2236 70%, #102b43 100%) !important;
-}
-
-/* Global readable typography for all principal app surfaces. */
-.wa-app :is(
-  h1, h2, h3, h4, h5, h6,
-  p, span, strong, b, small, em, label,
-  button, a, li, dt, dd
-) {
-  text-shadow: none;
-}
-
-.wa-brand,
-.wa-brand span,
-.wa-profile-name,
-.wa-room-title,
-.wa-user-name,
-.wa-header-title,
-.wa-settings-title,
-.wa-details-card-title,
-.wa-details-title,
-.wa-call-log-name,
-.wa-search-result-title,
-.wa-home-profile-name,
-.wa-home-room-name {
-  color: #fff !important;
-}
-
-.wa-profile-sub,
-.wa-room-sub,
-.wa-user-sub,
-.wa-header-sub,
-.wa-settings-note,
-.wa-call-log-meta,
-.wa-search-result-sub,
-.wa-home-profile-status,
-.wa-home-room-preview,
-.wa-empty,
-.wa-empty.dark {
-  color: #cbdbea !important;
-  opacity: 1 !important;
-}
-
-.wa-section-label,
-.wa-room-row-top,
-.wa-message-preview,
-.wa-status-text,
-.wa-call-time,
-.wa-call-type {
-  color: #dceaf6 !important;
-  opacity: 1 !important;
-}
-
-/* Conversation/contact rows use opaque contrast blocks. */
-.wa-room-card,
-.wa-user-card,
-.wa-call-log-card,
-.wa-search-result-card {
-  background: #163550 !important;
-  border-color: rgba(220, 237, 250, .18) !important;
-}
-
-.wa-room-card:hover,
-.wa-user-card:hover,
-.wa-call-log-card:hover,
-.wa-search-result-card:hover {
-  background: #235274 !important;
-  border-color: rgba(235, 246, 255, .42) !important;
-}
-
-.wa-room-card.active {
-  background: linear-gradient(135deg, #168acd 0%, #0875b6 100%) !important;
-}
-
-.wa-room-card.active,
-.wa-room-card.active * {
-  color: #fff !important;
-}
-
-/* Settings: explicit colours for every descendant and control. */
-.wa-settings-card,
-.wa-details-card {
-  background: linear-gradient(145deg, #1d4565 0%, #14334f 100%) !important;
-  border: 1px solid rgba(235, 246, 255, .34) !important;
-  color: #fff !important;
-}
-
-.wa-settings-card :is(div, span, p, label, strong, b, small),
-.wa-details-card :is(div, span, p, label, strong, b, small) {
-  color: #fff !important;
-  opacity: 1 !important;
-}
-
-.wa-settings-card .wa-settings-note,
-.wa-details-card .wa-settings-note {
-  color: #d3e3f0 !important;
-}
-
-.wa-settings-label {
-  color: #fff !important;
-  border-top-color: rgba(235, 246, 255, .22) !important;
-}
-
-.wa-select,
-.wa-settings-card input:not([type="color"]),
-.wa-settings-card textarea,
-.wa-details-card input:not([type="color"]),
-.wa-details-card textarea {
-  background: #081b2d !important;
-  color: #fff !important;
-  border: 1px solid rgba(235, 246, 255, .48) !important;
-}
-
-.wa-select option {
-  background: #081b2d !important;
-  color: #fff !important;
-}
-
-.wa-settings-btn {
-  background: linear-gradient(135deg, #27a9e8, #087bbb) !important;
-  color: #fff !important;
-  border-color: rgba(255, 255, 255, .30) !important;
-}
-
-/* Main workspace uses a brighter gradient under opaque message surfaces. */
-.wa-main {
-  background:
-    linear-gradient(rgba(7, 22, 38, .68), rgba(7, 22, 38, .68)),
-    radial-gradient(circle at 20% 10%, rgba(42, 171, 238, .38), transparent 34%),
-    radial-gradient(circle at 82% 88%, rgba(121, 91, 208, .34), transparent 38%),
-    linear-gradient(145deg, #0d2942 0%, #183d5c 52%, #2a416d 100%) !important;
-}
-
-.wa-header {
-  background: #102a43 !important;
-  border-bottom-color: rgba(235, 246, 255, .28) !important;
-}
-
-.wa-bubble {
-  background: #173c5a !important;
-  border-color: rgba(235, 246, 255, .26) !important;
-  color: #fff !important;
-}
-
-.wa-message-row.mine .wa-bubble {
-  background: linear-gradient(145deg, #168acd, #0876b5) !important;
-  color: #fff !important;
-}
-
-.wa-bubble,
-.wa-bubble * {
-  color: #fff !important;
-  opacity: 1 !important;
-}
-
-.wa-meta {
-  color: #d5e5f2 !important;
-}
-
-.wa-composer {
-  background: #0d2439 !important;
-  border-top-color: rgba(235, 246, 255, .26) !important;
-}
-
-.wa-input-wrap {
-  background: #163b59 !important;
-  border-color: rgba(235, 246, 255, .42) !important;
-}
-
-.wa-input,
-.wa-composer textarea {
-  color: #fff !important;
-}
-
-.wa-input::placeholder,
-.wa-composer textarea::placeholder,
-.wa-search-input::placeholder {
-  color: #c1d2e1 !important;
-  opacity: 1 !important;
-}
-
-.wa-icon-btn,
-.wa-mini-btn,
-.wa-close-chat-btn,
-.wa-details-back {
-  background: #183b59 !important;
-  color: #fff !important;
-  border-color: rgba(235, 246, 255, .32) !important;
-}
-
-/* Mobile keeps the same contrast guarantees. */
-@media (max-width: 780px) {
-  .wa-app,
-  .wa-sidebar,
-  .wa-app.has-active-chat .wa-main {
-    background:
-      linear-gradient(rgba(7, 22, 38, .72), rgba(7, 22, 38, .72)),
-      radial-gradient(circle at 12% 5%, rgba(42, 171, 238, .38), transparent 36%),
-      linear-gradient(145deg, #0e2b45, #213f68) !important;
+@media (min-width: 781px) {
+  .wa-header {
+    min-height: 72px !important;
+    height: 72px !important;
+    padding: 10px 18px !important;
+    gap: 12px !important;
+    background: #10263c !important;
+    border-bottom: 1px solid rgba(255,255,255,.14) !important;
   }
-
-  .wa-sidebar-panel {
-    background: linear-gradient(180deg, #153754 0%, #0d263d 100%) !important;
+  .wa-header-left {
+    min-width: 0 !important;
+    flex: 1 1 auto !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 12px !important;
   }
-
-  .wa-nav-rail {
-    background: #081b2c !important;
-  }
-
-  .wa-room-card,
-  .wa-user-card,
-  .wa-call-log-card {
-    background: #173b58 !important;
-  }
-
-  .wa-app.has-active-chat .wa-header {
-    background: #102a43 !important;
-  }
-
-  .wa-app.has-active-chat .wa-messages {
+  .wa-header-title-wrap {
+    min-width: 0 !important;
+    width: auto !important;
+    max-width: 520px !important;
+    padding: 0 !important;
+    text-align: left !important;
     background: transparent !important;
+  }
+  .wa-header-title {
+    color: #ffffff !important;
+    font-size: 16px !important;
+    line-height: 1.25 !important;
+    font-weight: 750 !important;
+    letter-spacing: 0 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+  .wa-header-sub {
+    margin-top: 3px !important;
+    color: #b9cbe0 !important;
+    font-size: 13px !important;
+    line-height: 1.2 !important;
+    font-weight: 500 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+  .wa-header-right {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    gap: 7px !important;
+  }
+  .wa-header-right .wa-icon-btn,
+  .wa-close-chat-btn {
+    color: #f8fbff !important;
+    background: #173653 !important;
+    border: 1px solid rgba(255,255,255,.16) !important;
+    box-shadow: none !important;
+  }
+  .wa-header-right .wa-icon-btn:hover,
+  .wa-close-chat-btn:hover { background: #214765 !important; }
+
+  .wa-messages {
+    align-items: stretch !important;
+    padding: 22px 28px 26px !important;
+  }
+  .wa-message-row {
+    width: 100% !important;
+    margin: 3px 0 !important;
+    align-items: flex-end !important;
+  }
+  .wa-message-row:not(.mine) .wa-message-content-wrap,
+  .wa-message-row:not(.mine) .wa-message-other-wrap {
+    width: fit-content !important;
+    max-width: min(78%, 960px) !important;
+    margin-right: auto !important;
+  }
+  .wa-message-row.mine .wa-message-content-wrap,
+  .wa-message-row.mine .wa-message-other-wrap {
+    width: fit-content !important;
+    max-width: min(72%, 860px) !important;
+    margin-left: auto !important;
+  }
+  .wa-bubble {
+    min-width: 88px !important;
+    padding: 10px 13px 8px !important;
+    font-size: 15px !important;
+    line-height: 1.48 !important;
+    letter-spacing: 0 !important;
+    overflow-wrap: anywhere !important;
+    word-break: normal !important;
+  }
+  .wa-message-row:not(.mine) .wa-bubble {
+    color: #132033 !important;
+    background: #ffffff !important;
+    border: 1px solid #dce5ef !important;
+  }
+  .wa-message-row.mine .wa-bubble {
+    color: #071526 !important;
+    background: #8ab9ff !important;
+    border: 1px solid #6da6f8 !important;
+  }
+  .wa-message-sender,
+  .wa-message-author,
+  .wa-sender-name {
+    color: #1581b9 !important;
+    font-size: 13px !important;
+    line-height: 1.2 !important;
+    font-weight: 750 !important;
+    margin: 0 0 5px 2px !important;
+  }
+  .wa-message-meta,
+  .wa-message-time,
+  .wa-message-status,
+  .wa-message-actions {
+    color: #34465c !important;
+    font-size: 12px !important;
+    line-height: 1.25 !important;
+  }
+  .wa-message-actions {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    gap: 4px 10px !important;
+    margin-top: 6px !important;
+  }
+  .wa-message-actions button,
+  .wa-message-action {
+    color: #24445f !important;
+    font-size: 12px !important;
+    font-weight: 650 !important;
+    white-space: nowrap !important;
+  }
+}
+
+@media (max-width: 780px) {
+  .wa-desktop-menu-btn { display: none !important; visibility: hidden !important; }
+  .wa-app.has-active-chat .wa-header-left {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+  }
+  .wa-app.has-active-chat .wa-mobile-back-btn {
+    order: -10 !important;
+    display: grid !important;
+    visibility: visible !important;
   }
 }

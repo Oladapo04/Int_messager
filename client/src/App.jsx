@@ -4628,9 +4628,11 @@ export default function App() {
     };
   }, []);
 
-  // Automatic message-list scrolling is intentionally disabled.
-  // Users keep their current reading position when messages, uploads,
-  // or typing indicators update.
+  useEffect(() => {
+    const listEl = messageListRef.current;
+    if (!listEl) return;
+    listEl.scrollTop = listEl.scrollHeight;
+  }, [groupedMessages, pendingUploadsForRoom.length, typingName]);
 
   function markPlayed(messageId) {
     setListenedMap((current) => {
@@ -7096,16 +7098,6 @@ export default function App() {
         <section className="wa-main">
           <header className="wa-header">
             <div className="wa-header-left">
-              <button
-                type="button"
-                className="wa-icon-btn wa-desktop-menu-btn"
-                onClick={() => setShowSidebar((v) => !v)}
-                title="Open sidebar"
-                aria-label="Open sidebar"
-              >
-                ☰
-              </button>
-
               {activeRoom ? (
                 <button
                   type="button"
