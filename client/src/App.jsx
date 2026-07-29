@@ -6774,6 +6774,29 @@ export default function App() {
           .wa-close-chat-btn { display: grid !important; }
         }
 
+        /* Final desktop bubble width and mobile navigation corrections */
+        @media (min-width: 901px) {
+          .wa-message-row:not(.mine) {
+            padding-right: 8% !important;
+          }
+          .wa-message-row.mine {
+            padding-left: 18% !important;
+          }
+          .wa-message-row:not(.mine) .wa-bubble {
+            width: fit-content !important;
+            max-width: min(920px, 84%) !important;
+          }
+          .wa-message-row.mine .wa-bubble {
+            width: fit-content !important;
+            max-width: min(820px, 76%) !important;
+          }
+        }
+
+        @media (max-width: 900px) {
+          /* Never show the hamburger/menu control on mobile. */
+          .wa-desktop-menu-btn { display: none !important; }
+        }
+
         /* Mobile chat navigation: back replaces the menu icon */
         @media (max-width: 900px) {
           .wa-app.has-active-chat .wa-desktop-menu-btn { display: none !important; }
