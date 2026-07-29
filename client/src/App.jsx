@@ -6264,6 +6264,127 @@ export default function App() {
           .wa-header-right .wa-icon-btn:not(.call-action):not(.wa-close-chat-btn) { display:none !important; }
           .wa-close-chat-btn { order:-1 !important; }
         }
+
+        /* Layout correction: readable lists, edge-to-edge desktop and mobile-first chat */
+        .wa-room-title,
+        .wa-user-name,
+        .wa-room-row-top,
+        .wa-profile-text .wa-room-title {
+          color:#0f172a !important;
+          opacity:1 !important;
+          -webkit-text-fill-color:#0f172a !important;
+        }
+        .wa-room-sub, .wa-user-sub, .wa-profile-sub { color:#64748b !important; }
+
+        @media (min-width: 901px) {
+          .wa-app {
+            width:100vw !important;
+            height:100dvh !important;
+            padding:0 !important;
+            gap:0 !important;
+            grid-template-columns:minmax(340px,390px) minmax(0,1fr) !important;
+            background:#e9eef5 !important;
+          }
+          .wa-sidebar, .wa-main {
+            height:100dvh !important;
+            border-radius:0 !important;
+            box-shadow:none !important;
+          }
+          .wa-sidebar { border-right:1px solid #dfe6ee !important; }
+          .wa-main { border:0 !important; }
+          .wa-header { min-height:74px !important; }
+          .wa-messages { padding-bottom:112px !important; }
+        }
+
+        @media (max-width: 900px) {
+          .wa-app, .wa-main { width:100vw !important; max-width:100vw !important; }
+          .wa-sidebar { grid-template-rows:minmax(0,1fr) calc(64px + env(safe-area-inset-bottom)) !important; }
+          .wa-sidebar-panel {
+            padding:0 0 8px !important;
+            background:#fff !important;
+          }
+          .wa-brand {
+            position:sticky !important; top:0 !important; z-index:6 !important;
+            min-height:58px !important; height:58px !important;
+            padding:10px 16px !important; margin:0 !important;
+            display:flex !important; align-items:center !important;
+            background:rgba(255,255,255,.97) !important;
+            border-bottom:1px solid #eef2f7 !important;
+            backdrop-filter:blur(14px) !important;
+          }
+          .wa-brand span { font-size:22px !important; }
+          .wa-brand em { color:var(--accent-color) !important; font-size:10px !important; }
+          .wa-search-input {
+            width:calc(100% - 24px) !important; height:42px !important;
+            margin:10px 12px 8px !important; border-radius:12px !important;
+          }
+          .wa-section-label { padding:8px 16px 5px !important; }
+          .wa-room-card, .wa-user-card, .wa-call-log-card, .wa-search-result-card {
+            min-height:82px !important;
+            padding:12px 16px !important;
+            margin:0 !important;
+            display:flex !important;
+            align-items:center !important;
+            gap:12px !important;
+            background:#fff !important;
+          }
+          .wa-room-card .wa-avatar, .wa-user-card .wa-avatar {
+            width:54px !important; height:54px !important; min-width:54px !important;
+            border-radius:50% !important; font-size:18px !important;
+          }
+          .wa-room-content, .wa-user-content { min-width:0 !important; flex:1 !important; }
+          .wa-room-title, .wa-user-name {
+            display:block !important; font-size:16px !important; line-height:1.25 !important;
+            font-weight:750 !important; white-space:nowrap !important; overflow:hidden !important; text-overflow:ellipsis !important;
+          }
+          .wa-room-sub, .wa-user-sub {
+            margin-top:4px !important; font-size:13px !important; line-height:1.35 !important;
+            white-space:nowrap !important; overflow:hidden !important; text-overflow:ellipsis !important;
+          }
+          .wa-nav-rail {
+            height:calc(64px + env(safe-area-inset-bottom)) !important;
+            min-height:calc(64px + env(safe-area-inset-bottom)) !important;
+            padding:5px 6px env(safe-area-inset-bottom) !important;
+          }
+          .wa-rail-btn { height:56px !important; border-radius:10px !important; }
+          .wa-rail-btn span { font-size:19px !important; }
+          .wa-rail-btn small { font-size:10px !important; }
+
+          .wa-app.has-active-chat .wa-main {
+            position:fixed !important; inset:0 !important; z-index:40 !important;
+            height:100dvh !important; background:var(--chat-wallpaper) !important;
+          }
+          .wa-app.has-active-chat .wa-sidebar { display:none !important; }
+          .wa-header {
+            min-height:60px !important; height:60px !important;
+            padding:7px 8px !important; flex:0 0 60px !important;
+          }
+          .wa-header-left { min-width:0 !important; flex:1 !important; gap:8px !important; }
+          .wa-header-left > .wa-icon-btn { display:none !important; }
+          .wa-header-title-wrap { min-width:0 !important; }
+          .wa-header-title { font-size:15px !important; white-space:nowrap !important; overflow:hidden !important; text-overflow:ellipsis !important; }
+          .wa-header-sub { font-size:11px !important; }
+          .wa-header-right { flex:0 0 auto !important; }
+          .wa-header-right .wa-close-chat-btn {
+            display:grid !important; width:40px !important; height:40px !important;
+            order:-1 !important; font-size:18px !important;
+          }
+          .wa-header-right .call-action { width:40px !important; height:40px !important; }
+          .wa-messages {
+            flex:1 1 auto !important; min-height:0 !important;
+            padding:14px 8px 86px !important;
+            scroll-padding-bottom:92px !important;
+          }
+          .wa-message-row { width:100% !important; max-width:none !important; }
+          .wa-bubble { max-width:88% !important; padding:9px 11px !important; }
+          .wa-composer {
+            left:8px !important; right:8px !important; bottom:max(7px,env(safe-area-inset-bottom)) !important;
+            transform:none !important; width:auto !important; min-height:58px !important;
+            padding:6px !important; border-radius:18px !important;
+          }
+          .wa-input { min-height:44px !important; }
+          .wa-send-btn { min-width:58px !important; height:44px !important; }
+        }
       `}</style>
 
       {showSidebar ? <div className="wa-mobile-overlay" onClick={() => setShowSidebar(false)} /> : null}
