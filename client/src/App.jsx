@@ -6385,6 +6385,345 @@ export default function App() {
           .wa-input { min-height:44px !important; }
           .wa-send-btn { min-width:58px !important; height:44px !important; }
         }
+
+
+        /* Final viewport, visibility and mobile conversation correction */
+        :root {
+          color-scheme: light;
+        }
+        html, body, #root {
+          width: 100% !important;
+          min-width: 100% !important;
+          max-width: none !important;
+          height: 100% !important;
+          min-height: 100% !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          overflow: hidden !important;
+          background: #f4f7fb !important;
+        }
+        body {
+          position: fixed !important;
+          inset: 0 !important;
+        }
+        #root {
+          position: absolute !important;
+          inset: 0 !important;
+          display: block !important;
+        }
+        .wa-app {
+          position: absolute !important;
+          inset: 0 !important;
+          width: 100% !important;
+          max-width: none !important;
+          height: 100% !important;
+          min-height: 0 !important;
+          max-height: none !important;
+          margin: 0 !important;
+          box-sizing: border-box !important;
+        }
+        .wa-app *, .wa-app *::before, .wa-app *::after {
+          box-sizing: border-box;
+        }
+
+        /* Global high-contrast safeguards */
+        .wa-app,
+        .wa-main,
+        .wa-sidebar-panel,
+        .wa-welcome-screen,
+        .wa-modal-card,
+        .wa-details-panel {
+          color: #0f172a !important;
+        }
+        .wa-app button,
+        .wa-app input,
+        .wa-app textarea,
+        .wa-app select {
+          font: inherit;
+        }
+        .wa-sidebar-panel,
+        .wa-sidebar-panel button,
+        .wa-room-card,
+        .wa-user-card,
+        .wa-call-log-card,
+        .wa-search-result-card,
+        .wa-profile-card,
+        .wa-settings-card,
+        .wa-settings-row,
+        .wa-section-label,
+        .wa-empty,
+        .wa-brand {
+          color: #0f172a !important;
+        }
+        .wa-room-title,
+        .wa-user-name,
+        .wa-call-name,
+        .wa-header-title,
+        .wa-profile-text,
+        .wa-message-author,
+        .wa-details-title,
+        .wa-modal-title,
+        .wa-welcome-content h1,
+        .wa-welcome-content h2,
+        .wa-home-card-title,
+        .wa-settings-title {
+          color: #0b1220 !important;
+          opacity: 1 !important;
+          text-shadow: none !important;
+          -webkit-text-fill-color: currentColor !important;
+        }
+        .wa-room-sub,
+        .wa-user-sub,
+        .wa-call-sub,
+        .wa-header-sub,
+        .wa-profile-sub,
+        .wa-message-time,
+        .wa-welcome-tagline,
+        .wa-welcome-intro,
+        .wa-settings-sub,
+        .wa-empty,
+        .wa-section-label {
+          color: #475569 !important;
+          opacity: 1 !important;
+          -webkit-text-fill-color: currentColor !important;
+        }
+        .wa-input,
+        .wa-search-input,
+        .wa-message-input,
+        .wa-composer textarea,
+        .wa-composer input {
+          color: #0f172a !important;
+          caret-color: var(--accent-color) !important;
+          background-color: #ffffff !important;
+          border-color: #cbd5e1 !important;
+        }
+        .wa-input::placeholder,
+        .wa-search-input::placeholder,
+        .wa-message-input::placeholder,
+        .wa-composer textarea::placeholder,
+        .wa-composer input::placeholder {
+          color: #64748b !important;
+          opacity: 1 !important;
+        }
+        .wa-icon-btn,
+        .wa-mini-btn,
+        .wa-profile-edit {
+          color: #1e293b !important;
+          background: #f8fafc !important;
+          border: 1px solid #cbd5e1 !important;
+        }
+        .wa-icon-btn:hover,
+        .wa-mini-btn:hover {
+          color: #020617 !important;
+          background: #e2e8f0 !important;
+          border-color: #94a3b8 !important;
+        }
+        .wa-send-btn,
+        .wa-primary-btn,
+        .wa-rail-btn.active {
+          color: #ffffff !important;
+          -webkit-text-fill-color: #ffffff !important;
+        }
+        .wa-message-row:not(.mine) .wa-bubble,
+        .wa-message-row:not(.mine) .wa-bubble * {
+          color: #111827 !important;
+          -webkit-text-fill-color: currentColor !important;
+        }
+        .wa-message-row.mine .wa-bubble,
+        .wa-message-row.mine .wa-bubble * {
+          color: #07111f !important;
+          -webkit-text-fill-color: currentColor !important;
+        }
+        .wa-bubble a { color: #075985 !important; text-decoration: underline; }
+        .wa-room-card,
+        .wa-user-card,
+        .wa-call-log-card,
+        .wa-search-result-card {
+          border-color: #e2e8f0 !important;
+        }
+        .wa-room-card.active {
+          background: color-mix(in srgb, var(--accent-color) 10%, #ffffff) !important;
+          border-color: color-mix(in srgb, var(--accent-color) 42%, #cbd5e1) !important;
+        }
+
+        @media (min-width: 901px) {
+          .wa-app {
+            display: grid !important;
+            grid-template-columns: minmax(360px, 400px) minmax(0, 1fr) !important;
+            grid-template-rows: minmax(0, 1fr) !important;
+            padding: 0 !important;
+            gap: 0 !important;
+          }
+          .wa-sidebar,
+          .wa-main {
+            width: 100% !important;
+            min-width: 0 !important;
+            height: 100% !important;
+            min-height: 0 !important;
+            max-height: none !important;
+            border-radius: 0 !important;
+          }
+          .wa-sidebar { grid-column: 1 !important; grid-row: 1 !important; }
+          .wa-main { grid-column: 2 !important; grid-row: 1 !important; }
+        }
+
+        @media (max-width: 900px) {
+          html, body, #root { height: 100dvh !important; }
+          body { width: 100vw !important; }
+          .wa-app {
+            display: block !important;
+            width: 100vw !important;
+            height: 100dvh !important;
+            min-height: 100dvh !important;
+            overflow: hidden !important;
+          }
+          .wa-app.has-active-chat {
+            display: block !important;
+          }
+          .wa-app.has-active-chat .wa-sidebar,
+          .wa-app.has-active-chat .wa-mobile-overlay {
+            display: none !important;
+          }
+          .wa-app.has-active-chat .wa-main {
+            position: fixed !important;
+            inset: 0 !important;
+            z-index: 100 !important;
+            display: grid !important;
+            grid-template-columns: minmax(0, 1fr) !important;
+            grid-template-rows: auto minmax(0, 1fr) auto !important;
+            width: 100vw !important;
+            height: 100dvh !important;
+            min-height: 0 !important;
+            max-height: 100dvh !important;
+            overflow: hidden !important;
+            border: 0 !important;
+            border-radius: 0 !important;
+            background: var(--chat-wallpaper) !important;
+          }
+          .wa-app.has-active-chat .wa-header {
+            position: relative !important;
+            inset: auto !important;
+            grid-column: 1 !important;
+            grid-row: 1 !important;
+            z-index: 5 !important;
+            display: flex !important;
+            flex: 0 0 auto !important;
+            width: 100% !important;
+            min-height: calc(64px + env(safe-area-inset-top)) !important;
+            height: auto !important;
+            padding: calc(8px + env(safe-area-inset-top)) 8px 8px !important;
+            background: #ffffff !important;
+            border-bottom: 1px solid #dbe3ed !important;
+            box-shadow: 0 2px 12px rgba(15,23,42,.08) !important;
+            backdrop-filter: none !important;
+          }
+          .wa-app.has-active-chat .wa-header-left {
+            display: flex !important;
+            align-items: center !important;
+            min-width: 0 !important;
+            flex: 1 1 auto !important;
+            gap: 8px !important;
+          }
+          .wa-app.has-active-chat .wa-header-left > .wa-icon-btn,
+          .wa-app.has-active-chat .wa-close-chat-btn {
+            display: grid !important;
+            flex: 0 0 40px !important;
+            width: 40px !important;
+            height: 40px !important;
+            place-items: center !important;
+          }
+          .wa-app.has-active-chat .wa-header-title-wrap {
+            min-width: 0 !important;
+            flex: 1 1 auto !important;
+          }
+          .wa-app.has-active-chat .wa-header-title {
+            color: #0b1220 !important;
+            font-size: 16px !important;
+            font-weight: 800 !important;
+            line-height: 1.2 !important;
+          }
+          .wa-app.has-active-chat .wa-header-sub {
+            color: #475569 !important;
+            font-size: 11px !important;
+            line-height: 1.2 !important;
+          }
+          .wa-app.has-active-chat .wa-header-right {
+            display: flex !important;
+            align-items: center !important;
+            gap: 4px !important;
+            flex: 0 0 auto !important;
+          }
+          .wa-app.has-active-chat .wa-header-right .wa-icon-btn {
+            display: grid !important;
+            width: 38px !important;
+            height: 38px !important;
+            min-width: 38px !important;
+            border: 0 !important;
+            background: transparent !important;
+          }
+          .wa-app.has-active-chat .wa-header-right .wa-icon-btn:hover {
+            background: #eef2f7 !important;
+          }
+          .wa-app.has-active-chat .wa-messages {
+            position: relative !important;
+            inset: auto !important;
+            grid-column: 1 !important;
+            grid-row: 2 !important;
+            width: 100% !important;
+            height: auto !important;
+            min-height: 0 !important;
+            max-height: none !important;
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+            padding: 14px 10px 18px !important;
+            scroll-padding-bottom: 18px !important;
+            -webkit-overflow-scrolling: touch !important;
+          }
+          .wa-app.has-active-chat .wa-message-row {
+            width: 100% !important;
+            max-width: none !important;
+          }
+          .wa-app.has-active-chat .wa-bubble {
+            max-width: 86% !important;
+            min-width: 0 !important;
+            font-size: 15px !important;
+            line-height: 1.42 !important;
+          }
+          .wa-app.has-active-chat .wa-composer {
+            position: relative !important;
+            inset: auto !important;
+            left: auto !important;
+            right: auto !important;
+            bottom: auto !important;
+            transform: none !important;
+            grid-column: 1 !important;
+            grid-row: 3 !important;
+            z-index: 6 !important;
+            width: 100% !important;
+            min-width: 0 !important;
+            min-height: calc(64px + env(safe-area-inset-bottom)) !important;
+            margin: 0 !important;
+            padding: 8px 8px calc(8px + env(safe-area-inset-bottom)) !important;
+            border: 0 !important;
+            border-top: 1px solid #dbe3ed !important;
+            border-radius: 0 !important;
+            background: #ffffff !important;
+            box-shadow: 0 -2px 12px rgba(15,23,42,.08) !important;
+            backdrop-filter: none !important;
+          }
+          .wa-app.has-active-chat .wa-input-wrap {
+            min-width: 0 !important;
+            border: 1px solid #cbd5e1 !important;
+            background: #f8fafc !important;
+          }
+          .wa-app.has-active-chat .wa-input,
+          .wa-app.has-active-chat .wa-composer textarea {
+            min-height: 44px !important;
+            max-height: 120px !important;
+            color: #0f172a !important;
+            background: transparent !important;
+          }
+        }
       `}</style>
 
       {showSidebar ? <div className="wa-mobile-overlay" onClick={() => setShowSidebar(false)} /> : null}
