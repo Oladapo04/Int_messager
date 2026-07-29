@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { buildRtcConfig, safeSetRemoteDescription, safeRestartIce, replaceOutgoingVideoTrack } from "./call/webrtcUtils";
 import io from "socket.io-client";
+import "./Version3.css";
 
 const API_BASE = "";
 const socket = io(API_BASE, { autoConnect: true });
