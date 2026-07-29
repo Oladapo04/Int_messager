@@ -22,6 +22,17 @@ const REACTION_OPTIONS = ["❤️", "👍", "😂", "😮", "😢", "🙏", "�
 const CHAT_EMOJIS = ["😀", "😁", "😂", "🤣", "😍", "😘", "😊", "😎", "😭", "😢", "😮", "😡", "🤔", "🙏", "❤️", "💔", "👍", "👎", "👏", "🙌", "🔥", "🎉", "💯", "✅", "👀", "✨", "🚀", "🎤", "📎", "📞"];
 const CHAT_PREFS_KEY = "int_messager_chat_prefs_v1";
 const PWA_BEFORE_INSTALL_PROMPT = "beforeinstallprompt";
+const AUTH_TOKEN_KEY = "int_messager_auth_token_v4";
+const ACCOUNT_INSTALL_ID_KEY = "int_messager_account_install_id_v4";
+
+function getAuthToken() { return localStorage.getItem(AUTH_TOKEN_KEY) || ""; }
+function authFetch(input, init = {}) {
+  const token = getAuthToken();
+  const headers = new Headers(init.headers || {});
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  return window.fetch(input, { ...init, headers });
+}
+
 
 function isStandalonePwa() {
   return (
@@ -3181,8 +3192,76 @@ function MessageBubble({
   );
 }
 
+function AuthScreen({ onAuthenticated, legacyInstallId }) {
+  const [mode, setMode] = useState("login");
+  const [displayName, setDisplayName] = useState("");
+  const [identifier, setIdentifier] = useState("");
+  const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [authError, setAuthError] = useState("");
+
+  async function submit(event) {
+    event.preventDefault();
+    setAuthError("");
+    if (mode === "register" && password !== confirmPassword) {
+      setAuthError("Passwords do not match");
+      return;
+    }
+    setBusy(true);
+    try {
+      const endpoint = mode === "register" ? "/api/auth/register" : "/api/auth/login";
+      const body = mode === "register"
+        ? { displayName, email: identifier, phone, password, legacyInstallId }
+        : { identifier, password };
+      const response = await window.fetch(`${API_BASE}${endpoint}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.success) throw new Error(payload.error || "Authentication failed");
+      onAuthenticated(payload.data);
+    } catch (error) {
+      setAuthError(error.message || "Authentication failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="v4-auth-shell">
+      <div className="v4-auth-brand">
+        <img src="/icons/icon-512.png" alt="" />
+        <h1>Int-Messager</h1>
+        <p>Connecting with love, on every device.</p>
+      </div>
+      <form className="v4-auth-card" onSubmit={submit}>
+        <div className="v4-auth-tabs">
+          <button type="button" className={mode === "login" ? "active" : ""} onClick={() => setMode("login")}>Sign in</button>
+          <button type="button" className={mode === "register" ? "active" : ""} onClick={() => setMode("register")}>Create account</button>
+        </div>
+        {mode === "register" ? (
+          <label>Display name<input value={displayName} onChange={(e) => setDisplayName(e.target.value)} required maxLength={30} autoComplete="name" /></label>
+        ) : null}
+        <label>{mode === "login" ? "Email or phone number" : "Email address"}<input type={mode === "register" ? "email" : "text"} value={identifier} onChange={(e) => setIdentifier(e.target.value)} required autoComplete={mode === "login" ? "username" : "email"} /></label>
+        {mode === "register" ? <label>Phone number <span>(optional)</span><input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel" /></label> : null}
+        <label>Password<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} autoComplete={mode === "login" ? "current-password" : "new-password"} /></label>
+        {mode === "register" ? <label>Confirm password<input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required minLength={8} autoComplete="new-password" /></label> : null}
+        {mode === "register" && legacyInstallId ? <div className="v4-claim-note">Your current device profile and chat history will be linked to this account.</div> : null}
+        {authError ? <div className="v4-auth-error">{authError}</div> : null}
+        <button className="v4-auth-submit" type="submit" disabled={busy}>{busy ? "Please wait…" : mode === "login" ? "Sign in" : "Create account"}</button>
+      </form>
+    </div>
+  );
+}
+
 export default function App() {
-  const installId = useMemo(() => getOrCreateInstallId(), []);
+  const legacyInstallId = useMemo(() => getOrCreateInstallId(), []);
+  const [installId, setInstallId] = useState(() => localStorage.getItem(ACCOUNT_INSTALL_ID_KEY) || legacyInstallId);
+  const [authToken, setAuthToken] = useState(() => getAuthToken());
+  const [authChecked, setAuthChecked] = useState(false);
 
   const [session, setSession] = useState(null);
   const [pwaInstallPrompt, setPwaInstallPrompt] = useState(null);
@@ -3327,7 +3406,7 @@ export default function App() {
         return;
       }
 
-      const keyRes = await fetch(`${API_BASE}/api/push/public-key`);
+      const keyRes = await authFetch(`${API_BASE}/api/push/public-key`);
       const keyPayload = await keyRes.json();
       if (!keyRes.ok || !keyPayload.publicKey) throw new Error(keyPayload.error || "Push public key is not configured.");
 
@@ -3336,7 +3415,7 @@ export default function App() {
         applicationServerKey: urlBase64ToUint8Array(keyPayload.publicKey),
       });
 
-      const saveRes = await fetch(`${API_BASE}/api/push/subscribe`, {
+      const saveRes = await authFetch(`${API_BASE}/api/push/subscribe`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -3858,32 +3937,60 @@ export default function App() {
 
   useEffect(() => {
     async function init() {
+      if (!authToken) {
+        setSession(null);
+        setProfile(null);
+        setAuthChecked(true);
+        return;
+      }
       try {
-        const res = await fetch(`${API_BASE}/api/session/init`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-install-id": installId,
-          },
-          body: JSON.stringify({ installId }),
-        });
-
-        const payload = await res.json();
-        if (!res.ok || !payload.success) {
-          throw new Error(payload.error || "Failed to initialize session");
-        }
-
-        setSession(payload.data);
-        setProfile(payload.data);
-        setDisplayNameInput(payload.data.displayName || "");
-        setProfileStatusInput(payload.data.profileStatus || "Available now");
+        const meRes = await authFetch(`${API_BASE}/api/auth/me`);
+        const mePayload = await meRes.json();
+        if (!meRes.ok || !mePayload.success) throw new Error(mePayload.error || "Your session has expired");
+        const account = mePayload.data.profile;
+        localStorage.setItem(ACCOUNT_INSTALL_ID_KEY, account.installId);
+        setInstallId(account.installId);
+        setSession(account);
+        setProfile(account);
+        setDisplayNameInput(account.displayName || "");
+        setProfileStatusInput(account.profileStatus || "Available now");
       } catch (err) {
-        setError(err.message || "Failed to initialize session");
+        localStorage.removeItem(AUTH_TOKEN_KEY);
+        localStorage.removeItem(ACCOUNT_INSTALL_ID_KEY);
+        setAuthToken("");
+        setSession(null);
+        setProfile(null);
+        setError(err.message || "Please sign in again");
+      } finally {
+        setAuthChecked(true);
       }
     }
-
     init();
-  }, [installId]);
+  }, [authToken]);
+
+  function handleAuthenticated(data) {
+    localStorage.setItem(AUTH_TOKEN_KEY, data.token);
+    localStorage.setItem(ACCOUNT_INSTALL_ID_KEY, data.profile.installId);
+    setAuthToken(data.token);
+    setInstallId(data.profile.installId);
+    setSession(data.profile);
+    setProfile(data.profile);
+    setDisplayNameInput(data.profile.displayName || "");
+    setProfileStatusInput(data.profile.profileStatus || "Available now");
+    setAuthChecked(true);
+  }
+
+  function handleLogout() {
+    localStorage.removeItem(AUTH_TOKEN_KEY);
+    localStorage.removeItem(ACCOUNT_INSTALL_ID_KEY);
+    setAuthToken("");
+    setSession(null);
+    setProfile(null);
+    setRooms([]);
+    setMessagesByRoom({});
+    setActiveRoomSlug("");
+  }
+
 
 
   useEffect(() => {
@@ -3926,9 +4033,9 @@ export default function App() {
     async function loadRoomsAndProfiles() {
       try {
         const [roomsRes, profilesRes, unreadRes] = await Promise.all([
-          fetch(`${API_BASE}/api/rooms`, { headers: { "x-install-id": installId } }),
-          fetch(`${API_BASE}/api/profiles`, { headers: { "x-install-id": installId } }),
-          fetch(`${API_BASE}/api/unread-counts`, { headers: { "x-install-id": installId } }),
+          authFetch(`${API_BASE}/api/rooms`, { headers: { "x-install-id": installId } }),
+          authFetch(`${API_BASE}/api/profiles`, { headers: { "x-install-id": installId } }),
+          authFetch(`${API_BASE}/api/unread-counts`, { headers: { "x-install-id": installId } }),
         ]);
 
         const [roomsPayload, profilesPayload, unreadPayload] = await Promise.all([
@@ -3991,7 +4098,7 @@ export default function App() {
       try {
         setGlobalMessageSearchLoading(true);
         setGlobalMessageSearchError("");
-        const res = await fetch(
+        const res = await authFetch(
           `${API_BASE}/api/messages/search?q=${encodeURIComponent(q)}&installId=${encodeURIComponent(installId)}`,
           { headers: { "x-install-id": installId }, signal: controller.signal }
         );
@@ -4282,7 +4389,7 @@ export default function App() {
     async function refreshActiveRoomMessagesForMobile() {
       if (document.hidden) return;
       try {
-        const res = await fetch(`${API_BASE}/api/messages/${encodeURIComponent(activeRoomSlug)}`, {
+        const res = await authFetch(`${API_BASE}/api/messages/${encodeURIComponent(activeRoomSlug)}`, {
           headers: { "x-install-id": installId },
         });
         const incoming = await res.json();
@@ -4424,7 +4531,7 @@ export default function App() {
     const refreshCallHistory = async () => {
       if (!canChat) return;
       try {
-        const res = await fetch(`${API_BASE}/api/calls?installId=${encodeURIComponent(installId)}`, { headers: { "x-install-id": installId } });
+        const res = await authFetch(`${API_BASE}/api/calls?installId=${encodeURIComponent(installId)}`, { headers: { "x-install-id": installId } });
         if (res.ok) setCallHistory(await res.json());
       } catch {
         // ignore call-history refresh failures
@@ -4650,7 +4757,7 @@ export default function App() {
       formData.append("profileStatus", profileStatusInput.trim() || "Available now");
       if (profileAvatarFile) formData.append("avatar", profileAvatarFile);
 
-      const res = await fetch(`${API_BASE}/api/profile`, {
+      const res = await authFetch(`${API_BASE}/api/profile`, {
         method: "POST",
         headers: { "x-install-id": installId },
         body: formData,
@@ -4674,7 +4781,7 @@ export default function App() {
   async function startDirectRoom(targetProfileId) {
     try {
       setError("");
-      const res = await fetch(`${API_BASE}/api/direct-room`, {
+      const res = await authFetch(`${API_BASE}/api/direct-room`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -4707,7 +4814,7 @@ export default function App() {
   async function deleteMessage(messageId) {
     try {
       setError("");
-      const res = await fetch(`${API_BASE}/api/messages/${messageId}`, {
+      const res = await authFetch(`${API_BASE}/api/messages/${messageId}`, {
         method: "DELETE",
         headers: { "x-install-id": installId },
       });
@@ -4747,7 +4854,7 @@ export default function App() {
 
     try {
       setError("");
-      const res = await fetch(`${API_BASE}/api/rooms/${encodeURIComponent(targetRoomSlug)}/messages`, {
+      const res = await authFetch(`${API_BASE}/api/rooms/${encodeURIComponent(targetRoomSlug)}/messages`, {
         method: "DELETE",
         headers: { "x-install-id": installId },
       });
@@ -4774,7 +4881,7 @@ export default function App() {
 
     try {
       setError("");
-      const res = await fetch(
+      const res = await authFetch(
         `${API_BASE}/api/rooms/${encodeURIComponent(targetRoomSlug)}/export?format=${encodeURIComponent(format)}`,
         { headers: { "x-install-id": installId } }
       );
@@ -4806,7 +4913,7 @@ export default function App() {
   async function reactToMessage(messageId, emoji) {
     try {
       setError("");
-      const res = await fetch(`${API_BASE}/api/messages/${messageId}/reactions`, {
+      const res = await authFetch(`${API_BASE}/api/messages/${messageId}/reactions`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -4847,7 +4954,7 @@ export default function App() {
     if (!confirmed) return;
 
     try {
-      const res = await fetch(`${API_BASE}/api/rooms/${encodeURIComponent(roomSlug)}/hide`, {
+      const res = await authFetch(`${API_BASE}/api/rooms/${encodeURIComponent(roomSlug)}/hide`, {
         method: "DELETE",
         headers: { "x-install-id": installId },
       });
@@ -4962,6 +5069,7 @@ export default function App() {
         const xhr = new XMLHttpRequest();
         xhr.open("POST", `${API_BASE}/upload`);
         xhr.setRequestHeader("x-install-id", installId);
+        if (getAuthToken()) xhr.setRequestHeader("Authorization", `Bearer ${getAuthToken()}`);
 
         xhr.upload.onprogress = (event) => {
           if (!event.lengthComputable) return;
@@ -5788,7 +5896,7 @@ export default function App() {
     if (!message?._id) return;
 
     try {
-      const res = await fetch(`${API_BASE}/api/messages/${message._id}/star`, {
+      const res = await authFetch(`${API_BASE}/api/messages/${message._id}/star`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -5821,7 +5929,7 @@ export default function App() {
     if (!message?._id) return;
 
     try {
-      const res = await fetch(`${API_BASE}/api/messages/${message._id}/pin`, {
+      const res = await authFetch(`${API_BASE}/api/messages/${message._id}/pin`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -5870,7 +5978,7 @@ export default function App() {
           forwardedFrom: { sender: message.sender || "", roomSlug: message.roomSlug || activeRoomSlug },
         });
       } else {
-        const res = await fetch(`${API_BASE}/api/messages/${message._id}/forward`, {
+        const res = await authFetch(`${API_BASE}/api/messages/${message._id}/forward`, {
           method: "POST",
           headers: { "Content-Type": "application/json", "x-install-id": installId },
           body: JSON.stringify({ installId, targetRoomSlug: targetRoom.slug }),
@@ -5952,11 +6060,15 @@ export default function App() {
     );
   }
 
-  if (!session) {
+  if (!authChecked) {
+    return (<> <StyleTag /> <div className="wa-empty">Loading…</div> </>);
+  }
+
+  if (!authToken || !session) {
     return (
       <>
         <StyleTag />
-        <div className="wa-empty">Loading…</div>
+        <AuthScreen onAuthenticated={handleAuthenticated} legacyInstallId={legacyInstallId} />
       </>
     );
   }
@@ -7060,6 +7172,13 @@ export default function App() {
             </>
           ) : sidebarMode === "settings" ? (
             <>
+              <div className="wa-section-label">Account</div>
+              <div className="wa-settings-card v4-account-card">
+                <div className="wa-settings-title">{profile?.displayName}</div>
+                <div className="wa-settings-note">{profile?.email || profile?.phone || "Signed-in account"}</div>
+                <div className="wa-settings-note">This profile is synced and can be recovered by signing in on another device.</div>
+                <button className="wa-settings-btn v4-logout-btn" type="button" onClick={handleLogout}>Sign out on this device</button>
+              </div>
               <div className="wa-section-label">Chat view</div>
               <div className="wa-settings-card">
                 <div className="wa-settings-title">Personalize this device</div>
@@ -7098,6 +7217,16 @@ export default function App() {
         <section className="wa-main">
           <header className="wa-header">
             <div className="wa-header-left">
+              <button
+                type="button"
+                className="wa-icon-btn wa-desktop-menu-btn"
+                onClick={() => setShowSidebar((v) => !v)}
+                title="Open sidebar"
+                aria-label="Open sidebar"
+              >
+                ☰
+              </button>
+
               {activeRoom ? (
                 <button
                   type="button"

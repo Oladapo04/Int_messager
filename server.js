@@ -5,6 +5,9 @@ const cors = require("cors");
 const http = require("http");
 const path = require("path");
 const multer = require("multer");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
 
 const cloudinary = require("cloudinary").v2;
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
@@ -30,6 +33,7 @@ const storage = new CloudinaryStorage({
   cloudinary,
   params: async (req, file) => {
     const originalName = file.originalname || "file";
+
     const safeName = sanitizeFileName(originalName);
 
     const isImage = file.mimetype.startsWith("image/");
@@ -37,6 +41,7 @@ const storage = new CloudinaryStorage({
     const isVideo = file.mimetype.startsWith("video/");
 
     let resourceType = "raw";
+
     if (isImage) resourceType = "image";
     if (isAudio || isVideo) resourceType = "video";
 
@@ -79,6 +84,8 @@ const MONGODB_URI =
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || "";
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || "";
 const VAPID_SUBJECT = process.env.VAPID_SUBJECT || "mailto:admin@example.com";
+const JWT_SECRET = process.env.JWT_SECRET || "change-this-in-production";
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "30d";
 
 if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
   webPush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
@@ -355,11 +362,16 @@ const profileSchema = new mongoose.Schema(
   {
     installId: {
       type: String,
-      required: true,
       unique: true,
+      sparse: true,
       index: true,
       trim: true,
     },
+    email: { type: String, unique: true, sparse: true, index: true, lowercase: true, trim: true },
+    phone: { type: String, unique: true, sparse: true, index: true, trim: true },
+    passwordHash: { type: String, default: "" },
+    accountVerified: { type: Boolean, default: true },
+    lastLoginAt: { type: Date, default: null },
     displayName: { type: String, default: "", trim: true },
     profileStatus: { type: String, default: "Available now", trim: true },
     avatarUrl: { type: String, default: "" },
@@ -482,15 +494,56 @@ async function finishCallLog(roomSlug, statusOverride) {
    HELPERS
 ========================= */
 
+function getBearerToken(req) {
+  const value = String(req.headers.authorization || "");
+  return value.startsWith("Bearer ") ? value.slice(7).trim() : "";
+}
+
+function verifyAuthToken(token) {
+  if (!token) return null;
+  try { return jwt.verify(token, JWT_SECRET); } catch { return null; }
+}
+
+function issueAuthToken(profile) {
+  return jwt.sign(
+    { profileId: String(profile._id), installId: profile.installId || "" },
+    JWT_SECRET,
+    { expiresIn: JWT_EXPIRES_IN }
+  );
+}
+
 function getInstallId(req) {
-  return (
-    req.headers["x-install-id"] ||
-    req.body?.installId ||
-    req.query?.installId ||
-    ""
-  )
+  const tokenPayload = verifyAuthToken(getBearerToken(req));
+  if (tokenPayload?.installId) return String(tokenPayload.installId).trim();
+  return (req.headers["x-install-id"] || req.body?.installId || req.query?.installId || "")
     .toString()
     .trim();
+}
+
+function normalizeEmail(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function normalizePhone(value) {
+  return String(value || "").replace(/[^+\d]/g, "").trim();
+}
+
+function authResponse(profile) {
+  return {
+    token: issueAuthToken(profile),
+    profile: {
+      installId: profile.installId,
+      profileId: profile._id,
+      _id: profile._id,
+      email: profile.email || "",
+      phone: profile.phone || "",
+      displayName: profile.displayName || "",
+      profileStatus: profile.profileStatus || "Available now",
+      avatarUrl: profile.avatarUrl || "",
+      nameLocked: profile.nameLocked,
+      activeChat: profile.activeChat,
+    },
+  };
 }
 
 function idsEqual(a, b) {
@@ -859,6 +912,90 @@ function buildChatExportText(room, messages) {
    API ROUTES
 ========================= */
 
+app.post("/api/auth/register", async (req, res) => {
+  try {
+    const email = normalizeEmail(req.body.email);
+    const phone = normalizePhone(req.body.phone);
+    const password = String(req.body.password || "");
+    const displayName = String(req.body.displayName || "").trim();
+    const legacyInstallId = String(req.body.legacyInstallId || "").trim();
+
+    if (!email && !phone) return res.status(400).json({ success: false, error: "Email or phone number is required" });
+    if (password.length < 8) return res.status(400).json({ success: false, error: "Password must be at least 8 characters" });
+    if (!displayName) return res.status(400).json({ success: false, error: "Display name is required" });
+
+    const duplicate = await Profile.findOne({ $or: [email ? { email } : null, phone ? { phone } : null].filter(Boolean) });
+    if (duplicate) return res.status(409).json({ success: false, error: "An account already exists with these details" });
+
+    let profile = legacyInstallId ? await Profile.findOne({ installId: legacyInstallId }) : null;
+    if (!profile) profile = new Profile({ installId: `account-${crypto.randomUUID()}` });
+
+    profile.email = email || undefined;
+    profile.phone = phone || undefined;
+    profile.passwordHash = await bcrypt.hash(password, 12);
+    profile.displayName = displayName.slice(0, 30);
+    profile.nameLocked = true;
+    profile.activeChat = true;
+    profile.lastLoginAt = new Date();
+    await profile.save();
+
+    io.emit("profiles_updated");
+    return res.status(201).json({ success: true, data: authResponse(profile) });
+  } catch (error) {
+    console.error("auth/register error:", error);
+    return res.status(500).json({ success: false, error: "Failed to create account" });
+  }
+});
+
+app.post("/api/auth/login", async (req, res) => {
+  try {
+    const identifier = String(req.body.identifier || "").trim();
+    const password = String(req.body.password || "");
+    const email = normalizeEmail(identifier);
+    const phone = normalizePhone(identifier);
+    const profile = await Profile.findOne({ $or: [{ email }, { phone }] });
+
+    if (!profile?.passwordHash || !(await bcrypt.compare(password, profile.passwordHash))) {
+      return res.status(401).json({ success: false, error: "Incorrect email, phone number, or password" });
+    }
+
+    profile.lastLoginAt = new Date();
+    profile.activeChat = true;
+    await profile.save();
+    return res.json({ success: true, data: authResponse(profile) });
+  } catch (error) {
+    console.error("auth/login error:", error);
+    return res.status(500).json({ success: false, error: "Failed to sign in" });
+  }
+});
+
+app.get("/api/auth/me", async (req, res) => {
+  const payload = verifyAuthToken(getBearerToken(req));
+  if (!payload?.profileId) return res.status(401).json({ success: false, error: "Sign in required" });
+  const profile = await Profile.findById(payload.profileId);
+  if (!profile) return res.status(401).json({ success: false, error: "Account no longer exists" });
+  return res.json({ success: true, data: authResponse(profile) });
+});
+
+app.post("/api/auth/change-password", async (req, res) => {
+  try {
+    const payload = verifyAuthToken(getBearerToken(req));
+    if (!payload?.profileId) return res.status(401).json({ success: false, error: "Sign in required" });
+    const profile = await Profile.findById(payload.profileId);
+    const currentPassword = String(req.body.currentPassword || "");
+    const newPassword = String(req.body.newPassword || "");
+    if (!profile || !(await bcrypt.compare(currentPassword, profile.passwordHash || ""))) {
+      return res.status(400).json({ success: false, error: "Current password is incorrect" });
+    }
+    if (newPassword.length < 8) return res.status(400).json({ success: false, error: "New password must be at least 8 characters" });
+    profile.passwordHash = await bcrypt.hash(newPassword, 12);
+    await profile.save();
+    return res.json({ success: true });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: "Failed to change password" });
+  }
+});
+
 app.get("/api", (req, res) => {
   res.send("Server is working");
 });
@@ -874,7 +1011,8 @@ app.post("/api/session/init", async (req, res) => {
       });
     }
 
-    let profile = await Profile.findOne({ installId });
+    const tokenPayload = verifyAuthToken(getBearerToken(req));
+    let profile = tokenPayload?.profileId ? await Profile.findById(tokenPayload.profileId) : await Profile.findOne({ installId });
 
     if (!profile) {
       profile = await Profile.create({
@@ -893,6 +1031,8 @@ app.post("/api/session/init", async (req, res) => {
         displayName: profile.displayName,
         profileStatus: profile.profileStatus || "Available now",
         avatarUrl: profile.avatarUrl || "",
+        email: profile.email || "",
+        phone: profile.phone || "",
         nameLocked: profile.nameLocked,
         activeChat: profile.activeChat,
       },
@@ -971,6 +1111,8 @@ app.post("/api/session/set-name", async (req, res) => {
         displayName: profile.displayName,
         profileStatus: profile.profileStatus || "Available now",
         avatarUrl: profile.avatarUrl || "",
+        email: profile.email || "",
+        phone: profile.phone || "",
         nameLocked: profile.nameLocked,
         activeChat: profile.activeChat,
       },
@@ -989,69 +1131,31 @@ app.post("/api/profile", (req, res) => {
   upload.single("avatar")(req, res, async (err) => {
     try {
       if (err) {
+        console.error(err);
+
         return res.status(500).json({
           success: false,
           error: err.message,
         });
       }
 
-      const installId = getInstallId(req);
-      const displayName = (req.body.displayName || "").trim();
-      const profileStatus = (req.body.profileStatus || "Available now").trim();
-
-      if (!installId) {
-        return res.status(400).json({
-          success: false,
-          error: "installId is required",
-        });
-      }
-
-      if (!displayName) {
-        return res.status(400).json({
-          success: false,
-          error: "displayName is required",
-        });
-      }
-
-      const update = {
-        displayName,
-        profileStatus,
-        nameLocked: true,
-        activeChat: true,
-      };
+      const update = {};
 
       if (req.file) {
         update.avatarUrl = req.file.path;
       }
 
-      const profile = await Profile.findOneAndUpdate(
-        { installId },
-        {
-          $set: update,
-          $setOnInsert: { installId },
-        },
-        { upsert: true, returnDocument: "after" }
-      );
-
-      io.emit("profiles_updated");
-
-      return res.json({
+      res.json({
         success: true,
-        data: {
-          installId: profile.installId,
-          profileId: profile._id,
-          displayName: profile.displayName,
-          profileStatus: profile.profileStatus || "Available now",
-          avatarUrl: profile.avatarUrl || "",
-          nameLocked: profile.nameLocked,
-          activeChat: profile.activeChat,
-        },
+        avatarUrl: update.avatarUrl,
       });
+
     } catch (error) {
-      console.error("profile update error:", error);
-      return res.status(500).json({
+      console.error(error);
+
+      res.status(500).json({
         success: false,
-        error: "Profile update failed",
+        error: "Profile upload failed",
       });
     }
   });
@@ -2536,11 +2640,23 @@ socket.on("call:start", async ({ roomSlug, profileId, name, callType = "audio" }
 
 const distPath = path.join(__dirname, "client", "dist");
 
-app.use(express.static(distPath));
+// Static assets must be served before the SPA fallback.
+// Otherwise JavaScript requests receive index.html and fail MIME checks.
+app.use(express.static(distPath, {
+  index: false,
+  setHeaders(res, filePath) {
+    if (filePath.endsWith("index.html")) {
+      res.setHeader("Cache-Control", "no-store");
+    }
+  },
+}));
 
-app.get(/.*/, (req, res) => {
-  res.sendFile(path.join(distPath, "index.html"));
-});
+app.get(
+  /^(?!\/api(?:\/|$)|\/socket\.io(?:\/|$)|\/manifest\.webmanifest$|\/sw\.js$|\/icons(?:\/|$)).*/,
+  (req, res) => {
+    res.sendFile(path.join(distPath, "index.html"));
+  }
+);
 
 (async () => {
   try {
