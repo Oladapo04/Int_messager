@@ -884,15 +884,22 @@ function StyleTag() {
       .wa-welcome-screen {
         min-height: 0;
         height: 100%;
+        overflow-y: auto;
+        padding: 28px;
+        background:
+          radial-gradient(circle at top, rgba(14, 165, 233, 0.10), transparent 35%),
+          linear-gradient(180deg, #eff6ff 0%, #f8fafc 100%);
+      }
+
+      .wa-welcome-content {
+        width: min(100%, 760px);
+        min-height: 100%;
+        margin: 0 auto;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        padding: 30px;
         text-align: center;
-        background:
-          radial-gradient(circle at top, rgba(14, 165, 233, 0.10), transparent 35%),
-          linear-gradient(180deg, #eff6ff 0%, #f8fafc 100%);
       }
 
       .wa-welcome-logo {
@@ -902,6 +909,7 @@ function StyleTag() {
         border-radius: 22px;
         margin-bottom: 18px;
         box-shadow: 0 18px 40px rgba(15, 23, 42, 0.16);
+        animation: wa-welcome-arrive 0.7s cubic-bezier(.2,.8,.2,1);
       }
 
       .wa-welcome-screen h1 {
@@ -911,19 +919,123 @@ function StyleTag() {
         color: #0f172a;
       }
 
-      .wa-welcome-screen p {
+      .wa-welcome-tagline {
         margin: 8px 0 0;
         font-size: 16px;
         font-weight: 700;
         color: #0ea5e9;
       }
 
-      .wa-welcome-screen span {
-        max-width: 380px;
-        margin-top: 12px;
+      .wa-welcome-intro {
+        max-width: 430px;
+        margin: 12px 0 0;
         color: #64748b;
         font-size: 14px;
         line-height: 1.5;
+      }
+
+      .wa-home-profile {
+        width: min(100%, 540px);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-top: 22px;
+        padding: 12px 14px;
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.88);
+        box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+        text-align: left;
+      }
+
+      .wa-home-profile-copy { min-width: 0; flex: 1; }
+      .wa-home-profile-name { font-weight: 900; color: #0f172a; }
+      .wa-home-profile-status { margin-top: 3px; color: #64748b; font-size: 13px; }
+
+      .wa-home-actions {
+        width: min(100%, 540px);
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+        margin-top: 16px;
+      }
+
+      .wa-home-action {
+        min-height: 72px;
+        border: 0;
+        border-radius: 16px;
+        padding: 12px 10px;
+        background: #ffffff;
+        color: #0f172a;
+        box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
+        cursor: pointer;
+        font-weight: 800;
+      }
+
+      .wa-home-action:hover { transform: translateY(-1px); }
+      .wa-home-action-icon { display: block; margin-bottom: 6px; font-size: 20px; }
+
+      .wa-home-section {
+        width: min(100%, 540px);
+        margin-top: 20px;
+        text-align: left;
+      }
+
+      .wa-home-section-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 9px;
+        color: #334155;
+        font-size: 13px;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+
+      .wa-home-count {
+        min-width: 24px;
+        padding: 3px 8px;
+        border-radius: 999px;
+        background: var(--accent-color, #22c55e);
+        color: #fff;
+        text-align: center;
+        font-size: 12px;
+      }
+
+      .wa-home-room-list { display: grid; gap: 8px; }
+
+      .wa-home-room {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        border: 1px solid rgba(148, 163, 184, 0.20);
+        border-radius: 16px;
+        padding: 10px 12px;
+        background: rgba(255,255,255,0.9);
+        cursor: pointer;
+        text-align: left;
+      }
+
+      .wa-home-room:hover { background: #fff; }
+      .wa-home-room-copy { min-width: 0; flex: 1; }
+      .wa-home-room-name { color: #0f172a; font-weight: 850; }
+      .wa-home-room-preview { margin-top: 3px; overflow: hidden; color: #64748b; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+      .wa-home-room-unread { min-width: 24px; padding: 4px 7px; border-radius: 999px; background: var(--accent-color, #22c55e); color: white; font-size: 11px; font-weight: 900; text-align: center; }
+      .wa-home-empty { padding: 14px; border-radius: 16px; background: rgba(255,255,255,0.72); color: #64748b; font-size: 13px; text-align: center; }
+
+      @keyframes wa-welcome-arrive {
+        from { opacity: 0; transform: translateY(-24px) scale(1.18); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
+      }
+
+      @media (max-width: 560px) {
+        .wa-welcome-screen { padding: 20px 14px; }
+        .wa-welcome-content { justify-content: flex-start; padding-top: 30px; }
+        .wa-home-actions { grid-template-columns: 1fr; }
+        .wa-home-action { min-height: 54px; }
       }
 
       @keyframes wa-launch-pop {
@@ -2596,6 +2708,318 @@ function StyleTag() {
         outline: 3px solid rgba(250, 204, 21, 0.95);
         box-shadow: 0 0 0 6px rgba(250, 204, 21, 0.22);
       }
+
+
+      /* 2026 commercial UI/UX refresh */
+      :root {
+        color-scheme: light;
+      }
+
+      body {
+        background:
+          radial-gradient(circle at 10% 10%, rgba(99,102,241,.13), transparent 28%),
+          radial-gradient(circle at 90% 90%, rgba(14,165,233,.12), transparent 30%),
+          #eef2f7;
+        overflow: hidden;
+      }
+
+      button, input, select, textarea { font: inherit; }
+      button { -webkit-tap-highlight-color: transparent; }
+      button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+        outline: 3px solid color-mix(in srgb, var(--accent-color, #6366f1) 34%, transparent);
+        outline-offset: 2px;
+      }
+
+      .wa-app {
+        grid-template-columns: 356px minmax(0, 1fr);
+        height: 100dvh;
+        max-width: 1720px;
+        margin: 0 auto;
+        background: rgba(255,255,255,.7);
+        box-shadow: 0 24px 80px rgba(15,23,42,.14);
+        overflow: hidden;
+      }
+
+      .wa-sidebar {
+        background:
+          linear-gradient(180deg, rgba(15,23,42,.98), rgba(20,29,53,.97)),
+          #0f172a;
+        padding: 18px 16px 20px;
+        border-right: 1px solid rgba(148,163,184,.16);
+        scrollbar-width: thin;
+        scrollbar-color: rgba(148,163,184,.28) transparent;
+      }
+
+      .wa-brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 42px;
+        margin: 0 2px 16px;
+        letter-spacing: -.02em;
+        font-size: 19px;
+      }
+      .wa-brand img {
+        width: 34px;
+        height: 34px;
+        border-radius: 11px;
+        box-shadow: 0 8px 22px rgba(0,0,0,.28);
+      }
+
+      .wa-profile-card {
+        padding: 12px;
+        margin-bottom: 14px;
+        border: 1px solid rgba(255,255,255,.08);
+        background: linear-gradient(135deg, rgba(255,255,255,.10), rgba(255,255,255,.055));
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.05);
+        transition: transform .18s ease, background .18s ease, border-color .18s ease;
+      }
+      .wa-profile-card:hover {
+        transform: translateY(-1px);
+        background: rgba(255,255,255,.13);
+        border-color: rgba(255,255,255,.14);
+      }
+
+      .wa-side-switcher {
+        padding: 4px;
+        gap: 3px;
+        background: rgba(2,6,23,.34);
+        border: 1px solid rgba(148,163,184,.10);
+        border-radius: 14px;
+        margin-bottom: 13px;
+      }
+      .wa-side-tab {
+        min-height: 38px;
+        border-radius: 10px;
+        font-size: 12px;
+        font-weight: 750;
+        letter-spacing: .01em;
+        transition: background .18s ease, color .18s ease, transform .18s ease;
+      }
+      .wa-side-tab:hover { background: rgba(255,255,255,.07); }
+      .wa-side-tab.active {
+        background: rgba(255,255,255,.14);
+        box-shadow: 0 5px 14px rgba(0,0,0,.16), inset 0 1px rgba(255,255,255,.08);
+      }
+
+      .wa-search-input {
+        min-height: 44px;
+        border: 1px solid rgba(148,163,184,.12);
+        border-radius: 13px;
+        background: rgba(2,6,23,.34);
+        color: #f8fafc;
+        padding: 0 14px;
+        transition: background .18s ease, border-color .18s ease, box-shadow .18s ease;
+      }
+      .wa-search-input::placeholder { color: #94a3b8; }
+      .wa-search-input:focus {
+        background: rgba(2,6,23,.52);
+        border-color: color-mix(in srgb, var(--accent-color, #6366f1) 60%, white 8%);
+        box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent-color, #6366f1) 18%, transparent);
+      }
+
+      .wa-section-label {
+        margin: 17px 7px 8px;
+        color: #94a3b8;
+        font-size: 10px;
+        letter-spacing: .16em;
+        text-transform: uppercase;
+        font-weight: 850;
+      }
+
+      .wa-room-card, .wa-user-card, .wa-call-log-card, .wa-search-result-card {
+        border: 1px solid transparent;
+        border-radius: 15px;
+        margin-bottom: 5px;
+        padding: 11px 10px;
+        transition: transform .16s ease, background .16s ease, border-color .16s ease;
+      }
+      .wa-room-card:hover, .wa-user-card:hover, .wa-call-log-card:hover, .wa-search-result-card:hover {
+        transform: translateX(2px);
+        background: rgba(255,255,255,.095);
+      }
+      .wa-room-card.active {
+        background: linear-gradient(135deg, color-mix(in srgb, var(--accent-color, #6366f1) 35%, transparent), rgba(255,255,255,.09));
+        border-color: color-mix(in srgb, var(--accent-color, #6366f1) 46%, transparent);
+        box-shadow: 0 9px 22px rgba(2,6,23,.18);
+      }
+      .wa-room-title { letter-spacing: -.012em; }
+      .wa-room-sub, .wa-user-sub, .wa-profile-sub { color: #a9b6c8; line-height: 1.35; }
+      .wa-unread-badge {
+        min-width: 21px;
+        height: 21px;
+        padding: 0 6px;
+        box-shadow: 0 5px 12px color-mix(in srgb, var(--accent-color, #6366f1) 34%, transparent);
+      }
+
+      .wa-main {
+        min-width: 0;
+        background: color-mix(in srgb, var(--chat-wallpaper, #e8edf3) 88%, white 12%);
+        position: relative;
+      }
+      .wa-main::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background:
+          radial-gradient(circle at 18% 15%, rgba(255,255,255,.72), transparent 28%),
+          radial-gradient(circle at 84% 82%, color-mix(in srgb, var(--accent-color, #6366f1) 7%, transparent), transparent 30%);
+        z-index: 0;
+      }
+      .wa-main > * { position: relative; z-index: 1; }
+
+      .wa-header {
+        min-height: 72px;
+        padding: 10px 18px;
+        background: rgba(255,255,255,.82);
+        border-bottom: 1px solid rgba(148,163,184,.20);
+        backdrop-filter: blur(18px) saturate(140%);
+        -webkit-backdrop-filter: blur(18px) saturate(140%);
+        box-shadow: 0 4px 22px rgba(15,23,42,.045);
+      }
+      .wa-header-title { font-size: 16px; letter-spacing: -.018em; }
+      .wa-header-sub { color: #64748b; }
+      .wa-header-app-logo { border-radius: 12px; box-shadow: 0 7px 18px rgba(15,23,42,.13); }
+
+      .wa-icon-btn {
+        width: 41px;
+        height: 41px;
+        border-radius: 12px;
+        border: 1px solid rgba(148,163,184,.20);
+        background: rgba(255,255,255,.72);
+        box-shadow: 0 4px 12px rgba(15,23,42,.055);
+        transition: transform .16s ease, background .16s ease, box-shadow .16s ease;
+      }
+      .wa-icon-btn:hover {
+        transform: translateY(-1px);
+        background: #fff;
+        box-shadow: 0 8px 18px rgba(15,23,42,.10);
+      }
+
+      .wa-chat {
+        padding: 22px clamp(14px, 3vw, 42px) 118px;
+        scroll-padding-bottom: 104px;
+      }
+      .wa-message-row { margin: 3px 0; }
+      .wa-bubble {
+        max-width: min(680px, 76%);
+        border: 1px solid rgba(148,163,184,.16);
+        box-shadow: 0 5px 18px rgba(15,23,42,.065);
+        line-height: 1.48;
+      }
+      .wa-message-row.own .wa-bubble {
+        border-color: color-mix(in srgb, var(--chat-color, #2563eb) 42%, transparent);
+        box-shadow: 0 7px 20px color-mix(in srgb, var(--chat-color, #2563eb) 14%, transparent);
+      }
+
+      .wa-composer-wrap {
+        padding: 10px clamp(12px, 2.5vw, 28px) 14px;
+        background: linear-gradient(180deg, rgba(255,255,255,0), rgba(255,255,255,.88) 28%);
+        border-top: 0;
+      }
+      .wa-composer {
+        max-width: 1040px;
+        margin: 0 auto;
+        padding: 8px;
+        border-radius: 20px;
+        border: 1px solid rgba(148,163,184,.23);
+        background: rgba(255,255,255,.91);
+        box-shadow: 0 14px 36px rgba(15,23,42,.13);
+        backdrop-filter: blur(14px);
+      }
+      .wa-message-input, .wa-composer textarea {
+        min-height: 44px;
+        background: transparent;
+      }
+      .wa-send-btn {
+        min-height: 42px;
+        border-radius: 13px;
+        box-shadow: 0 8px 18px color-mix(in srgb, var(--accent-color, #6366f1) 24%, transparent);
+        transition: transform .16s ease, filter .16s ease;
+      }
+      .wa-send-btn:hover { transform: translateY(-1px); filter: brightness(1.04); }
+
+      .wa-welcome-screen {
+        padding: 28px;
+        background: transparent;
+      }
+      .wa-welcome-content {
+        width: min(920px, 100%);
+        min-height: min(720px, calc(100dvh - 128px));
+        margin: 0 auto;
+        padding: clamp(24px, 4vw, 50px);
+        border: 1px solid rgba(255,255,255,.75);
+        border-radius: 32px;
+        background: linear-gradient(145deg, rgba(255,255,255,.75), rgba(255,255,255,.48));
+        box-shadow: 0 30px 80px rgba(15,23,42,.10), inset 0 1px rgba(255,255,255,.85);
+        backdrop-filter: blur(22px) saturate(135%);
+        -webkit-backdrop-filter: blur(22px) saturate(135%);
+      }
+      .wa-welcome-logo {
+        width: 88px;
+        height: 88px;
+        padding: 4px;
+        border-radius: 25px;
+        box-shadow: 0 20px 45px rgba(15,23,42,.18);
+      }
+      .wa-welcome-screen h1 { font-size: clamp(30px, 5vw, 48px); letter-spacing: -.045em; }
+      .wa-welcome-tagline { font-size: 16px; color: #475569; }
+      .wa-welcome-intro { max-width: 580px; color: #64748b; line-height: 1.65; }
+      .wa-home-action, .wa-home-chat-card {
+        border: 1px solid rgba(148,163,184,.18);
+        background: rgba(255,255,255,.70);
+        box-shadow: 0 8px 22px rgba(15,23,42,.055);
+        transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+      }
+      .wa-home-action:hover, .wa-home-chat-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 15px 30px rgba(15,23,42,.10);
+        border-color: color-mix(in srgb, var(--accent-color, #6366f1) 32%, transparent);
+      }
+
+      .wa-modal-backdrop {
+        background: rgba(2,6,23,.55);
+        backdrop-filter: blur(8px);
+      }
+      .wa-profile-modal, .wa-chat-details-panel, .wa-call-card {
+        border: 1px solid rgba(255,255,255,.78);
+        box-shadow: 0 30px 90px rgba(2,6,23,.26);
+      }
+
+      @media (max-width: 1100px) {
+        .wa-app { grid-template-columns: 320px minmax(0, 1fr); }
+        .wa-chat { padding-inline: 18px; }
+      }
+
+      @media (max-width: 900px) {
+        body { background: #eef2f7; }
+        .wa-app { display: block; width: 100vw; max-width: none; }
+        .wa-sidebar {
+          width: min(88vw, 340px);
+          max-width: none;
+          box-shadow: 24px 0 70px rgba(2,6,23,.38);
+        }
+        .wa-header { min-height: 66px; padding: 8px 10px; }
+        .wa-welcome-screen { padding: 12px; }
+        .wa-welcome-content {
+          min-height: calc(100dvh - 90px);
+          padding: 24px 16px;
+          border-radius: 24px;
+        }
+        .wa-bubble { max-width: 88%; }
+        .wa-composer-wrap { padding: 8px 8px max(10px, env(safe-area-inset-bottom)); }
+        .wa-composer { border-radius: 17px; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+          scroll-behavior: auto !important;
+          animation-duration: .01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: .01ms !important;
+        }
+      }
     `}
 
 
@@ -3153,6 +3577,25 @@ export default function App() {
     () => Object.values(unreadCounts || {}).reduce((total, count) => total + Number(count || 0), 0),
     [unreadCounts]
   );
+
+  const unreadRooms = useMemo(
+    () => roomsSorted.filter((room) => Number(unreadCounts[room.slug] || 0) > 0).slice(0, 3),
+    [roomsSorted, unreadCounts]
+  );
+
+  const recentRooms = useMemo(
+    () => roomsSorted.filter((room) => Number(unreadCounts[room.slug] || 0) === 0).slice(0, 3),
+    [roomsSorted, unreadCounts]
+  );
+
+  function openHomeRoom(roomSlug) {
+    if (!roomSlug) return;
+    setSidebarMode("chats");
+    setActiveRoomSlug(roomSlug);
+    setReplyTo(null);
+    setShowChatDetails(false);
+    setShowSidebar(false);
+  }
 
   const filteredRooms = useMemo(
     () =>
@@ -5608,12 +6051,244 @@ export default function App() {
   return (
     <>
       <StyleTag />
+      <style>{`
+        /* Int-Messager structural redesign v2 */
+        .wa-app {
+          display: grid !important;
+          grid-template-columns: minmax(360px, 410px) minmax(0, 1fr) !important;
+          height: 100dvh !important;
+          max-height: 100dvh !important;
+          padding: 14px !important;
+          gap: 14px !important;
+          background:
+            radial-gradient(circle at 8% 8%, color-mix(in srgb, var(--accent-color) 22%, transparent), transparent 29%),
+            radial-gradient(circle at 94% 92%, color-mix(in srgb, var(--app-color) 32%, transparent), transparent 36%),
+            #eef2f7 !important;
+          overflow: hidden !important;
+        }
+        .wa-sidebar {
+          position: relative !important;
+          width: auto !important;
+          min-width: 0 !important;
+          display: grid !important;
+          grid-template-columns: 82px minmax(0, 1fr) !important;
+          border: 0 !important;
+          border-radius: 28px !important;
+          overflow: hidden !important;
+          background: #ffffff !important;
+          box-shadow: 0 24px 70px rgba(15, 23, 42, .15) !important;
+        }
+        .wa-nav-rail {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 22px;
+          padding: 18px 10px;
+          background: linear-gradient(180deg, #111827 0%, color-mix(in srgb, var(--app-color) 80%, #020617) 100%);
+          color: #fff;
+        }
+        .wa-rail-logo, .wa-rail-profile, .wa-rail-btn { border: 0; font: inherit; cursor: pointer; }
+        .wa-rail-logo {
+          width: 50px; height: 50px; border-radius: 17px; padding: 5px;
+          background: rgba(255,255,255,.11); box-shadow: inset 0 0 0 1px rgba(255,255,255,.13);
+        }
+        .wa-rail-logo img { width: 100%; height: 100%; object-fit: cover; border-radius: 13px; }
+        .wa-rail-nav { display: flex; flex: 1; width: 100%; flex-direction: column; gap: 8px; }
+        .wa-rail-btn {
+          position: relative; min-height: 62px; border-radius: 18px; display: grid; place-items: center;
+          gap: 1px; color: #94a3b8; background: transparent; transition: .2s ease;
+        }
+        .wa-rail-btn span { font-size: 21px; line-height: 1; }
+        .wa-rail-btn small { font-size: 10px; font-weight: 750; letter-spacing: .02em; }
+        .wa-rail-btn:hover { color: #fff; background: rgba(255,255,255,.08); transform: translateY(-1px); }
+        .wa-rail-btn.active { color: #fff; background: linear-gradient(135deg, color-mix(in srgb, var(--accent-color) 92%, white), var(--accent-color)); box-shadow: 0 12px 26px color-mix(in srgb, var(--accent-color) 38%, transparent); }
+        .wa-rail-btn b { position: absolute; top: 7px; right: 7px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; display: grid; place-items:center; font-size: 9px; background:#ef4444; color:#fff; border:2px solid #111827; }
+        .wa-rail-profile { width: 46px; height: 46px; border-radius: 16px; padding: 0; background: transparent; overflow: hidden; box-shadow: 0 0 0 2px rgba(255,255,255,.18); }
+        .wa-rail-profile .wa-avatar { width: 46px !important; height: 46px !important; border-radius: 16px !important; }
+        .wa-sidebar-panel { min-width: 0; display: flex; flex-direction: column; overflow: hidden; padding: 20px 14px 14px; background: linear-gradient(180deg,#fff 0%,#f8fafc 100%); }
+        .wa-brand { padding: 0 8px 14px !important; min-height: 48px !important; border:0 !important; background:transparent !important; color:#0f172a !important; }
+        .wa-brand img { display:none !important; }
+        .wa-brand span { font-size: 22px !important; letter-spacing:-.04em; }
+        .wa-brand em { margin-left:auto; font-size:10px; font-style:normal; text-transform:uppercase; letter-spacing:.12em; color:#94a3b8; }
+        .wa-profile-card { margin: 0 2px 14px !important; border-radius: 18px !important; padding: 12px !important; background:#f1f5f9 !important; border:1px solid #e2e8f0 !important; box-shadow:none !important; }
+        .wa-side-switcher { display:none !important; }
+        .wa-search-input { margin: 0 2px 14px !important; height: 46px !important; border-radius: 15px !important; padding: 0 15px 0 16px !important; border:1px solid #e2e8f0 !important; background:#fff !important; box-shadow:0 8px 20px rgba(15,23,42,.05) !important; }
+        .wa-section-label { padding: 4px 8px 9px !important; font-size:11px !important; letter-spacing:.12em !important; color:#94a3b8 !important; }
+        .wa-room-card, .wa-user-card, .wa-call-log-card, .wa-search-result-card {
+          margin: 0 2px 7px !important; border-radius: 18px !important; padding: 12px !important;
+          border:1px solid transparent !important; background:transparent !important; transition:.18s ease !important;
+        }
+        .wa-room-card:hover, .wa-user-card:hover, .wa-call-log-card:hover, .wa-search-result-card:hover { background:#fff !important; border-color:#e2e8f0 !important; box-shadow:0 9px 24px rgba(15,23,42,.07) !important; transform:translateY(-1px); }
+        .wa-room-card.active { background:#fff !important; border-color:color-mix(in srgb,var(--accent-color) 32%,#e2e8f0) !important; box-shadow:0 12px 30px rgba(15,23,42,.09) !important; }
+        .wa-room-card.active::before { content:""; width:4px; height:34px; border-radius:4px; background:var(--accent-color); position:absolute; left:-2px; top:50%; transform:translateY(-50%); }
+        .wa-main { border-radius:28px !important; overflow:hidden !important; background:#fff !important; border:1px solid rgba(255,255,255,.78) !important; box-shadow:0 24px 70px rgba(15,23,42,.13) !important; }
+        .wa-header { min-height:82px !important; padding:14px 20px !important; background:rgba(255,255,255,.92) !important; backdrop-filter:blur(24px) !important; border-bottom:1px solid #e8edf3 !important; }
+        .wa-header-title { font-size:17px !important; letter-spacing:-.02em; }
+        .wa-header-sub { font-size:12px !important; color:#64748b !important; }
+        .wa-messages { padding:28px clamp(18px,4vw,64px) 120px !important; background-color:var(--chat-wallpaper) !important; background-image: radial-gradient(circle at 1px 1px, rgba(100,116,139,.10) 1px, transparent 0) !important; background-size:24px 24px !important; }
+        .wa-message-row { max-width: 900px !important; margin-left:auto !important; margin-right:auto !important; }
+        .wa-bubble { max-width:min(660px,78%) !important; padding:11px 14px !important; border-radius:18px !important; box-shadow:0 8px 22px rgba(15,23,42,.08) !important; border:1px solid rgba(255,255,255,.7) !important; }
+        .wa-message-row.mine .wa-bubble { border-bottom-right-radius:6px !important; background:var(--chat-color) !important; }
+        .wa-message-row:not(.mine) .wa-bubble { border-bottom-left-radius:6px !important; background:#fff !important; }
+        .wa-composer { position:absolute !important; left:50% !important; bottom:18px !important; transform:translateX(-50%) !important; width:min(880px,calc(100% - 42px)) !important; min-height:68px !important; padding:9px !important; border:1px solid rgba(226,232,240,.92) !important; border-radius:24px !important; background:rgba(255,255,255,.94) !important; backdrop-filter:blur(24px) !important; box-shadow:0 20px 50px rgba(15,23,42,.18) !important; }
+        .wa-input-wrap { background:#f8fafc !important; border-radius:17px !important; }
+        .wa-input { min-height:48px !important; background:transparent !important; }
+        .wa-send-btn { min-width:74px !important; height:48px !important; border-radius:16px !important; box-shadow:0 10px 22px color-mix(in srgb,var(--accent-color) 32%,transparent) !important; }
+        .wa-welcome-screen { background:linear-gradient(145deg,#f8fafc,#eef2ff) !important; }
+        .wa-welcome-content { width:min(980px,100%) !important; display:grid !important; grid-template-columns:minmax(260px,.8fr) minmax(320px,1.2fr) !important; align-items:start !important; gap:22px !important; text-align:left !important; }
+        .wa-welcome-logo, .wa-welcome-content>h1, .wa-welcome-tagline, .wa-welcome-intro, .wa-home-profile, .wa-home-actions { grid-column:1; }
+        .wa-welcome-logo { width:84px !important; height:84px !important; margin:0 !important; }
+        .wa-welcome-content h1 { margin:4px 0 0 !important; font-size:clamp(42px,5vw,68px) !important; line-height:.95 !important; }
+        .wa-welcome-tagline { margin:0 !important; font-size:18px !important; }
+        .wa-welcome-intro { margin:6px 0 8px !important; }
+        .wa-home-actions { grid-template-columns:1fr !important; }
+        .wa-home-section { grid-column:2; margin:0 !important; background:rgba(255,255,255,.76) !important; border:1px solid rgba(255,255,255,.9) !important; box-shadow:0 18px 48px rgba(15,23,42,.08) !important; }
+        .wa-home-section + .wa-home-section { margin-top:0 !important; }
+        .wa-close-chat-btn {
+          color:#64748b !important;
+          background:#f1f5f9 !important;
+          border:1px solid #e2e8f0 !important;
+        }
+        .wa-close-chat-btn:hover { color:#0f172a !important; background:#e2e8f0 !important; }
+
+        @media (max-width: 900px) {
+          .wa-app { display:block !important; padding:0 !important; }
+          .wa-main { border-radius:0 !important; height:100dvh !important; }
+          .wa-sidebar { position:fixed !important; inset:0 auto 0 0 !important; width:min(92vw,390px) !important; z-index:50 !important; border-radius:0 24px 24px 0 !important; transform:translateX(-105%); transition:.24s ease; }
+          .wa-sidebar.open { transform:translateX(0); }
+          .wa-nav-rail { width:70px; padding:14px 8px; }
+          .wa-welcome-content { display:flex !important; text-align:center !important; }
+          .wa-home-section { width:100% !important; }
+          .wa-composer { width:calc(100% - 18px) !important; bottom:8px !important; border-radius:20px !important; }
+          .wa-messages { padding:20px 12px 104px !important; }
+          .wa-bubble { max-width:86% !important; }
+
+          /* Native mobile messenger navigation */
+          .wa-sidebar {
+            inset:0 !important;
+            width:100vw !important;
+            max-width:none !important;
+            height:100dvh !important;
+            border-radius:0 !important;
+            transform:none !important;
+            display:grid !important;
+            grid-template-columns:1fr !important;
+            grid-template-rows:minmax(0,1fr) 72px !important;
+            background:#fff !important;
+            z-index:50 !important;
+          }
+          .wa-app.has-active-chat .wa-sidebar {
+            transform:translateX(-105%) !important;
+            transition:transform .22s ease !important;
+          }
+          .wa-app.has-active-chat .wa-sidebar.open { transform:translateX(0) !important; }
+          .wa-app.no-active-chat .wa-main { display:none !important; }
+          .wa-app.has-active-chat .wa-main { display:flex !important; width:100vw !important; }
+          .wa-sidebar-panel {
+            grid-column:1 !important;
+            grid-row:1 !important;
+            width:100% !important;
+            min-width:0 !important;
+            padding:18px 14px 18px !important;
+            overflow-y:auto !important;
+            overflow-x:hidden !important;
+            -webkit-overflow-scrolling:touch;
+          }
+          .wa-nav-rail {
+            grid-column:1 !important;
+            grid-row:2 !important;
+            position:relative !important;
+            inset:auto !important;
+            width:100% !important;
+            height:72px !important;
+            min-height:72px !important;
+            padding:7px max(8px,env(safe-area-inset-right)) calc(7px + env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left)) !important;
+            display:flex !important;
+            flex-direction:row !important;
+            align-items:center !important;
+            justify-content:space-around !important;
+            gap:4px !important;
+            border-radius:0 !important;
+            background:rgba(255,255,255,.97) !important;
+            border-top:1px solid #e2e8f0 !important;
+            box-shadow:0 -10px 28px rgba(15,23,42,.08) !important;
+            order:2 !important;
+          }
+          .wa-rail-logo, .wa-rail-profile { display:none !important; }
+          .wa-rail-nav {
+            width:100% !important;
+            display:grid !important;
+            grid-template-columns:repeat(4,minmax(0,1fr)) !important;
+            gap:4px !important;
+          }
+          .wa-rail-btn {
+            width:100% !important;
+            height:56px !important;
+            min-width:0 !important;
+            border-radius:14px !important;
+            color:#64748b !important;
+            display:flex !important;
+            flex-direction:column !important;
+            align-items:center !important;
+            justify-content:center !important;
+            gap:3px !important;
+          }
+          .wa-rail-btn span { font-size:20px !important; }
+          .wa-rail-btn small { font-size:10px !important; }
+          .wa-rail-btn.active {
+            color:var(--accent-color) !important;
+            background:color-mix(in srgb,var(--accent-color) 10%,white) !important;
+            box-shadow:none !important;
+          }
+          .wa-rail-btn b { top:3px !important; right:calc(50% - 26px) !important; border-color:#fff !important; }
+          .wa-mobile-overlay { display:none !important; }
+          .wa-brand { padding:0 4px 14px !important; }
+          .wa-brand span { font-size:28px !important; }
+          .wa-brand em { font-size:11px !important; }
+          .wa-profile-card { display:none !important; }
+          .wa-search-input { width:100% !important; margin:0 0 14px !important; }
+          .wa-room-card, .wa-user-card, .wa-call-log-card, .wa-search-result-card {
+            width:100% !important;
+            min-height:72px !important;
+            margin:0 0 4px !important;
+            border-radius:0 !important;
+            border:0 !important;
+            border-bottom:1px solid #eef2f7 !important;
+            padding:11px 4px !important;
+            box-shadow:none !important;
+          }
+          .wa-room-card.active { background:#f8fafc !important; box-shadow:none !important; }
+          .wa-room-card.active::before { display:none !important; }
+          .wa-header { min-height:68px !important; padding:8px 10px !important; }
+          .wa-header-right { gap:4px !important; }
+          .wa-header-right .wa-icon-btn:not(.call-action):not(.wa-close-chat-btn) { display:none !important; }
+          .wa-close-chat-btn { order:-1 !important; }
+        }
+      `}</style>
 
       {showSidebar ? <div className="wa-mobile-overlay" onClick={() => setShowSidebar(false)} /> : null}
 
-      <div className={`wa-app bubble-${chatPrefs.bubbleShape} font-${chatPrefs.fontSize}`} style={{ "--app-color": chatPrefs.appColor, "--accent-color": chatPrefs.accentColor, "--chat-wallpaper": chatPrefs.wallpaper, "--chat-color": chatPrefs.chatColor }}>
+      <div className={`wa-app ${activeRoom ? "has-active-chat" : "no-active-chat"} bubble-${chatPrefs.bubbleShape} font-${chatPrefs.fontSize}`} style={{ "--app-color": chatPrefs.appColor, "--accent-color": chatPrefs.accentColor, "--chat-wallpaper": chatPrefs.wallpaper, "--chat-color": chatPrefs.chatColor }}>
         <aside className={`wa-sidebar ${showSidebar ? "open" : ""}`}>
-          <div className="wa-brand">Messenger</div>
+          <nav className="wa-nav-rail" aria-label="Main navigation">
+            <button type="button" className="wa-rail-logo" title="Home" onClick={() => { setActiveRoomSlug(""); setShowChatDetails(false); }}>
+              <img src="/icons/icon-192.png" alt="Int-Messager" />
+            </button>
+            <div className="wa-rail-nav">
+              <button type="button" className={`wa-rail-btn ${sidebarMode === "chats" ? "active" : ""}`} onClick={() => setSidebarMode("chats")} title="Chats"><span>✉</span><small>Chats</small>{totalUnreadCount ? <b>{totalUnreadCount > 99 ? "99+" : totalUnreadCount}</b> : null}</button>
+              <button type="button" className={`wa-rail-btn ${sidebarMode === "people" ? "active" : ""}`} onClick={() => setSidebarMode("people")} title="Contacts"><span>◉</span><small>Contacts</small></button>
+              <button type="button" className={`wa-rail-btn ${sidebarMode === "calls" ? "active" : ""}`} onClick={() => setSidebarMode("calls")} title="Calls"><span>☎</span><small>Calls</small></button>
+              <button type="button" className={`wa-rail-btn ${sidebarMode === "settings" ? "active" : ""}`} onClick={() => setSidebarMode("settings")} title="Settings"><span>⚙</span><small>Settings</small></button>
+            </div>
+            <button type="button" className="wa-rail-profile" title="Edit profile" onClick={() => {
+              setDisplayNameInput(profile.displayName || "");
+              setProfileStatusInput(profile.profileStatus || "Available now");
+              setProfileAvatarPreview(profile.avatarUrl || "");
+              setShowProfileEditor(true);
+            }}><Avatar label={profile.displayName} src={profile.avatarUrl} /></button>
+          </nav>
+          <div className="wa-sidebar-panel">
+          <div className="wa-brand"><img src="/icons/icon-192.png" alt="" /><span>Int-Messager</span><em>{sidebarMode}</em></div>
 
           <button
             type="button"
@@ -5648,7 +6323,7 @@ export default function App() {
               className={`wa-side-tab ${sidebarMode === "people" ? "active" : ""}`}
               onClick={() => setSidebarMode("people")}
             >
-              People
+              Contacts
             </button>
             <button
               type="button"
@@ -5670,7 +6345,7 @@ export default function App() {
             className="wa-search-input"
             value={chatSearch}
             onChange={(e) => setChatSearch(e.target.value)}
-            placeholder={sidebarMode === "chats" ? "Search chats" : sidebarMode === "people" ? "Search people" : sidebarMode === "settings" ? "Personalize chat" : "Search calls"}
+            placeholder={sidebarMode === "chats" ? "Search chats" : sidebarMode === "people" ? "Search contacts" : sidebarMode === "settings" ? "Personalize chat" : "Search calls"}
           />
 
           {sidebarMode === "chats" && chatSearch.trim().length >= 2 ? (
@@ -5844,7 +6519,7 @@ export default function App() {
             </>
           ) : (
             <>
-              <div className="wa-section-label">People</div>
+              <div className="wa-section-label">Contacts</div>
               {filteredProfiles.map((user) => (
                 <button
                   key={user._id}
@@ -5861,6 +6536,7 @@ export default function App() {
               ))}
             </>
           )}
+          </div>
         </aside>
 
         <section className="wa-main">
@@ -5943,6 +6619,23 @@ export default function App() {
                 title="Search messages"
               >
                 🔍
+              </button>
+
+              <button
+                type="button"
+                className="wa-icon-btn wa-close-chat-btn"
+                onClick={() => {
+                  setActiveRoomSlug("");
+                  setReplyTo(null);
+                  setShowChatDetails(false);
+                  setShowMessageSearch(false);
+                  setSidebarMode("chats");
+                  setShowSidebar(false);
+                }}
+                title="Close chat"
+                aria-label="Close chat"
+              >
+                ✕
               </button>
               </div>
             ) : null}
@@ -6246,10 +6939,73 @@ export default function App() {
             </>
           ) : (
             <main className="wa-welcome-screen">
-              <img src="/icons/icon-192.png" alt="Int-Messager" className="wa-welcome-logo" />
-              <h1>Int-Messager</h1>
-              <p>Connecting with love</p>
-              <span>Select a conversation from the Chats tab to start messaging.</span>
+              <div className="wa-welcome-content">
+                <img src="/icons/icon-192.png" alt="Int-Messager" className="wa-welcome-logo" />
+                <h1>Int-Messager</h1>
+                <p className="wa-welcome-tagline">Connecting with love</p>
+                <div className="wa-welcome-intro">Choose a conversation, reconnect with someone, or open the General group when you are ready.</div>
+
+                <div className="wa-home-profile">
+                  <Avatar label={profile?.displayName || "Me"} src={profile?.avatarUrl} />
+                  <div className="wa-home-profile-copy">
+                    <div className="wa-home-profile-name">{profile?.displayName || "Your profile"}</div>
+                    <div className="wa-home-profile-status">{profile?.profileStatus || "Available now"}</div>
+                  </div>
+                </div>
+
+                <div className="wa-home-actions">
+                  <button type="button" className="wa-home-action" onClick={() => { setSidebarMode("people"); setShowSidebar(true); }}>
+                    <span className="wa-home-action-icon">✚</span>
+                    New chat
+                  </button>
+                  <button type="button" className="wa-home-action" onClick={() => openHomeRoom("general")}>
+                    <span className="wa-home-action-icon">💬</span>
+                    Open General
+                  </button>
+                  <button type="button" className="wa-home-action" onClick={() => { setSidebarMode("chats"); setShowSidebar(true); }}>
+                    <span className="wa-home-action-icon">🔍</span>
+                    Find a chat
+                  </button>
+                </div>
+
+                {unreadRooms.length ? (
+                  <section className="wa-home-section">
+                    <div className="wa-home-section-title">
+                      <span>Unread conversations</span>
+                      <span className="wa-home-count">{totalUnreadCount}</span>
+                    </div>
+                    <div className="wa-home-room-list">
+                      {unreadRooms.map((room) => (
+                        <button key={room.slug} type="button" className="wa-home-room" onClick={() => openHomeRoom(room.slug)}>
+                          <Avatar label={getRoomDisplayName(room, profile?.displayName, currentProfileId, profiles)} src={getRoomAvatarSrc(room)} />
+                          <div className="wa-home-room-copy">
+                            <div className="wa-home-room-name">{getRoomDisplayName(room, profile?.displayName, currentProfileId, profiles)}</div>
+                            <div className="wa-home-room-preview">{room.lastMessageText || (room.slug === "general" ? "Public room" : "New conversation")}</div>
+                          </div>
+                          <span className="wa-home-room-unread">{unreadCounts[room.slug]}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
+
+                <section className="wa-home-section">
+                  <div className="wa-home-section-title"><span>Recent chats</span></div>
+                  {recentRooms.length ? (
+                    <div className="wa-home-room-list">
+                      {recentRooms.map((room) => (
+                        <button key={room.slug} type="button" className="wa-home-room" onClick={() => openHomeRoom(room.slug)}>
+                          <Avatar label={getRoomDisplayName(room, profile?.displayName, currentProfileId, profiles)} src={getRoomAvatarSrc(room)} />
+                          <div className="wa-home-room-copy">
+                            <div className="wa-home-room-name">{getRoomDisplayName(room, profile?.displayName, currentProfileId, profiles)}</div>
+                            <div className="wa-home-room-preview">{room.lastMessageText || (room.slug === "general" ? "Public room" : "New conversation")}</div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  ) : <div className="wa-home-empty">Your recent conversations will appear here.</div>}
+                </section>
+              </div>
             </main>
           )}
         </section>
