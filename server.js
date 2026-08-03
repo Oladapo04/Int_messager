@@ -1286,34 +1286,98 @@ app.post("/api/session/set-name", async (req, res) => {
 
 
 app.post("/api/profile", (req, res) => {
-  upload.single("avatar")(req, res, async (err) => {
+  upload.single("avatar")(req, res, async (uploadError) => {
     try {
-      if (err) {
-        console.error(err);
-
-        return res.status(500).json({
+      if (uploadError) {
+        console.error("Profile upload error:", uploadError);
+        return res.status(400).json({
           success: false,
-          error: err.message,
+          error: uploadError.message || "Profile image upload failed",
         });
       }
 
-      const update = {};
-
-      if (req.file) {
-        update.avatarUrl = req.file.path;
+      if (req.file && !String(req.file.mimetype || "").startsWith("image/")) {
+        return res.status(400).json({
+          success: false,
+          error: "Please choose a valid image file.",
+        });
       }
 
-      res.json({
+      const tokenPayload = verifyAuthToken(getBearerToken(req));
+      const requestInstallId = getInstallId(req);
+
+      // Prefer the authenticated profile ID. The install ID fallback keeps
+      // previously claimed accounts compatible while they migrate to JWT auth.
+      let profile = null;
+      if (tokenPayload?.profileId) {
+        profile = await Profile.findById(tokenPayload.profileId);
+      }
+      if (!profile && requestInstallId) {
+        profile = await Profile.findOne({ installId: requestInstallId });
+      }
+
+      if (!profile) {
+        return res.status(401).json({
+          success: false,
+          error: "Your session has expired. Please sign in again.",
+        });
+      }
+
+      const displayName = String(req.body?.displayName || "").trim();
+      const profileStatus =
+        String(req.body?.profileStatus || "").trim() || "Available now";
+
+      if (!displayName) {
+        return res.status(400).json({
+          success: false,
+          error: "Display name is required.",
+        });
+      }
+
+      const duplicateName = await Profile.findOne({
+        _id: { $ne: profile._id },
+        displayName: { $regex: `^${escapeRegex(displayName)}$`, $options: "i" },
+      }).lean();
+
+      if (duplicateName) {
+        return res.status(409).json({
+          success: false,
+          error: "That display name is already in use.",
+        });
+      }
+
+      profile.displayName = displayName;
+      profile.profileStatus = profileStatus;
+      profile.nameLocked = true;
+      profile.activeChat = true;
+
+      if (req.file?.path) {
+        profile.avatarUrl = req.file.path;
+      }
+
+      await profile.save();
+      io.emit("profiles_updated");
+
+      return res.json({
         success: true,
-        avatarUrl: update.avatarUrl,
+        data: {
+          installId: profile.installId,
+          profileId: profile._id,
+          _id: profile._id,
+          email: profile.email || "",
+          phone: profile.phone || "",
+          displayName: profile.displayName || "",
+          profileStatus: profile.profileStatus || "Available now",
+          avatarUrl: profile.avatarUrl || "",
+          nameLocked: profile.nameLocked,
+          activeChat: profile.activeChat,
+        },
       });
-
     } catch (error) {
-      console.error(error);
-
-      res.status(500).json({
+      console.error("Profile update error:", error);
+      return res.status(500).json({
         success: false,
-        error: "Profile upload failed",
+        error: "Profile update failed.",
       });
     }
   });

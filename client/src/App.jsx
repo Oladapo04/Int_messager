@@ -3209,6 +3209,13 @@ function AuthScreen({ onAuthenticated, legacyInstallId }) {
   const [authMessage, setAuthMessage] = useState("");
   const [developmentResetUrl, setDevelopmentResetUrl] = useState("");
 
+  function keepAuthFieldVisible(event) {
+    const field = event.currentTarget;
+    window.setTimeout(() => {
+      field.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+    }, 280);
+  }
+
   function changeMode(nextMode) {
     setMode(nextMode);
     setAuthError("");
@@ -3304,20 +3311,20 @@ function AuthScreen({ onAuthenticated, legacyInstallId }) {
         )}
 
         {mode === "register" ? (
-          <label>Display name<input value={displayName} onChange={(e) => setDisplayName(e.target.value)} required maxLength={30} autoComplete="name" /></label>
+          <label>Display name<input value={displayName} onChange={(e) => setDisplayName(e.target.value)} required maxLength={30} autoComplete="name" onFocus={keepAuthFieldVisible} /></label>
         ) : null}
 
         {mode !== "reset" ? (
-          <label>{mode === "login" || mode === "forgot" ? "Email or phone number" : "Email address"}<input type={mode === "register" ? "email" : "text"} value={identifier} onChange={(e) => setIdentifier(e.target.value)} required autoComplete={mode === "login" ? "username" : "email"} /></label>
+          <label>{mode === "login" || mode === "forgot" ? "Email or phone number" : "Email address"}<input type={mode === "register" ? "email" : "text"} value={identifier} onChange={(e) => setIdentifier(e.target.value)} required autoComplete={mode === "login" ? "username" : "email"} inputMode={mode === "register" ? "email" : "text"} onFocus={keepAuthFieldVisible} /></label>
         ) : initialResetEmail ? <div className="v41-reset-account">Resetting password for <strong>{initialResetEmail}</strong></div> : null}
 
-        {mode === "register" ? <label>Phone number <span>(optional)</span><input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel" /></label> : null}
+        {mode === "register" ? <label>Phone number <span>(optional)</span><input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel" onFocus={keepAuthFieldVisible} /></label> : null}
 
         {mode === "login" || mode === "register" || mode === "reset" ? (
-          <label>{mode === "reset" ? "New password" : "Password"}<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} autoComplete={mode === "login" ? "current-password" : "new-password"} /></label>
+          <label>{mode === "reset" ? "New password" : "Password"}<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} autoComplete={mode === "login" ? "current-password" : "new-password"} onFocus={keepAuthFieldVisible} /></label>
         ) : null}
 
-        {mode === "register" || mode === "reset" ? <label>Confirm password<input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required minLength={8} autoComplete="new-password" /></label> : null}
+        {mode === "register" || mode === "reset" ? <label>Confirm password<input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required minLength={8} autoComplete="new-password" onFocus={keepAuthFieldVisible} /></label> : null}
 
         {mode === "login" ? <button type="button" className="v41-forgot-link" onClick={() => changeMode("forgot")}>Forgot password?</button> : null}
         {mode === "register" && legacyInstallId ? <div className="v4-claim-note">Your current device profile and chat history will be linked to this account.</div> : null}
@@ -3335,6 +3342,50 @@ function AuthScreen({ onAuthenticated, legacyInstallId }) {
   );
 }
 
+
+async function prepareProfileImage(file) {
+  if (!file) return null;
+
+  const maxInputSize = 25 * 1024 * 1024;
+  if (file.size > maxInputSize) {
+    throw new Error("The selected picture is too large. Please choose an image smaller than 25 MB.");
+  }
+
+  const supportedWithoutConversion = ["image/jpeg", "image/png", "image/webp"];
+  if (supportedWithoutConversion.includes(file.type) && file.size <= 4 * 1024 * 1024) {
+    return file;
+  }
+
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const image = await new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error("This picture format could not be read. Please choose a JPG, PNG or WebP image."));
+      img.src = objectUrl;
+    });
+
+    const maxDimension = 1280;
+    const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight));
+    const width = Math.max(1, Math.round(image.naturalWidth * scale));
+    const height = Math.max(1, Math.round(image.naturalHeight * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Your browser could not prepare the selected picture.");
+    context.drawImage(image, 0, 0, width, height);
+
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.86));
+    if (!blob) throw new Error("The selected picture could not be prepared for upload.");
+
+    const baseName = (file.name || "profile-picture").replace(/\.[^.]+$/, "");
+    return new File([blob], `${baseName}.jpg`, { type: "image/jpeg", lastModified: Date.now() });
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
 export default function App() {
   const legacyInstallId = useMemo(() => getOrCreateInstallId(), []);
   const [installId, setInstallId] = useState(() => localStorage.getItem(ACCOUNT_INSTALL_ID_KEY) || legacyInstallId);
@@ -3350,6 +3401,8 @@ export default function App() {
   const [profileAvatarFile, setProfileAvatarFile] = useState(null);
   const [profileAvatarPreview, setProfileAvatarPreview] = useState("");
   const [showProfileEditor, setShowProfileEditor] = useState(false);
+  const [profileSavePending, setProfileSavePending] = useState(false);
+  const [profileSaveError, setProfileSaveError] = useState("");
   const [rooms, setRooms] = useState([]);
   const [profiles, setProfiles] = useState([]);
   const [activeRoomSlug, setActiveRoomSlug] = useState("");
@@ -4832,32 +4885,71 @@ export default function App() {
   }
 
   async function handleSetName() {
+    if (profileSavePending) return;
+
+    const nextDisplayName = displayNameInput.trim();
+    if (!nextDisplayName) {
+      setProfileSaveError("Display name is required.");
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 60000);
+
     try {
       setError("");
+      setProfileSaveError("");
+      setProfileSavePending(true);
+
       const formData = new FormData();
       formData.append("installId", installId);
-      formData.append("displayName", displayNameInput.trim());
+      formData.append("displayName", nextDisplayName);
       formData.append("profileStatus", profileStatusInput.trim() || "Available now");
-      if (profileAvatarFile) formData.append("avatar", profileAvatarFile);
+
+      if (profileAvatarFile) {
+        const preparedImage = await prepareProfileImage(profileAvatarFile);
+        if (preparedImage) formData.append("avatar", preparedImage, preparedImage.name);
+      }
 
       const res = await authFetch(`${API_BASE}/api/profile`, {
         method: "POST",
         headers: { "x-install-id": installId },
         body: formData,
+        signal: controller.signal,
       });
 
-      const payload = await res.json();
+      const responseText = await res.text();
+      let payload = {};
+      try {
+        payload = responseText ? JSON.parse(responseText) : {};
+      } catch {
+        throw new Error("The server returned an invalid response while saving your profile.");
+      }
+
       if (!res.ok || !payload.success) {
         throw new Error(payload.error || "Failed to save profile");
       }
 
-      setSession(payload.data);
-      setProfile(payload.data);
+      if (!payload.data) {
+        throw new Error("The server returned an incomplete profile response.");
+      }
+
+      setSession((current) => ({ ...(current || {}), ...payload.data }));
+      setProfile((current) => ({ ...(current || {}), ...payload.data }));
+      setDisplayNameInput(payload.data.displayName || nextDisplayName);
+      setProfileStatusInput(payload.data.profileStatus || "Available now");
       setProfileAvatarFile(null);
-      setProfileAvatarPreview("");
+      setProfileAvatarPreview(payload.data.avatarUrl || "");
       setShowProfileEditor(false);
     } catch (err) {
-      setError(err.message || "Failed to save profile");
+      const message = err?.name === "AbortError"
+        ? "The picture upload took too long. Check your connection and try again."
+        : (err?.message || "Failed to save profile");
+      setProfileSaveError(message);
+      setError(message);
+    } finally {
+      window.clearTimeout(timeoutId);
+      setProfileSavePending(false);
     }
   }
 
@@ -7295,6 +7387,7 @@ export default function App() {
                   setProfileStatusInput(profile?.profileStatus || "Available now");
                   setProfileAvatarPreview(profile?.avatarUrl || "");
                   setProfileAvatarFile(null);
+                  setProfileSaveError("");
                   setShowProfileEditor(true);
                 }}>Change profile picture and details</button>
                 <div className="wa-settings-note">This profile is synced and can be recovered by signing in on another device.</div>
@@ -7873,8 +7966,10 @@ export default function App() {
                 hidden
                 onChange={(e) => {
                   const file = e.target.files?.[0] || null;
+                  setProfileSaveError("");
                   setProfileAvatarFile(file);
                   setProfileAvatarPreview(file ? URL.createObjectURL(file) : (profile?.avatarUrl || ""));
+                  e.target.value = "";
                 }}
               />
             </label>
@@ -7892,9 +7987,25 @@ export default function App() {
               placeholder="Profile status"
               maxLength={80}
             />
+            {profileSaveError ? (
+              <div className="wa-profile-save-error" role="alert">{profileSaveError}</div>
+            ) : null}
             <div className="wa-modal-actions">
-              <button type="button" className="wa-icon-btn" onClick={() => setShowProfileEditor(false)}>Cancel</button>
-              <button type="button" className="wa-send-btn" onClick={handleSetName}>Save</button>
+              <button
+                type="button"
+                className="wa-icon-btn"
+                disabled={profileSavePending}
+                onClick={() => {
+                  setProfileSaveError("");
+                  setShowProfileEditor(false);
+                }}
+              >Cancel</button>
+              <button
+                type="button"
+                className="wa-send-btn"
+                disabled={profileSavePending || !displayNameInput.trim()}
+                onClick={handleSetName}
+              >{profileSavePending ? "Saving…" : "Save"}</button>
             </div>
           </div>
         </div>
