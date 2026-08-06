@@ -10,7 +10,9 @@
     "server": "node server.js",
     "electron:dev": "concurrently \"node server.js\" \"cd client && npm run dev\" \"wait-on http://localhost:3001/api http://localhost:5173 && cross-env ELECTRON_START_URL=http://localhost:5173 electron .\"",
     "electron:pack": "npm run client:build && electron-builder --dir",
-    "electron:dist": "npm run client:build && electron-builder"
+    "electron:dist": "npm run client:build && electron-builder",
+    "lint": "eslint server.js scripts client/src --max-warnings=500",
+    "validate": "node scripts/validate-project.js"
   },
   "dependencies": {
     "@electron/remote": "^2.1.2",
@@ -29,10 +31,13 @@
     "web-push": "^3.6.7"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "concurrently": "^9.1.2",
     "cross-env": "^7.0.3",
     "electron": "^35.0.0",
     "electron-builder": "^25.1.8",
+    "eslint": "^10.8.0",
+    "globals": "^17.9.0",
     "wait-on": "^8.0.2"
   },
   "build": {

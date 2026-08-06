@@ -9,6 +9,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
+const notificationService = require("./server/services/notificationService");
 
 const cloudinary = require("cloudinary").v2;
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
@@ -297,6 +298,8 @@ const roomSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true },
     slug: { type: String, required: true, unique: true, trim: true },
     isDirect: { type: Boolean, default: false },
+    isSaved: { type: Boolean, default: false, index: true },
+    ownerProfileId: { type: mongoose.Schema.Types.ObjectId, ref: "Profile", default: null, index: true },
     participants: [{ type: mongoose.Schema.Types.ObjectId, ref: "Profile" }],
     lastMessageText: { type: String, default: "" },
     lastMessageAt: { type: Date, default: null },
@@ -354,6 +357,9 @@ const messageSchema = new mongoose.Schema(
 
     isDeleted: { type: Boolean, default: false },
     deletedAt: { type: Date, default: null },
+    isEdited: { type: Boolean, default: false },
+    editedAt: { type: Date, default: null },
+    hiddenFor: [{ type: mongoose.Schema.Types.ObjectId, ref: "Profile" }],
 
     status: {
       type: String,
@@ -390,6 +396,12 @@ const profileSchema = new mongoose.Schema(
     avatarUrl: { type: String, default: "" },
     nameLocked: { type: Boolean, default: false },
     activeChat: { type: Boolean, default: false },
+    username: { type: String, unique: true, sparse: true, index: true, lowercase: true, trim: true },
+    pinnedRooms: { type: [String], default: [] },
+    archivedRooms: { type: [String], default: [] },
+    mutedRooms: { type: [String], default: [] },
+    manuallyUnreadRooms: { type: [String], default: [] },
+    keepArchivedOnNewMessage: { type: Boolean, default: true },
     pushSubscriptions: {
       type: [Object],
       default: [],
@@ -401,6 +413,20 @@ const profileSchema = new mongoose.Schema(
 const Room = mongoose.model("Room", roomSchema);
 const Message = mongoose.model("Message", messageSchema);
 const Profile = mongoose.model("Profile", profileSchema);
+
+const sessionSchema = new mongoose.Schema({
+  sessionId: { type: String, required: true, unique: true, index: true },
+  profileId: { type: mongoose.Schema.Types.ObjectId, ref: "Profile", required: true, index: true },
+  deviceName: { type: String, default: "Unknown device" },
+  browser: { type: String, default: "" },
+  userAgent: { type: String, default: "" },
+  ipAddress: { type: String, default: "" },
+  lastActiveAt: { type: Date, default: Date.now },
+  expiresAt: { type: Date, required: true, index: { expires: 0 } },
+  revokedAt: { type: Date, default: null },
+}, { timestamps: true });
+const AuthSession = mongoose.model("AuthSession", sessionSchema);
+
 
 const callLogSchema = new mongoose.Schema(
   {
@@ -533,6 +559,10 @@ function getInstallId(req) {
     .trim();
 }
 
+function escapeRegex(value = "") {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function normalizeEmail(value) {
   return String(value || "").trim().toLowerCase();
 }
@@ -621,9 +651,29 @@ async function sendPasswordResetEmail(profile, resetUrl) {
   }
 }
 
-function authResponse(profile) {
+function parseDeviceName(req) {
+  const ua = String(req.headers["user-agent"] || "");
+  if (/iphone|ipad/i.test(ua)) return "iPhone/iPad";
+  if (/android/i.test(ua)) return "Android device";
+  if (/windows/i.test(ua)) return "Windows device";
+  if (/macintosh|mac os/i.test(ua)) return "Mac";
+  return "Web browser";
+}
+
+async function createAuthSession(profile, req) {
+  const sessionId = crypto.randomUUID();
+  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  await AuthSession.create({ sessionId, profileId: profile._id, deviceName: parseDeviceName(req), browser: String(req.headers["sec-ch-ua"] || ""), userAgent: String(req.headers["user-agent"] || ""), ipAddress: String(req.ip || ""), expiresAt });
+  return sessionId;
+}
+
+function issueSessionToken(profile, sessionId) {
+  return jwt.sign({ profileId: String(profile._id), installId: profile.installId || "", sessionId }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+}
+
+function authResponse(profile, sessionId = "") {
   return {
-    token: issueAuthToken(profile),
+    token: sessionId ? issueSessionToken(profile, sessionId) : issueAuthToken(profile),
     profile: {
       installId: profile.installId,
       profileId: profile._id,
@@ -633,6 +683,11 @@ function authResponse(profile) {
       displayName: profile.displayName || "",
       profileStatus: profile.profileStatus || "Available now",
       avatarUrl: profile.avatarUrl || "",
+      username: profile.username || "",
+      pinnedRooms: profile.pinnedRooms || [],
+      archivedRooms: profile.archivedRooms || [],
+      mutedRooms: profile.mutedRooms || [],
+      manuallyUnreadRooms: profile.manuallyUnreadRooms || [],
       nameLocked: profile.nameLocked,
       activeChat: profile.activeChat,
     },
@@ -651,6 +706,26 @@ function normalizeDirectSlug(profileIdA, profileIdB) {
 async function getProfileByInstallId(installId) {
   if (!installId) return null;
   return Profile.findOne({ installId });
+}
+
+async function ensureSavedMessagesRoom(profile) {
+  if (!profile?._id) return null;
+
+  const slug = `saved:${String(profile._id)}`;
+  return Room.findOneAndUpdate(
+    { slug },
+    {
+      $set: {
+        name: "Saved Messages",
+        isDirect: true,
+        isSaved: true,
+        ownerProfileId: profile._id,
+        participants: [profile._id],
+      },
+      $setOnInsert: { slug },
+    },
+    { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
+  );
 }
 
 async function ensurePublicRoom(roomSlug) {
@@ -695,6 +770,8 @@ function roomResponseShape(room, currentProfileId) {
     name: room.name,
     slug: room.slug,
     isDirect: room.isDirect,
+    isSaved: Boolean(room.isSaved),
+    ownerProfileId: room.ownerProfileId || null,
     participants: room.participants || [],
     lastMessageText: room.lastMessageText || "",
     lastMessageAt: room.lastMessageAt,
@@ -1032,8 +1109,10 @@ app.post("/api/auth/register", async (req, res) => {
     profile.lastLoginAt = new Date();
     await profile.save();
 
+    const sessionId = await createAuthSession(profile, req);
+    notificationService.welcome(profile).catch((error) => console.warn("Welcome email failed:", error.message));
     io.emit("profiles_updated");
-    return res.status(201).json({ success: true, data: authResponse(profile) });
+    return res.status(201).json({ success: true, data: authResponse(profile, sessionId) });
   } catch (error) {
     console.error("auth/register error:", error);
     return res.status(500).json({ success: false, error: "Failed to create account" });
@@ -1064,7 +1143,7 @@ app.post("/api/auth/forgot-password", async (req, res) => {
     await profile.save();
 
     const resetUrl = `${APP_BASE_URL}/?resetToken=${encodeURIComponent(token)}&email=${encodeURIComponent(profile.email)}`;
-    const delivery = await sendPasswordResetEmail(profile, resetUrl);
+    const delivery = await notificationService.passwordReset(profile, resetUrl, PASSWORD_RESET_EXPIRES_MINUTES);
     const payload = { success: true, message: genericMessage };
     if (process.env.NODE_ENV !== "production" && delivery.developmentPreview) payload.developmentResetUrl = resetUrl;
     return res.json(payload);
@@ -1094,8 +1173,9 @@ app.post("/api/auth/reset-password", async (req, res) => {
     profile.passwordResetExpiresAt = null;
     profile.passwordChangedAt = new Date();
     await profile.save();
+    await AuthSession.updateMany({ profileId: profile._id, revokedAt: null }, { $set: { revokedAt: new Date() } });
 
-    return res.json({ success: true, message: "Password reset successful. You can now sign in." });
+    return res.json({ success: true, message: "Password reset successful. Sign in again on your devices." });
   } catch (error) {
     console.error("auth/reset-password error:", error);
     return res.status(500).json({ success: false, error: "Failed to reset password" });
@@ -1117,7 +1197,9 @@ app.post("/api/auth/login", async (req, res) => {
     profile.lastLoginAt = new Date();
     profile.activeChat = true;
     await profile.save();
-    return res.json({ success: true, data: authResponse(profile) });
+    const sessionId = await createAuthSession(profile, req);
+    notificationService.loginAlert(profile, parseDeviceName(req)).catch((error) => console.warn("Login alert failed:", error.message));
+    return res.json({ success: true, data: authResponse(profile, sessionId) });
   } catch (error) {
     console.error("auth/login error:", error);
     return res.status(500).json({ success: false, error: "Failed to sign in" });
@@ -1127,9 +1209,37 @@ app.post("/api/auth/login", async (req, res) => {
 app.get("/api/auth/me", async (req, res) => {
   const payload = verifyAuthToken(getBearerToken(req));
   if (!payload?.profileId) return res.status(401).json({ success: false, error: "Sign in required" });
+  if (payload.sessionId) {
+    const session = await AuthSession.findOne({ sessionId: payload.sessionId, profileId: payload.profileId, revokedAt: null, expiresAt: { $gt: new Date() } });
+    if (!session) return res.status(401).json({ success: false, error: "This device session has expired" });
+    session.lastActiveAt = new Date();
+    await session.save();
+  }
   const profile = await Profile.findById(payload.profileId);
   if (!profile) return res.status(401).json({ success: false, error: "Account no longer exists" });
-  return res.json({ success: true, data: authResponse(profile) });
+  return res.json({ success: true, data: authResponse(profile, payload.sessionId || "") });
+});
+
+app.get("/api/auth/sessions", async (req, res) => {
+  const payload = verifyAuthToken(getBearerToken(req));
+  if (!payload?.profileId) return res.status(401).json({ success: false, error: "Sign in required" });
+  const sessions = await AuthSession.find({ profileId: payload.profileId, revokedAt: null, expiresAt: { $gt: new Date() } }).sort({ lastActiveAt: -1 }).lean();
+  return res.json({ success: true, data: sessions.map((item) => ({ sessionId: item.sessionId, deviceName: item.deviceName, browser: item.browser, userAgent: item.userAgent, lastActiveAt: item.lastActiveAt, createdAt: item.createdAt, current: item.sessionId === payload.sessionId })) });
+});
+
+app.delete("/api/auth/sessions/:sessionId", async (req, res) => {
+  const payload = verifyAuthToken(getBearerToken(req));
+  if (!payload?.profileId) return res.status(401).json({ success: false, error: "Sign in required" });
+  if (req.params.sessionId === payload.sessionId) return res.status(400).json({ success: false, error: "Use Sign out to remove this device" });
+  await AuthSession.updateOne({ sessionId: req.params.sessionId, profileId: payload.profileId }, { $set: { revokedAt: new Date() } });
+  return res.json({ success: true });
+});
+
+app.post("/api/auth/sessions/revoke-others", async (req, res) => {
+  const payload = verifyAuthToken(getBearerToken(req));
+  if (!payload?.profileId) return res.status(401).json({ success: false, error: "Sign in required" });
+  await AuthSession.updateMany({ profileId: payload.profileId, sessionId: { $ne: payload.sessionId }, revokedAt: null }, { $set: { revokedAt: new Date() } });
+  return res.json({ success: true });
 });
 
 app.post("/api/auth/change-password", async (req, res) => {
@@ -1369,19 +1479,169 @@ app.post("/api/profile", (req, res) => {
           displayName: profile.displayName || "",
           profileStatus: profile.profileStatus || "Available now",
           avatarUrl: profile.avatarUrl || "",
+          username: profile.username || "",
+          pinnedRooms: profile.pinnedRooms || [],
+          archivedRooms: profile.archivedRooms || [],
+          mutedRooms: profile.mutedRooms || [],
+          manuallyUnreadRooms: profile.manuallyUnreadRooms || [],
+          keepArchivedOnNewMessage: profile.keepArchivedOnNewMessage !== false,
           nameLocked: profile.nameLocked,
           activeChat: profile.activeChat,
         },
       });
     } catch (error) {
       console.error("Profile update error:", error);
+      const message = error?.name === "ValidationError"
+        ? Object.values(error.errors || {}).map((item) => item.message).join(" ")
+        : error?.code === 11000
+          ? "That profile name or username is already in use."
+          : error?.message || "Profile update failed.";
       return res.status(500).json({
         success: false,
-        error: "Profile update failed.",
+        error: message,
       });
     }
   });
 });
+
+
+app.get("/api/chat-preferences", async (req, res) => {
+  try {
+    const tokenPayload = verifyAuthToken(getBearerToken(req));
+    if (!tokenPayload?.profileId) return res.status(401).json({ success: false, error: "Please sign in again." });
+    const profile = await Profile.findById(tokenPayload.profileId).select("pinnedRooms archivedRooms mutedRooms manuallyUnreadRooms keepArchivedOnNewMessage").lean();
+    if (!profile) return res.status(404).json({ success: false, error: "Profile not found." });
+    return res.json({
+      success: true,
+      data: {
+        pinnedRooms: profile.pinnedRooms || [],
+        archivedRooms: profile.archivedRooms || [],
+        mutedRooms: profile.mutedRooms || [],
+        manuallyUnreadRooms: profile.manuallyUnreadRooms || [],
+        keepArchivedOnNewMessage: profile.keepArchivedOnNewMessage !== false,
+      },
+    });
+  } catch (error) {
+    console.error("chat preferences load error:", error);
+    return res.status(500).json({ success: false, error: "Failed to load chat preferences." });
+  }
+});
+
+app.patch("/api/chat-preferences/pinned-order", async (req, res) => {
+  try {
+    const tokenPayload = verifyAuthToken(getBearerToken(req));
+    if (!tokenPayload?.profileId) return res.status(401).json({ success: false, error: "Please sign in again." });
+
+    const requested = Array.isArray(req.body?.roomSlugs) ? req.body.roomSlugs : [];
+    const roomSlugs = [...new Set(requested.map((value) => String(value || "").trim()).filter(Boolean))];
+    if (roomSlugs.length > 5) return res.status(400).json({ success: false, error: "You can pin a maximum of five chats." });
+
+    const profile = await Profile.findById(tokenPayload.profileId)
+      .select("pinnedRooms archivedRooms mutedRooms manuallyUnreadRooms keepArchivedOnNewMessage");
+    if (!profile) return res.status(404).json({ success: false, error: "Profile not found." });
+
+    const rooms = await Room.find({ slug: { $in: roomSlugs } }).select("slug isSaved isDirect participants").lean();
+    const roomsBySlug = new Map(rooms.map((room) => [room.slug, room]));
+    for (const slug of roomSlugs) {
+      const room = roomsBySlug.get(slug);
+      if (!room || room.isSaved || !profileCanAccessRoom(profile, room)) {
+        return res.status(400).json({ success: false, error: "One or more chats cannot be pinned." });
+      }
+    }
+
+    profile.pinnedRooms = roomSlugs;
+    await profile.save();
+    io.emit("profiles_updated");
+    return res.json({ success: true, data: {
+      pinnedRooms: profile.pinnedRooms || [], archivedRooms: profile.archivedRooms || [],
+      mutedRooms: profile.mutedRooms || [], manuallyUnreadRooms: profile.manuallyUnreadRooms || [],
+      keepArchivedOnNewMessage: profile.keepArchivedOnNewMessage !== false,
+    }});
+  } catch (error) {
+    console.error("pinned chat order update error:", error);
+    return res.status(500).json({ success: false, error: "Failed to save pinned chat order." });
+  }
+});
+
+app.patch("/api/chat-preferences/archive-behaviour", async (req, res) => {
+  try {
+    const tokenPayload = verifyAuthToken(getBearerToken(req));
+    if (!tokenPayload?.profileId) return res.status(401).json({ success: false, error: "Please sign in again." });
+    const profile = await Profile.findById(tokenPayload.profileId)
+      .select("pinnedRooms archivedRooms mutedRooms manuallyUnreadRooms keepArchivedOnNewMessage");
+    if (!profile) return res.status(404).json({ success: false, error: "Profile not found." });
+    profile.keepArchivedOnNewMessage = req.body?.keepArchivedOnNewMessage !== false;
+    await profile.save();
+    return res.json({ success: true, data: {
+      pinnedRooms: profile.pinnedRooms || [], archivedRooms: profile.archivedRooms || [],
+      mutedRooms: profile.mutedRooms || [], manuallyUnreadRooms: profile.manuallyUnreadRooms || [],
+      keepArchivedOnNewMessage: profile.keepArchivedOnNewMessage !== false,
+    }});
+  } catch (error) {
+    console.error("archive behaviour update error:", error);
+    return res.status(500).json({ success: false, error: "Failed to update archive behaviour." });
+  }
+});
+
+app.patch("/api/chat-preferences/:roomSlug", async (req, res) => {
+  try {
+    const tokenPayload = verifyAuthToken(getBearerToken(req));
+    if (!tokenPayload?.profileId) return res.status(401).json({ success: false, error: "Please sign in again." });
+    const roomSlug = String(req.params.roomSlug || "").trim();
+    const action = String(req.body?.action || "").trim();
+    const enabled = Boolean(req.body?.enabled);
+    const fieldMap = { pin: "pinnedRooms", archive: "archivedRooms", mute: "mutedRooms", unread: "manuallyUnreadRooms" };
+    const field = fieldMap[action];
+    if (!roomSlug || !field) return res.status(400).json({ success: false, error: "Invalid chat preference request." });
+
+    const profile = await Profile.findById(tokenPayload.profileId)
+      .select("pinnedRooms archivedRooms mutedRooms manuallyUnreadRooms keepArchivedOnNewMessage");
+    if (!profile) return res.status(404).json({ success: false, error: "Profile not found." });
+
+    if (action === "pin") {
+      const room = await Room.findOne({ slug: roomSlug }).select("slug isSaved isDirect participants").lean();
+      if (!room || !profileCanAccessRoom(profile, room)) {
+        return res.status(404).json({ success: false, error: "Chat not found." });
+      }
+      if (room.isSaved || roomSlug.startsWith("saved:")) {
+        return res.status(400).json({ success: false, error: "Saved Messages is always placed first and does not need pinning." });
+      }
+
+      const current = [...new Set((profile.pinnedRooms || []).filter((slug) => slug && !String(slug).startsWith("saved:")))];
+      if (enabled && !current.includes(roomSlug)) {
+        if (current.length >= 5) return res.status(400).json({ success: false, error: "You can pin a maximum of five chats." });
+        current.push(roomSlug);
+      } else if (!enabled) {
+        profile.pinnedRooms = current.filter((slug) => slug !== roomSlug);
+      }
+      if (enabled) profile.pinnedRooms = current;
+      await profile.save();
+    } else {
+      const current = new Set(profile[field] || []);
+      if (enabled) current.add(roomSlug); else current.delete(roomSlug);
+      profile[field] = [...current];
+      await profile.save();
+    }
+
+    io.emit("profiles_updated");
+    return res.json({ success: true, data: {
+      pinnedRooms: profile.pinnedRooms || [], archivedRooms: profile.archivedRooms || [],
+      mutedRooms: profile.mutedRooms || [], manuallyUnreadRooms: profile.manuallyUnreadRooms || [],
+      keepArchivedOnNewMessage: profile.keepArchivedOnNewMessage !== false,
+    }});
+  } catch (error) {
+    console.error("chat preferences update error:", error);
+    return res.status(500).json({ success: false, error: error?.message || "Failed to update chat preference." });
+  }
+});
+
+async function restoreArchivedRoomForNewMessage(roomSlug, senderProfileId) {
+  if (!roomSlug || String(roomSlug).startsWith("saved:")) return;
+  await Profile.updateMany(
+    { _id: { $ne: senderProfileId }, archivedRooms: roomSlug, keepArchivedOnNewMessage: false },
+    { $pull: { archivedRooms: roomSlug } }
+  );
+}
 
 app.get("/api/push/public-key", (req, res) => {
   if (!VAPID_PUBLIC_KEY) {
@@ -1534,6 +1794,21 @@ app.post("/api/direct-room", async (req, res) => {
   }
 });
 
+app.post("/api/saved-messages", async (req, res) => {
+  try {
+    const currentProfile = await getProfileByInstallId(getInstallId(req));
+    if (!currentProfile) {
+      return res.status(401).json({ success: false, error: "Please sign in again" });
+    }
+
+    const room = await ensureSavedMessagesRoom(currentProfile);
+    return res.json({ success: true, data: roomResponseShape(room, currentProfile._id) });
+  } catch (error) {
+    console.error("saved-messages error:", error);
+    return res.status(500).json({ success: false, error: "Failed to open Saved Messages" });
+  }
+});
+
 app.get("/api/rooms", async (req, res) => {
   try {
     const installId = getInstallId(req);
@@ -1542,6 +1817,8 @@ app.get("/api/rooms", async (req, res) => {
     if (!currentProfile) {
       return res.json([]);
     }
+
+    await ensureSavedMessagesRoom(currentProfile);
 
     const hiddenRows = await HiddenChat.find({ profileId: currentProfile._id }).lean();
     const hiddenSlugs = hiddenRows.map((row) => row.roomSlug);
@@ -1605,6 +1882,7 @@ app.get("/api/messages/search", async (req, res) => {
     const messages = await Message.find({
       roomSlug: { $in: roomSlugs },
       isDeleted: { $ne: true },
+      hiddenFor: { $ne: currentProfile._id },
       $or: [
         { content: matcher },
         { fileName: matcher },
@@ -1665,8 +1943,8 @@ app.get("/api/rooms/:roomSlug/export", async (req, res) => {
 
     const clearRow = await ChatClear.findOne({ roomSlug, profileId: currentProfile._id }).lean();
     const query = clearRow?.clearedAt
-      ? { roomSlug, createdAt: { $gt: clearRow.clearedAt } }
-      : { roomSlug };
+      ? { roomSlug, createdAt: { $gt: clearRow.clearedAt }, hiddenFor: { $ne: currentProfile._id } }
+      : { roomSlug, hiddenFor: { $ne: currentProfile._id } };
 
     const messages = await Message.find(query)
       .sort({ createdAt: 1 })
@@ -1738,7 +2016,9 @@ app.get("/api/messages/:roomSlug", async (req, res) => {
     }
 
     const clearRow = await ChatClear.findOne({ roomSlug, profileId: currentProfile._id }).lean();
-    const query = clearRow?.clearedAt ? { roomSlug, createdAt: { $gt: clearRow.clearedAt } } : { roomSlug };
+    const query = clearRow?.clearedAt
+      ? { roomSlug, createdAt: { $gt: clearRow.clearedAt }, hiddenFor: { $ne: currentProfile._id } }
+      : { roomSlug, hiddenFor: { $ne: currentProfile._id } };
     const messages = await Message.find(query).sort({ createdAt: 1 }).lean();
     return res.json(messages);
   } catch (error) {
@@ -1855,40 +2135,91 @@ app.delete("/api/rooms/:roomSlug/hide", async (req, res) => {
   }
 });
 
-app.delete("/api/messages/:messageId", async (req, res) => {
+const MESSAGE_EDIT_WINDOW_MS = 15 * 60 * 1000;
+const MESSAGE_DELETE_EVERYONE_WINDOW_MS = 15 * 60 * 1000;
+
+app.patch("/api/messages/:messageId", async (req, res) => {
   try {
     const installId = getInstallId(req);
     const { messageId } = req.params;
-
+    const content = String(req.body?.content || "").trim();
     const currentProfile = await getProfileByInstallId(installId);
-    if (!currentProfile) {
-      return res.status(403).json({
-        success: false,
-        error: "Unauthorized",
-      });
-    }
+
+    if (!currentProfile) return res.status(403).json({ success: false, error: "Unauthorized" });
+    if (!content) return res.status(400).json({ success: false, error: "Message cannot be empty" });
+    if (content.length > 5000) return res.status(400).json({ success: false, error: "Message is too long" });
 
     const message = await Message.findById(messageId);
-    if (!message) {
-      return res.status(404).json({
-        success: false,
-        error: "Message not found",
-      });
+    if (!message) return res.status(404).json({ success: false, error: "Message not found" });
+    if (!idsEqual(message.senderProfileId, currentProfile._id)) {
+      return res.status(403).json({ success: false, error: "You can only edit your own messages" });
+    }
+    if (message.isDeleted) return res.status(409).json({ success: false, error: "Deleted messages cannot be edited" });
+    if (message.type !== "text") return res.status(400).json({ success: false, error: "Only text messages can be edited" });
+    if (Date.now() - new Date(message.createdAt).getTime() > MESSAGE_EDIT_WINDOW_MS) {
+      return res.status(409).json({ success: false, error: "Messages can only be edited within 15 minutes" });
     }
 
     const room = await Room.findOne({ slug: message.roomSlug });
     if (!room || !profileCanAccessRoom(currentProfile, room)) {
-      return res.status(403).json({
-        success: false,
-        error: "You do not have access to this room",
-      });
+      return res.status(403).json({ success: false, error: "You do not have access to this room" });
+    }
+
+    message.content = content;
+    message.isEdited = true;
+    message.editedAt = new Date();
+    await message.save();
+
+    await Message.updateMany(
+      { "replyTo.messageId": message._id },
+      { $set: { "replyTo.content": content } }
+    );
+    await refreshRoomLastMessage(message.roomSlug);
+
+    const plain = message.toObject({ flattenMaps: true });
+    io.to(message.roomSlug).emit("message_edited", { roomSlug: message.roomSlug, message: plain });
+    io.emit("rooms_updated");
+    return res.json({ success: true, data: plain });
+  } catch (error) {
+    console.error("edit message error:", error);
+    return res.status(500).json({ success: false, error: "Failed to edit message" });
+  }
+});
+
+app.delete("/api/messages/:messageId", async (req, res) => {
+  try {
+    const installId = getInstallId(req);
+    const { messageId } = req.params;
+    const mode = String(req.query.mode || req.body?.mode || "everyone").toLowerCase();
+    const currentProfile = await getProfileByInstallId(installId);
+    if (!currentProfile) return res.status(403).json({ success: false, error: "Unauthorized" });
+
+    const message = await Message.findById(messageId);
+    if (!message) return res.status(404).json({ success: false, error: "Message not found" });
+    const room = await Room.findOne({ slug: message.roomSlug });
+    if (!room || !profileCanAccessRoom(currentProfile, room)) {
+      return res.status(403).json({ success: false, error: "You do not have access to this room" });
+    }
+
+    if (mode === "me") {
+      const alreadyHidden = (message.hiddenFor || []).some((id) => idsEqual(id, currentProfile._id));
+      if (!alreadyHidden) {
+        message.hiddenFor = [...(message.hiddenFor || []), currentProfile._id];
+        await message.save();
+      }
+      const socketIds = profileSockets[String(currentProfile._id)] || new Set();
+      socketIds.forEach((socketId) => io.to(socketId).emit("message_hidden", {
+        roomSlug: message.roomSlug,
+        messageId: String(message._id),
+      }));
+      return res.json({ success: true, data: { messageId: String(message._id), mode: "me" } });
     }
 
     if (!idsEqual(message.senderProfileId, currentProfile._id)) {
-      return res.status(403).json({
-        success: false,
-        error: "You can only delete your own messages",
-      });
+      return res.status(403).json({ success: false, error: "You can only delete your own messages for everyone" });
+    }
+    if (Date.now() - new Date(message.createdAt).getTime() > MESSAGE_DELETE_EVERYONE_WINDOW_MS) {
+      return res.status(409).json({ success: false, error: "Messages can only be deleted for everyone within 15 minutes" });
     }
 
     message.isDeleted = true;
@@ -1900,7 +2231,6 @@ app.delete("/api/messages/:messageId", async (req, res) => {
     message.mimeType = "";
     message.encryptedFile = false;
     message.isEncrypted = false;
-    message.replyTo = null;
     message.reactions = {};
     message.starredBy = [];
     message.pinned = false;
@@ -1908,25 +2238,23 @@ app.delete("/api/messages/:messageId", async (req, res) => {
     message.pinnedBy = null;
     await message.save();
 
+    await Message.updateMany(
+      { "replyTo.messageId": message._id },
+      { $set: { "replyTo.content": "This message was deleted", "replyTo.fileName": "" } }
+    );
     await refreshRoomLastMessage(message.roomSlug);
 
+    const plain = message.toObject({ flattenMaps: true });
     io.to(message.roomSlug).emit("message_deleted", {
       roomSlug: message.roomSlug,
       messageId: String(message._id),
-      message: message.toObject({ flattenMaps: true }),
+      message: plain,
     });
     io.emit("rooms_updated");
-
-    return res.json({
-      success: true,
-      data: message.toObject({ flattenMaps: true }),
-    });
+    return res.json({ success: true, data: plain });
   } catch (error) {
     console.error("delete message error:", error);
-    return res.status(500).json({
-      success: false,
-      error: "Failed to delete message",
-    });
+    return res.status(500).json({ success: false, error: "Failed to delete message" });
   }
 });
 
@@ -2316,6 +2644,7 @@ app.post("/upload", (req, res) => {
         }
       );
 
+      await restoreArchivedRoomForNewMessage(roomSlug, profile._id);
       const plainMessage = message.toObject({ flattenMaps: true });
       await emitMessageToRoomParticipants(roomSlug, plainMessage, io);
       await emitUnreadCountsForRoom(roomSlug, io);
@@ -2649,7 +2978,7 @@ socket.on("call:start", async ({ roomSlug, profileId, name, callType = "audio" }
         });
       }
 
-      const messages = await Message.find({ roomSlug })
+      const messages = await Message.find({ roomSlug, hiddenFor: { $ne: profile._id } })
         .sort({ createdAt: 1 })
         .lean();
 
@@ -2720,6 +3049,7 @@ socket.on("call:start", async ({ roomSlug, profileId, name, callType = "audio" }
         }
       );
 
+      await restoreArchivedRoomForNewMessage(roomSlug, profile._id);
       const plainMessage = message.toObject({ flattenMaps: true });
       await emitMessageToRoomParticipants(roomSlug, plainMessage, io);
       await emitUnreadCountsForRoom(roomSlug, io);

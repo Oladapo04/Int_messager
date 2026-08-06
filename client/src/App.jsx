@@ -1,8 +1,16 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import DeviceSessions from "./components/DeviceSessions";
+import { apiFetch as authFetch, AUTH_TOKEN_KEY } from "./services/api";
 import { buildRtcConfig, safeSetRemoteDescription, safeRestartIce, replaceOutgoingVideoTrack } from "./call/webrtcUtils";
 import io from "socket.io-client";
 import "./Version3.css";
+import "./styles/layout-v474.css";
+import "./styles/premium-v474.css";
 import "./themes.css";
+import AuthScreen from "./components/auth/AuthScreen";
+import NavigationRail from "./components/layout/NavigationRail";
+import MessageActions from "./components/chat/MessageActions";
+import { editMessageRequest, deleteMessageRequest } from "./services/messageService";
 
 const API_BASE = "";
 const socket = io(API_BASE, { autoConnect: true });
@@ -23,17 +31,17 @@ const REACTION_OPTIONS = ["❤️", "👍", "😂", "😮", "😢", "🙏", "�
 const CHAT_EMOJIS = ["😀", "😁", "😂", "🤣", "😍", "😘", "😊", "😎", "😭", "😢", "😮", "😡", "🤔", "🙏", "❤️", "💔", "👍", "👎", "👏", "🙌", "🔥", "🎉", "💯", "✅", "👀", "✨", "🚀", "🎤", "📎", "📞"];
 const CHAT_PREFS_KEY = "int_messager_chat_prefs_v1";
 const PWA_BEFORE_INSTALL_PROMPT = "beforeinstallprompt";
-const AUTH_TOKEN_KEY = "int_messager_auth_token_v4";
 const ACCOUNT_INSTALL_ID_KEY = "int_messager_account_install_id_v4";
 const DESKTOP_SIDEBAR_WIDTH_KEY = "int_messager_desktop_sidebar_width_v44";
 
-function getAuthToken() { return localStorage.getItem(AUTH_TOKEN_KEY) || ""; }
-function authFetch(input, init = {}) {
-  const token = getAuthToken();
-  const headers = new Headers(init.headers || {});
-  if (token) headers.set("Authorization", `Bearer ${token}`);
-  return window.fetch(input, { ...init, headers });
+function formatRecordingTime(totalSeconds = 0) {
+  const safeSeconds = Math.max(0, Number(totalSeconds) || 0);
+  const minutes = Math.floor(safeSeconds / 60);
+  const seconds = Math.floor(safeSeconds % 60);
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
+
+function getAuthToken() { return localStorage.getItem(AUTH_TOKEN_KEY) || ""; }
 
 
 function isStandalonePwa() {
@@ -220,6 +228,7 @@ function groupMessagesByDay(messages) {
 
 function getRoomDisplayName(room, currentUserName, currentProfileId = "", profiles = []) {
   if (!room) return "Chat";
+  if (room.isSaved || String(room.slug || "").startsWith("saved:")) return "Saved Messages";
   if (!room.isDirect) return room.name || room.slug || "General";
 
   const participantIds = Array.isArray(room.participants)
@@ -400,41 +409,6 @@ function VoiceNotePlayer({
   const playedBars = duration ? Math.round((currentTime / duration) * waveBars.length) : 0;
   const remainingTime = Math.max(duration - currentTime, 0);
 
-
-  useEffect(() => {
-    registerPwaServiceWorker();
-
-    const handlePwaBeforeInstallPrompt = (event) => {
-      event.preventDefault();
-      setPwaInstallPrompt(event);
-      if (!isStandalonePwa()) setShowPwaInstallPrompt(true);
-    };
-
-    const handlePwaInstalled = () => {
-      setPwaInstallPrompt(null);
-      setShowPwaInstallPrompt(false);
-    };
-
-    window.addEventListener(PWA_BEFORE_INSTALL_PROMPT, handlePwaBeforeInstallPrompt);
-    window.addEventListener("appinstalled", handlePwaInstalled);
-
-    return () => {
-      window.removeEventListener(PWA_BEFORE_INSTALL_PROMPT, handlePwaBeforeInstallPrompt);
-      window.removeEventListener("appinstalled", handlePwaInstalled);
-    };
-  }, []);
-
-  async function installPwaApp() {
-    if (!pwaInstallPrompt) {
-      setShowPwaInstallPrompt(false);
-      return;
-    }
-
-    pwaInstallPrompt.prompt();
-    await pwaInstallPrompt.userChoice.catch(() => null);
-    setPwaInstallPrompt(null);
-    setShowPwaInstallPrompt(false);
-  }
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -3051,7 +3025,10 @@ function MessageBubble({
   listenedMap,
   markPlayed,
   onReply,
-  onDelete,
+  onEdit,
+  onDeleteForMe,
+  onDeleteForEveryone,
+  onScrollToReply,
   onOpenReactionPicker,
   onStartLongPressReaction,
   onCancelLongPressReaction,
@@ -3092,10 +3069,10 @@ function MessageBubble({
       ) : null}
 
       {message.replyTo?.messageId ? (
-        <div className="wa-reply-card">
+        <button type="button" className="wa-reply-card wa-reply-card-button" onClick={() => onScrollToReply(message.replyTo.messageId)}>
           <div className="wa-reply-sender">{message.replyTo.sender}</div>
           <div>{message.replyTo.fileName || message.replyTo.content}</div>
-        </div>
+        </button>
       ) : null}
 
       {message.type === "audio" && !message.isDeleted ? (
@@ -3121,40 +3098,26 @@ function MessageBubble({
 
       <div className="wa-meta">
         <span>{formatTime(message.createdAt)}</span>
+        {message.isEdited ? <span className="wa-edited-label">Edited</span> : null}
         {mine ? <span>{message.status || "sent"}</span> : null}
         {!message.isDeleted ? (
-          <>
-            <button
-              type="button"
-              className="wa-meta-btn"
-              onClick={(e) => {
-                const rect = e.currentTarget.getBoundingClientRect();
-                onOpenReactionPicker(message, {
-                  x: rect.left + rect.width / 2,
-                  y: rect.top - 8,
-                });
-              }}
-            >
-              😊
-            </button>
-            <button type="button" className="wa-meta-btn" onClick={() => onReply(message)}>
-              Reply
-            </button>
-            <button type="button" className="wa-meta-btn" onClick={() => onForward(message)}>
-              Forward
-            </button>
-            <button type="button" className="wa-meta-btn" onClick={() => onToggleStar(message)}>
-              {isStarredByMe ? "Unstar" : "Star"}
-            </button>
-            <button type="button" className="wa-meta-btn" onClick={() => onTogglePin(message)}>
-              {isPinned ? "Unpin" : "Pin"}
-            </button>
-            {mine ? (
-              <button type="button" className="wa-meta-btn" onClick={() => onDelete(message._id)}>
-                Delete
-              </button>
-            ) : null}
-          </>
+          <MessageActions
+            message={message}
+            mine={mine}
+            isStarred={isStarredByMe}
+            isPinned={isPinned}
+            onReact={(event) => {
+              const rect = event.currentTarget.getBoundingClientRect();
+              onOpenReactionPicker(message, { x: rect.left + rect.width / 2, y: rect.top - 8 });
+            }}
+            onReply={() => onReply(message)}
+            onForward={() => onForward(message)}
+            onToggleStar={() => onToggleStar(message)}
+            onTogglePin={() => onTogglePin(message)}
+            onEdit={() => onEdit(message)}
+            onDeleteForMe={() => onDeleteForMe(message)}
+            onDeleteForEveryone={() => onDeleteForEveryone(message)}
+          />
         ) : null}
       </div>
     </>
@@ -3194,154 +3157,6 @@ function MessageBubble({
     </div>
   );
 }
-
-function AuthScreen({ onAuthenticated, legacyInstallId }) {
-  const initialResetToken = useMemo(() => new URLSearchParams(window.location.search).get("resetToken") || "", []);
-  const initialResetEmail = useMemo(() => new URLSearchParams(window.location.search).get("email") || "", []);
-  const [mode, setMode] = useState(initialResetToken ? "reset" : "login");
-  const [displayName, setDisplayName] = useState("");
-  const [identifier, setIdentifier] = useState(initialResetEmail);
-  const [phone, setPhone] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [authError, setAuthError] = useState("");
-  const [authMessage, setAuthMessage] = useState("");
-  const [developmentResetUrl, setDevelopmentResetUrl] = useState("");
-
-  function keepAuthFieldVisible(event) {
-    const field = event.currentTarget;
-    window.setTimeout(() => {
-      field.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
-    }, 280);
-  }
-
-  function changeMode(nextMode) {
-    setMode(nextMode);
-    setAuthError("");
-    setAuthMessage("");
-    setPassword("");
-    setConfirmPassword("");
-    setDevelopmentResetUrl("");
-  }
-
-  async function submit(event) {
-    event.preventDefault();
-    setAuthError("");
-    setAuthMessage("");
-    setDevelopmentResetUrl("");
-
-    if ((mode === "register" || mode === "reset") && password !== confirmPassword) {
-      setAuthError("Passwords do not match");
-      return;
-    }
-
-    setBusy(true);
-    try {
-      let endpoint = "/api/auth/login";
-      let body = { identifier, password };
-
-      if (mode === "register") {
-        endpoint = "/api/auth/register";
-        body = { displayName, email: identifier, phone, password, legacyInstallId };
-      } else if (mode === "forgot") {
-        endpoint = "/api/auth/forgot-password";
-        body = { identifier };
-      } else if (mode === "reset") {
-        endpoint = "/api/auth/reset-password";
-        body = { token: initialResetToken, newPassword: password };
-      }
-
-      const response = await window.fetch(`${API_BASE}${endpoint}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const payload = await response.json();
-      if (!response.ok || !payload.success) throw new Error(payload.error || "Request failed");
-
-      if (mode === "forgot") {
-        setAuthMessage(payload.message || "Check your email for password reset instructions.");
-        setDevelopmentResetUrl(payload.developmentResetUrl || "");
-        return;
-      }
-
-      if (mode === "reset") {
-        window.history.replaceState({}, "", window.location.pathname);
-        setIdentifier(initialResetEmail);
-        setPassword("");
-        setConfirmPassword("");
-        setMode("login");
-        setAuthMessage(payload.message || "Password reset successful. You can now sign in.");
-        return;
-      }
-
-      onAuthenticated(payload.data);
-    } catch (error) {
-      setAuthError(error.message || "Request failed");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const title = mode === "forgot"
-    ? "Recover your account"
-    : mode === "reset"
-      ? "Choose a new password"
-      : "";
-
-  return (
-    <div className="v4-auth-shell">
-      <div className="v4-auth-brand">
-        <img src="/icons/icon-512.png" alt="" />
-        <h1>Int-Messager</h1>
-        <p>Connecting with love, on every device.</p>
-      </div>
-      <form className="v4-auth-card" onSubmit={submit}>
-        {mode === "login" || mode === "register" ? (
-          <div className="v4-auth-tabs">
-            <button type="button" className={mode === "login" ? "active" : ""} onClick={() => changeMode("login")}>Sign in</button>
-            <button type="button" className={mode === "register" ? "active" : ""} onClick={() => changeMode("register")}>Create account</button>
-          </div>
-        ) : (
-          <div className="v41-auth-heading">
-            <button type="button" className="v41-back-link" onClick={() => changeMode("login")} aria-label="Back to sign in">←</button>
-            <div><h2>{title}</h2><p>{mode === "forgot" ? "Enter the email address or phone number connected to your account." : "Your new password must contain at least eight characters."}</p></div>
-          </div>
-        )}
-
-        {mode === "register" ? (
-          <label>Display name<input value={displayName} onChange={(e) => setDisplayName(e.target.value)} required maxLength={30} autoComplete="name" onFocus={keepAuthFieldVisible} /></label>
-        ) : null}
-
-        {mode !== "reset" ? (
-          <label>{mode === "login" || mode === "forgot" ? "Email or phone number" : "Email address"}<input type={mode === "register" ? "email" : "text"} value={identifier} onChange={(e) => setIdentifier(e.target.value)} required autoComplete={mode === "login" ? "username" : "email"} inputMode={mode === "register" ? "email" : "text"} onFocus={keepAuthFieldVisible} /></label>
-        ) : initialResetEmail ? <div className="v41-reset-account">Resetting password for <strong>{initialResetEmail}</strong></div> : null}
-
-        {mode === "register" ? <label>Phone number <span>(optional)</span><input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel" onFocus={keepAuthFieldVisible} /></label> : null}
-
-        {mode === "login" || mode === "register" || mode === "reset" ? (
-          <label>{mode === "reset" ? "New password" : "Password"}<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} autoComplete={mode === "login" ? "current-password" : "new-password"} onFocus={keepAuthFieldVisible} /></label>
-        ) : null}
-
-        {mode === "register" || mode === "reset" ? <label>Confirm password<input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required minLength={8} autoComplete="new-password" onFocus={keepAuthFieldVisible} /></label> : null}
-
-        {mode === "login" ? <button type="button" className="v41-forgot-link" onClick={() => changeMode("forgot")}>Forgot password?</button> : null}
-        {mode === "register" && legacyInstallId ? <div className="v4-claim-note">Your current device profile and chat history will be linked to this account.</div> : null}
-        {authError ? <div className="v4-auth-error" role="alert">{authError}</div> : null}
-        {authMessage ? <div className="v41-auth-success" role="status">{authMessage}</div> : null}
-        {developmentResetUrl ? <a className="v41-dev-reset-link" href={developmentResetUrl}>Open development reset link</a> : null}
-
-        <button className="v4-auth-submit" type="submit" disabled={busy}>
-          {busy ? "Please wait…" : mode === "login" ? "Sign in" : mode === "register" ? "Create account" : mode === "forgot" ? "Send reset instructions" : "Reset password"}
-        </button>
-
-        {mode === "forgot" ? <button type="button" className="v41-secondary-auth-btn" onClick={() => changeMode("login")}>Return to sign in</button> : null}
-      </form>
-    </div>
-  );
-}
-
 
 async function prepareProfileImage(file) {
   if (!file) return null;
@@ -3413,6 +3228,7 @@ export default function App() {
   const [typingName, setTypingName] = useState("");
   const [recordingName, setRecordingName] = useState("");
   const [replyTo, setReplyTo] = useState(null);
+  const [forwardPickerMessage, setForwardPickerMessage] = useState(null);
   const [activeAudioId, setActiveAudioId] = useState(null);
   const [pendingUploads, setPendingUploads] = useState([]);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -3430,6 +3246,7 @@ export default function App() {
   const [showChatDetails, setShowChatDetails] = useState(false);
   const [unreadCounts, setUnreadCounts] = useState({});
   const [sidebarMode, setSidebarMode] = useState("chats");
+  const [developerStatus, setDeveloperStatus] = useState("");
   const [desktopSidebarWidth, setDesktopSidebarWidth] = useState(() => {
     const savedWidth = Number(localStorage.getItem(DESKTOP_SIDEBAR_WIDTH_KEY));
     return Number.isFinite(savedWidth) && savedWidth >= 440 && savedWidth <= 620 ? savedWidth : 520;
@@ -3437,6 +3254,8 @@ export default function App() {
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
   const [chatPrefs, setChatPrefs] = useState(loadChatPrefs);
   const [roomContextMenu, setRoomContextMenu] = useState(null);
+  const [chatOrgPrefs, setChatOrgPrefs] = useState({ pinnedRooms: [], archivedRooms: [], mutedRooms: [], manuallyUnreadRooms: [], keepArchivedOnNewMessage: true });
+  const [showArchivedChats, setShowArchivedChats] = useState(false);
 
   const [isRecording, setIsRecording] = useState(false);
   const [recordingError, setRecordingError] = useState("");
@@ -3444,6 +3263,41 @@ export default function App() {
   const [voicePreviewUrl, setVoicePreviewUrl] = useState("");
   const [voicePreviewBlob, setVoicePreviewBlob] = useState(null);
   const [isSendingVoicePreview, setIsSendingVoicePreview] = useState(false);
+
+  useEffect(() => {
+    registerPwaServiceWorker();
+
+    const handlePwaBeforeInstallPrompt = (event) => {
+      event.preventDefault();
+      setPwaInstallPrompt(event);
+      if (!isStandalonePwa()) setShowPwaInstallPrompt(true);
+    };
+
+    const handlePwaInstalled = () => {
+      setPwaInstallPrompt(null);
+      setShowPwaInstallPrompt(false);
+    };
+
+    window.addEventListener(PWA_BEFORE_INSTALL_PROMPT, handlePwaBeforeInstallPrompt);
+    window.addEventListener("appinstalled", handlePwaInstalled);
+
+    return () => {
+      window.removeEventListener(PWA_BEFORE_INSTALL_PROMPT, handlePwaBeforeInstallPrompt);
+      window.removeEventListener("appinstalled", handlePwaInstalled);
+    };
+  }, []);
+
+  async function installPwaApp() {
+    if (!pwaInstallPrompt) {
+      setShowPwaInstallPrompt(false);
+      return;
+    }
+
+    pwaInstallPrompt.prompt();
+    await pwaInstallPrompt.userChoice.catch(() => null);
+    setPwaInstallPrompt(null);
+    setShowPwaInstallPrompt(false);
+  }
 
   // WebRTC voice call state
   const [inCall, setInCall] = useState(false);
@@ -3566,6 +3420,48 @@ export default function App() {
     } catch (error) {
       console.error("Enable notifications error:", error);
       alert(error.message || "Failed to enable notifications.");
+    }
+  }
+
+  async function updateArchiveBehaviour(keepArchivedOnNewMessage) {
+    try {
+      const res = await authFetch(`${API_BASE}/api/chat-preferences/archive-behaviour`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ keepArchivedOnNewMessage }),
+      });
+      const payload = await res.json();
+      if (!res.ok || payload.success === false) throw new Error(payload.error || "Failed to update archive behaviour.");
+      setChatOrgPrefs(payload.data);
+    } catch (error) {
+      setError(error.message || "Failed to update archive behaviour.");
+    }
+  }
+
+  async function runDeveloperHealthCheck() {
+    try {
+      setDeveloperStatus("Checking…");
+      const started = performance.now();
+      const res = await fetch(`${API_BASE}/api`);
+      if (!res.ok) throw new Error(`Server returned ${res.status}`);
+      setDeveloperStatus(`Server online · ${Math.round(performance.now() - started)} ms · Socket ${socket.connected ? "connected" : "disconnected"}`);
+    } catch (error) {
+      setDeveloperStatus(`Health check failed: ${error.message}`);
+    }
+  }
+
+  async function resetDeveloperCache() {
+    try {
+      const registrations = await navigator.serviceWorker?.getRegistrations?.();
+      await Promise.all((registrations || []).map((registration) => registration.unregister()));
+      if (window.caches) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((key) => caches.delete(key)));
+      }
+      setDeveloperStatus("Service worker and caches cleared. Reloading…");
+      window.setTimeout(() => window.location.reload(), 500);
+    } catch (error) {
+      setDeveloperStatus(`Cache reset failed: ${error.message}`);
     }
   }
 
@@ -3771,18 +3667,24 @@ export default function App() {
 
   const roomsSorted = useMemo(() => {
     if (!rooms.length) return [];
-
+    const pinnedOrder = (chatOrgPrefs.pinnedRooms || []).filter((slug) => slug && !String(slug).startsWith("saved:"));
+    const pinnedIndex = new Map(pinnedOrder.map((slug, index) => [slug, index]));
+    const manualUnread = new Set(chatOrgPrefs.manuallyUnreadRooms || []);
     return [...rooms].sort((a, b) => {
-      const aUnread = unreadCounts[a.slug] || 0;
-      const bUnread = unreadCounts[b.slug] || 0;
-
+      const savedDiff = Number(Boolean(b.isSaved)) - Number(Boolean(a.isSaved));
+      if (savedDiff) return savedDiff;
+      const aPinned = pinnedIndex.has(a.slug);
+      const bPinned = pinnedIndex.has(b.slug);
+      if (aPinned !== bPinned) return Number(bPinned) - Number(aPinned);
+      if (aPinned && bPinned) return pinnedIndex.get(a.slug) - pinnedIndex.get(b.slug);
+      const aUnread = Number(unreadCounts[a.slug] || 0) + Number(manualUnread.has(a.slug));
+      const bUnread = Number(unreadCounts[b.slug] || 0) + Number(manualUnread.has(b.slug));
       if (bUnread !== aUnread) return bUnread - aUnread;
-
       const aTime = a.lastMessageAt ? new Date(a.lastMessageAt).getTime() : 0;
       const bTime = b.lastMessageAt ? new Date(b.lastMessageAt).getTime() : 0;
       return bTime - aTime;
     });
-  }, [rooms, unreadCounts]);
+  }, [rooms, unreadCounts, chatOrgPrefs]);
 
   const activeRoom = useMemo(
     () => roomsSorted.find((room) => room.slug === activeRoomSlug) || null,
@@ -3815,12 +3717,14 @@ export default function App() {
 
   const filteredRooms = useMemo(
     () =>
-      roomsSorted.filter((room) =>
-        getRoomDisplayName(room, profile?.displayName, currentProfileId, profiles)
+      roomsSorted.filter((room) => {
+        const archived = !room.isSaved && (chatOrgPrefs.archivedRooms || []).includes(room.slug);
+        if (showArchivedChats !== archived) return false;
+        return getRoomDisplayName(room, profile?.displayName, currentProfileId, profiles)
           .toLowerCase()
-          .includes(chatSearch.toLowerCase())
-      ),
-    [roomsSorted, chatSearch, profile?.displayName]
+          .includes(chatSearch.toLowerCase());
+      }),
+    [roomsSorted, chatSearch, profile?.displayName, chatOrgPrefs.archivedRooms, showArchivedChats]
   );
 
   const filteredProfiles = useMemo(
@@ -3906,6 +3810,7 @@ export default function App() {
 
   function getRoomAvatarSrc(room) {
     if (!room || room.slug === "general") return "";
+    if (room.isSaved || String(room.slug || "").startsWith("saved:")) return profile?.avatarUrl || "";
     const otherProfileId = (room.participants || []).find((id) => String(id) !== String(currentProfileId || ""));
     return getProfileAvatarById(otherProfileId);
   }
@@ -4165,6 +4070,32 @@ export default function App() {
 
   useEffect(() => {
     if (!canChat) return;
+    authFetch(`${API_BASE}/api/chat-preferences`)
+      .then((res) => res.json().then((payload) => ({ res, payload })))
+      .then(({ res, payload }) => {
+        if (res.ok && payload?.success) setChatOrgPrefs(payload.data);
+      })
+      .catch(() => {});
+  }, [canChat]);
+
+  async function updateRoomPreference(roomSlug, action, enabled) {
+    try {
+      const res = await authFetch(`${API_BASE}/api/chat-preferences/${encodeURIComponent(roomSlug)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, enabled }),
+      });
+      const payload = await res.json();
+      if (!res.ok || !payload.success) throw new Error(payload.error || "Failed to update chat preference");
+      setChatOrgPrefs(payload.data);
+      if (action === "archive" && enabled && activeRoomSlug === roomSlug) setActiveRoomSlug("");
+    } catch (err) {
+      setError(err.message || "Failed to update chat preference");
+    }
+  }
+
+  useEffect(() => {
+    if (!canChat) return;
 
     async function loadRoomsAndProfiles() {
       try {
@@ -4383,6 +4314,28 @@ export default function App() {
       });
     };
 
+    const handleEditedMessage = ({ roomSlug, message }) => {
+      if (!roomSlug || !message?._id) return;
+      setMessagesByRoom((current) => ({
+        ...current,
+        [roomSlug]: (current[roomSlug] || []).map((item) =>
+          String(item._id) === String(message._id)
+            ? { ...item, ...message, reactions: normalizeReactions(message.reactions) }
+            : item.replyTo?.messageId && String(item.replyTo.messageId) === String(message._id)
+              ? { ...item, replyTo: { ...item.replyTo, content: message.content } }
+              : item
+        ),
+      }));
+    };
+
+    const handleHiddenMessage = ({ roomSlug, messageId }) => {
+      if (!roomSlug || !messageId) return;
+      setMessagesByRoom((current) => ({
+        ...current,
+        [roomSlug]: (current[roomSlug] || []).filter((item) => String(item._id) !== String(messageId)),
+      }));
+    };
+
     const handleFlagsUpdated = ({ roomSlug, message }) => {
       setMessagesByRoom((current) => {
         const roomMessages = current[roomSlug] || [];
@@ -4471,6 +4424,8 @@ export default function App() {
     socket.on("load_messages", handleLoadMessages);
     socket.on("receive_message", handleReceiveMessage);
     socket.on("message_deleted", handleDeletedMessage);
+    socket.on("message_edited", handleEditedMessage);
+    socket.on("message_hidden", handleHiddenMessage);
     socket.on("messages_status_updated", handleStatusesUpdated);
     socket.on("message_reaction_updated", handleReactionUpdated);
     socket.on("message_flags_updated", handleFlagsUpdated);
@@ -4487,6 +4442,8 @@ export default function App() {
       socket.off("load_messages", handleLoadMessages);
       socket.off("receive_message", handleReceiveMessage);
       socket.off("message_deleted", handleDeletedMessage);
+      socket.off("message_edited", handleEditedMessage);
+      socket.off("message_hidden", handleHiddenMessage);
       socket.off("messages_status_updated", handleStatusesUpdated);
       socket.off("message_reaction_updated", handleReactionUpdated);
       socket.off("message_flags_updated", handleFlagsUpdated);
@@ -4877,6 +4834,17 @@ export default function App() {
     listEl.scrollTop = listEl.scrollHeight;
   }, [groupedMessages, pendingUploadsForRoom.length, typingName]);
 
+  function scrollToMessage(messageId) {
+    if (!messageId) return;
+    const escapedId = typeof CSS !== "undefined" && CSS.escape
+      ? CSS.escape(String(messageId))
+      : String(messageId).replace(/["\\]/g, "\\$&");
+    const node = document.querySelector(`[data-message-id="${escapedId}"]`);
+    if (!node) return;
+    node.scrollIntoView({ behavior: "smooth", block: "center" });
+    setHighlightedSearchMessageId(String(messageId));
+  }
+
   function markPlayed(messageId) {
     setListenedMap((current) => {
       if (current[messageId]) return current;
@@ -4986,18 +4954,41 @@ export default function App() {
     }
   }
 
-  async function deleteMessage(messageId) {
+  async function editMessage(message) {
+    if (!message?._id || message.type !== "text" || message.isDeleted) return;
+    const nextContent = window.prompt("Edit message", message.content || "");
+    if (nextContent === null) return;
+    const content = nextContent.trim();
+    if (!content || content === String(message.content || "").trim()) return;
     try {
       setError("");
-      const res = await authFetch(`${API_BASE}/api/messages/${messageId}`, {
-        method: "DELETE",
-        headers: { "x-install-id": installId },
-      });
+      await editMessageRequest(message._id, content, installId);
+    } catch (err) {
+      setError(err.message || "Failed to edit message");
+    }
+  }
 
-      const payload = await res.json();
-      if (!res.ok || !payload.success) {
-        throw new Error(payload.error || "Failed to delete message");
-      }
+  async function deleteMessageForMe(message) {
+    if (!message?._id) return;
+    if (!window.confirm("Delete this message for you?")) return;
+    try {
+      setError("");
+      await deleteMessageRequest(message._id, "me", installId);
+      setMessagesByRoom((current) => ({
+        ...current,
+        [message.roomSlug]: (current[message.roomSlug] || []).filter((item) => String(item._id) !== String(message._id)),
+      }));
+    } catch (err) {
+      setError(err.message || "Failed to delete message");
+    }
+  }
+
+  async function deleteMessageForEveryone(message) {
+    if (!message?._id) return;
+    if (!window.confirm("Delete this message for everyone?")) return;
+    try {
+      setError("");
+      await deleteMessageRequest(message._id, "everyone", installId);
     } catch (err) {
       setError(err.message || "Failed to delete message");
     }
@@ -5264,11 +5255,11 @@ export default function App() {
             return;
           }
 
-          let payload = null;
+          let payload;
           try {
             payload = JSON.parse(xhr.responseText || "null");
           } catch {
-            payload = null;
+            // The server response was not JSON; use the HTTP status fallback below.
           }
 
           reject(new Error(payload?.error || payload?.message || `Upload failed (${xhr.status})`));
@@ -6364,797 +6355,25 @@ export default function App() {
   return (
     <>
       <StyleTag />
-      <style>{`
-        /* Int-Messager structural redesign v2 */
-        .wa-app {
-          display: grid !important;
-          grid-template-columns: minmax(360px, 410px) minmax(0, 1fr) !important;
-          height: 100dvh !important;
-          max-height: 100dvh !important;
-          padding: 14px !important;
-          gap: 14px !important;
-          background:
-            radial-gradient(circle at 8% 8%, color-mix(in srgb, var(--accent-color) 22%, transparent), transparent 29%),
-            radial-gradient(circle at 94% 92%, color-mix(in srgb, var(--app-color) 32%, transparent), transparent 36%),
-            #eef2f7 !important;
-          overflow: hidden !important;
-        }
-        .wa-sidebar {
-          position: relative !important;
-          width: auto !important;
-          min-width: 0 !important;
-          display: grid !important;
-          grid-template-columns: 82px minmax(0, 1fr) !important;
-          border: 0 !important;
-          border-radius: 28px !important;
-          overflow: hidden !important;
-          background: #ffffff !important;
-          box-shadow: 0 24px 70px rgba(15, 23, 42, .15) !important;
-        }
-        .wa-nav-rail {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 22px;
-          padding: 18px 10px;
-          background: linear-gradient(180deg, #111827 0%, color-mix(in srgb, var(--app-color) 80%, #020617) 100%);
-          color: #fff;
-        }
-        .wa-rail-logo, .wa-rail-profile, .wa-rail-btn { border: 0; font: inherit; cursor: pointer; }
-        .wa-rail-logo {
-          width: 50px; height: 50px; border-radius: 17px; padding: 5px;
-          background: rgba(255,255,255,.11); box-shadow: inset 0 0 0 1px rgba(255,255,255,.13);
-        }
-        .wa-rail-logo img { width: 100%; height: 100%; object-fit: cover; border-radius: 13px; }
-        .wa-rail-nav { display: flex; flex: 1; width: 100%; flex-direction: column; gap: 8px; }
-        .wa-rail-btn {
-          position: relative; min-height: 62px; border-radius: 18px; display: grid; place-items: center;
-          gap: 1px; color: #94a3b8; background: transparent; transition: .2s ease;
-        }
-        .wa-rail-btn span { font-size: 21px; line-height: 1; }
-        .wa-rail-btn small { font-size: 10px; font-weight: 750; letter-spacing: .02em; }
-        .wa-rail-btn:hover { color: #fff; background: rgba(255,255,255,.08); transform: translateY(-1px); }
-        .wa-rail-btn.active { color: #fff; background: linear-gradient(135deg, color-mix(in srgb, var(--accent-color) 92%, white), var(--accent-color)); box-shadow: 0 12px 26px color-mix(in srgb, var(--accent-color) 38%, transparent); }
-        .wa-rail-btn b { position: absolute; top: 7px; right: 7px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; display: grid; place-items:center; font-size: 9px; background:#ef4444; color:#fff; border:2px solid #111827; }
-        .wa-rail-profile { width: 46px; height: 46px; border-radius: 16px; padding: 0; background: transparent; overflow: hidden; box-shadow: 0 0 0 2px rgba(255,255,255,.18); }
-        .wa-rail-profile .wa-avatar { width: 46px !important; height: 46px !important; border-radius: 16px !important; }
-        .wa-sidebar-panel { min-width: 0; display: flex; flex-direction: column; overflow: hidden; padding: 20px 14px 14px; background: linear-gradient(180deg,#fff 0%,#f8fafc 100%); }
-        .wa-brand { padding: 0 8px 14px !important; min-height: 48px !important; border:0 !important; background:transparent !important; color:#0f172a !important; }
-        .wa-brand img { display:none !important; }
-        .wa-brand span { font-size: 22px !important; letter-spacing:-.04em; }
-        .wa-brand em { margin-left:auto; font-size:10px; font-style:normal; text-transform:uppercase; letter-spacing:.12em; color:#94a3b8; }
-        .wa-profile-card { margin: 0 2px 14px !important; border-radius: 18px !important; padding: 12px !important; background:#f1f5f9 !important; border:1px solid #e2e8f0 !important; box-shadow:none !important; }
-        .wa-side-switcher { display:none !important; }
-        .wa-search-input { margin: 0 2px 14px !important; height: 46px !important; border-radius: 15px !important; padding: 0 15px 0 16px !important; border:1px solid #e2e8f0 !important; background:#fff !important; box-shadow:0 8px 20px rgba(15,23,42,.05) !important; }
-        .wa-section-label { padding: 4px 8px 9px !important; font-size:11px !important; letter-spacing:.12em !important; color:#94a3b8 !important; }
-        .wa-room-card, .wa-user-card, .wa-call-log-card, .wa-search-result-card {
-          margin: 0 2px 7px !important; border-radius: 18px !important; padding: 12px !important;
-          border:1px solid transparent !important; background:transparent !important; transition:.18s ease !important;
-        }
-        .wa-room-card:hover, .wa-user-card:hover, .wa-call-log-card:hover, .wa-search-result-card:hover { background:#fff !important; border-color:#e2e8f0 !important; box-shadow:0 9px 24px rgba(15,23,42,.07) !important; transform:translateY(-1px); }
-        .wa-room-card.active { background:#fff !important; border-color:color-mix(in srgb,var(--accent-color) 32%,#e2e8f0) !important; box-shadow:0 12px 30px rgba(15,23,42,.09) !important; }
-        .wa-room-card.active::before { content:""; width:4px; height:34px; border-radius:4px; background:var(--accent-color); position:absolute; left:-2px; top:50%; transform:translateY(-50%); }
-        .wa-main { border-radius:28px !important; overflow:hidden !important; background:#fff !important; border:1px solid rgba(255,255,255,.78) !important; box-shadow:0 24px 70px rgba(15,23,42,.13) !important; }
-        .wa-header { min-height:82px !important; padding:14px 20px !important; background:rgba(255,255,255,.92) !important; backdrop-filter:blur(24px) !important; border-bottom:1px solid #e8edf3 !important; }
-        .wa-header-title { font-size:17px !important; letter-spacing:-.02em; }
-        .wa-header-sub { font-size:12px !important; color:#64748b !important; }
-        .wa-messages { padding:28px clamp(18px,4vw,64px) 120px !important; background-color:var(--chat-wallpaper) !important; background-image: radial-gradient(circle at 1px 1px, rgba(100,116,139,.10) 1px, transparent 0) !important; background-size:24px 24px !important; }
-        .wa-message-row { max-width: 900px !important; margin-left:auto !important; margin-right:auto !important; }
-        .wa-bubble { max-width:min(660px,78%) !important; padding:11px 14px !important; border-radius:18px !important; box-shadow:0 8px 22px rgba(15,23,42,.08) !important; border:1px solid rgba(255,255,255,.7) !important; }
-        .wa-message-row.mine .wa-bubble { border-bottom-right-radius:6px !important; background:var(--chat-color) !important; }
-        .wa-message-row:not(.mine) .wa-bubble { border-bottom-left-radius:6px !important; background:#fff !important; }
-        .wa-composer { position:absolute !important; left:50% !important; bottom:18px !important; transform:translateX(-50%) !important; width:min(880px,calc(100% - 42px)) !important; min-height:68px !important; padding:9px !important; border:1px solid rgba(226,232,240,.92) !important; border-radius:24px !important; background:rgba(255,255,255,.94) !important; backdrop-filter:blur(24px) !important; box-shadow:0 20px 50px rgba(15,23,42,.18) !important; }
-        .wa-input-wrap { background:#f8fafc !important; border-radius:17px !important; }
-        .wa-input { min-height:48px !important; background:transparent !important; }
-        .wa-send-btn { min-width:74px !important; height:48px !important; border-radius:16px !important; box-shadow:0 10px 22px color-mix(in srgb,var(--accent-color) 32%,transparent) !important; }
-        .wa-welcome-screen { background:linear-gradient(145deg,#f8fafc,#eef2ff) !important; }
-        .wa-welcome-content { width:min(980px,100%) !important; display:grid !important; grid-template-columns:minmax(260px,.8fr) minmax(320px,1.2fr) !important; align-items:start !important; gap:22px !important; text-align:left !important; }
-        .wa-welcome-logo, .wa-welcome-content>h1, .wa-welcome-tagline, .wa-welcome-intro, .wa-home-profile, .wa-home-actions { grid-column:1; }
-        .wa-welcome-logo { width:84px !important; height:84px !important; margin:0 !important; }
-        .wa-welcome-content h1 { margin:4px 0 0 !important; font-size:clamp(42px,5vw,68px) !important; line-height:.95 !important; }
-        .wa-welcome-tagline { margin:0 !important; font-size:18px !important; }
-        .wa-welcome-intro { margin:6px 0 8px !important; }
-        .wa-home-actions { grid-template-columns:1fr !important; }
-        .wa-home-section { grid-column:2; margin:0 !important; background:rgba(255,255,255,.76) !important; border:1px solid rgba(255,255,255,.9) !important; box-shadow:0 18px 48px rgba(15,23,42,.08) !important; }
-        .wa-home-section + .wa-home-section { margin-top:0 !important; }
-        .wa-close-chat-btn {
-          color:#64748b !important;
-          background:#f1f5f9 !important;
-          border:1px solid #e2e8f0 !important;
-        }
-        .wa-close-chat-btn:hover { color:#0f172a !important; background:#e2e8f0 !important; }
-
-        @media (max-width: 900px) {
-          .wa-app { display:block !important; padding:0 !important; }
-          .wa-main { border-radius:0 !important; height:100dvh !important; }
-          .wa-sidebar { position:fixed !important; inset:0 auto 0 0 !important; width:min(92vw,390px) !important; z-index:50 !important; border-radius:0 24px 24px 0 !important; transform:translateX(-105%); transition:.24s ease; }
-          .wa-sidebar.open { transform:translateX(0); }
-          .wa-nav-rail { width:70px; padding:14px 8px; }
-          .wa-welcome-content { display:flex !important; text-align:center !important; }
-          .wa-home-section { width:100% !important; }
-          .wa-composer { width:calc(100% - 18px) !important; bottom:8px !important; border-radius:20px !important; }
-          .wa-messages { padding:20px 12px 104px !important; }
-          .wa-bubble { max-width:86% !important; }
-
-          /* Native mobile messenger navigation */
-          .wa-sidebar {
-            inset:0 !important;
-            width:100vw !important;
-            max-width:none !important;
-            height:100dvh !important;
-            border-radius:0 !important;
-            transform:none !important;
-            display:grid !important;
-            grid-template-columns:1fr !important;
-            grid-template-rows:minmax(0,1fr) 72px !important;
-            background:#fff !important;
-            z-index:50 !important;
-          }
-          .wa-app.has-active-chat .wa-sidebar {
-            transform:translateX(-105%) !important;
-            transition:transform .22s ease !important;
-          }
-          .wa-app.has-active-chat .wa-sidebar.open { transform:translateX(0) !important; }
-          .wa-app.no-active-chat .wa-main { display:none !important; }
-          .wa-app.has-active-chat .wa-main { display:flex !important; width:100vw !important; }
-          .wa-sidebar-panel {
-            grid-column:1 !important;
-            grid-row:1 !important;
-            width:100% !important;
-            min-width:0 !important;
-            padding:18px 14px 18px !important;
-            overflow-y:auto !important;
-            overflow-x:hidden !important;
-            -webkit-overflow-scrolling:touch;
-          }
-          .wa-nav-rail {
-            grid-column:1 !important;
-            grid-row:2 !important;
-            position:relative !important;
-            inset:auto !important;
-            width:100% !important;
-            height:72px !important;
-            min-height:72px !important;
-            padding:7px max(8px,env(safe-area-inset-right)) calc(7px + env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left)) !important;
-            display:flex !important;
-            flex-direction:row !important;
-            align-items:center !important;
-            justify-content:space-around !important;
-            gap:4px !important;
-            border-radius:0 !important;
-            background:rgba(255,255,255,.97) !important;
-            border-top:1px solid #e2e8f0 !important;
-            box-shadow:0 -10px 28px rgba(15,23,42,.08) !important;
-            order:2 !important;
-          }
-          .wa-rail-logo, .wa-rail-profile { display:none !important; }
-          .wa-rail-nav {
-            width:100% !important;
-            display:grid !important;
-            grid-template-columns:repeat(4,minmax(0,1fr)) !important;
-            gap:4px !important;
-          }
-          .wa-rail-btn {
-            width:100% !important;
-            height:56px !important;
-            min-width:0 !important;
-            border-radius:14px !important;
-            color:#64748b !important;
-            display:flex !important;
-            flex-direction:column !important;
-            align-items:center !important;
-            justify-content:center !important;
-            gap:3px !important;
-          }
-          .wa-rail-btn span { font-size:20px !important; }
-          .wa-rail-btn small { font-size:10px !important; }
-          .wa-rail-btn.active {
-            color:var(--accent-color) !important;
-            background:color-mix(in srgb,var(--accent-color) 10%,white) !important;
-            box-shadow:none !important;
-          }
-          .wa-rail-btn b { top:3px !important; right:calc(50% - 26px) !important; border-color:#fff !important; }
-          .wa-mobile-overlay { display:none !important; }
-          .wa-brand { padding:0 4px 14px !important; }
-          .wa-brand span { font-size:28px !important; }
-          .wa-brand em { font-size:11px !important; }
-          .wa-profile-card { display:none !important; }
-          .wa-search-input { width:100% !important; margin:0 0 14px !important; }
-          .wa-room-card, .wa-user-card, .wa-call-log-card, .wa-search-result-card {
-            width:100% !important;
-            min-height:72px !important;
-            margin:0 0 4px !important;
-            border-radius:0 !important;
-            border:0 !important;
-            border-bottom:1px solid #eef2f7 !important;
-            padding:11px 4px !important;
-            box-shadow:none !important;
-          }
-          .wa-room-card.active { background:#f8fafc !important; box-shadow:none !important; }
-          .wa-room-card.active::before { display:none !important; }
-          .wa-header { min-height:68px !important; padding:8px 10px !important; }
-          .wa-header-right { gap:4px !important; }
-          .wa-header-right .wa-icon-btn:not(.call-action):not(.wa-close-chat-btn) { display:none !important; }
-          .wa-close-chat-btn { order:-1 !important; }
-        }
-
-        /* Layout correction: readable lists, edge-to-edge desktop and mobile-first chat */
-        .wa-room-title,
-        .wa-user-name,
-        .wa-room-row-top,
-        .wa-profile-text .wa-room-title {
-          color:#0f172a !important;
-          opacity:1 !important;
-          -webkit-text-fill-color:#0f172a !important;
-        }
-        .wa-room-sub, .wa-user-sub, .wa-profile-sub { color:#64748b !important; }
-
-        @media (min-width: 901px) {
-          .wa-app {
-            width:100vw !important;
-            height:100dvh !important;
-            padding:0 !important;
-            gap:0 !important;
-            grid-template-columns:minmax(340px,390px) minmax(0,1fr) !important;
-            background:#e9eef5 !important;
-          }
-          .wa-sidebar, .wa-main {
-            height:100dvh !important;
-            border-radius:0 !important;
-            box-shadow:none !important;
-          }
-          .wa-sidebar { border-right:1px solid #dfe6ee !important; }
-          .wa-main { border:0 !important; }
-          .wa-header { min-height:74px !important; }
-          .wa-messages { padding-bottom:112px !important; }
-        }
-
-        @media (max-width: 900px) {
-          .wa-app, .wa-main { width:100vw !important; max-width:100vw !important; }
-          .wa-sidebar { grid-template-rows:minmax(0,1fr) calc(64px + env(safe-area-inset-bottom)) !important; }
-          .wa-sidebar-panel {
-            padding:0 0 8px !important;
-            background:#fff !important;
-          }
-          .wa-brand {
-            position:sticky !important; top:0 !important; z-index:6 !important;
-            min-height:58px !important; height:58px !important;
-            padding:10px 16px !important; margin:0 !important;
-            display:flex !important; align-items:center !important;
-            background:rgba(255,255,255,.97) !important;
-            border-bottom:1px solid #eef2f7 !important;
-            backdrop-filter:blur(14px) !important;
-          }
-          .wa-brand span { font-size:22px !important; }
-          .wa-brand em { color:var(--accent-color) !important; font-size:10px !important; }
-          .wa-search-input {
-            width:calc(100% - 24px) !important; height:42px !important;
-            margin:10px 12px 8px !important; border-radius:12px !important;
-          }
-          .wa-section-label { padding:8px 16px 5px !important; }
-          .wa-room-card, .wa-user-card, .wa-call-log-card, .wa-search-result-card {
-            min-height:82px !important;
-            padding:12px 16px !important;
-            margin:0 !important;
-            display:flex !important;
-            align-items:center !important;
-            gap:12px !important;
-            background:#fff !important;
-          }
-          .wa-room-card .wa-avatar, .wa-user-card .wa-avatar {
-            width:54px !important; height:54px !important; min-width:54px !important;
-            border-radius:50% !important; font-size:18px !important;
-          }
-          .wa-room-content, .wa-user-content { min-width:0 !important; flex:1 !important; }
-          .wa-room-title, .wa-user-name {
-            display:block !important; font-size:16px !important; line-height:1.25 !important;
-            font-weight:750 !important; white-space:nowrap !important; overflow:hidden !important; text-overflow:ellipsis !important;
-          }
-          .wa-room-sub, .wa-user-sub {
-            margin-top:4px !important; font-size:13px !important; line-height:1.35 !important;
-            white-space:nowrap !important; overflow:hidden !important; text-overflow:ellipsis !important;
-          }
-          .wa-nav-rail {
-            height:calc(64px + env(safe-area-inset-bottom)) !important;
-            min-height:calc(64px + env(safe-area-inset-bottom)) !important;
-            padding:5px 6px env(safe-area-inset-bottom) !important;
-          }
-          .wa-rail-btn { height:56px !important; border-radius:10px !important; }
-          .wa-rail-btn span { font-size:19px !important; }
-          .wa-rail-btn small { font-size:10px !important; }
-
-          .wa-app.has-active-chat .wa-main {
-            position:fixed !important; inset:0 !important; z-index:40 !important;
-            height:100dvh !important; background:var(--chat-wallpaper) !important;
-          }
-          .wa-app.has-active-chat .wa-sidebar { display:none !important; }
-          .wa-header {
-            min-height:60px !important; height:60px !important;
-            padding:7px 8px !important; flex:0 0 60px !important;
-          }
-          .wa-header-left { min-width:0 !important; flex:1 !important; gap:8px !important; }
-          .wa-header-left > .wa-icon-btn { display:none !important; }
-          .wa-header-title-wrap { min-width:0 !important; }
-          .wa-header-title { font-size:15px !important; white-space:nowrap !important; overflow:hidden !important; text-overflow:ellipsis !important; }
-          .wa-header-sub { font-size:11px !important; }
-          .wa-header-right { flex:0 0 auto !important; }
-          .wa-header-right .wa-close-chat-btn {
-            display:grid !important; width:40px !important; height:40px !important;
-            order:-1 !important; font-size:18px !important;
-          }
-          .wa-header-right .call-action { width:40px !important; height:40px !important; }
-          .wa-messages {
-            flex:1 1 auto !important; min-height:0 !important;
-            padding:14px 8px 86px !important;
-            scroll-padding-bottom:92px !important;
-          }
-          .wa-message-row { width:100% !important; max-width:none !important; }
-          .wa-bubble { max-width:88% !important; padding:9px 11px !important; }
-          .wa-composer {
-            left:8px !important; right:8px !important; bottom:max(7px,env(safe-area-inset-bottom)) !important;
-            transform:none !important; width:auto !important; min-height:58px !important;
-            padding:6px !important; border-radius:18px !important;
-          }
-          .wa-input { min-height:44px !important; }
-          .wa-send-btn { min-width:58px !important; height:44px !important; }
-        }
-
-
-        /* Final viewport, visibility and mobile conversation correction */
-        :root {
-          color-scheme: light;
-        }
-        html, body, #root {
-          width: 100% !important;
-          min-width: 100% !important;
-          max-width: none !important;
-          height: 100% !important;
-          min-height: 100% !important;
-          margin: 0 !important;
-          padding: 0 !important;
-          overflow: hidden !important;
-          background: #f4f7fb !important;
-        }
-        body {
-          position: fixed !important;
-          inset: 0 !important;
-        }
-        #root {
-          position: absolute !important;
-          inset: 0 !important;
-          display: block !important;
-        }
-        .wa-app {
-          position: absolute !important;
-          inset: 0 !important;
-          width: 100% !important;
-          max-width: none !important;
-          height: 100% !important;
-          min-height: 0 !important;
-          max-height: none !important;
-          margin: 0 !important;
-          box-sizing: border-box !important;
-        }
-        .wa-app *, .wa-app *::before, .wa-app *::after {
-          box-sizing: border-box;
-        }
-
-        /* Global high-contrast safeguards */
-        .wa-app,
-        .wa-main,
-        .wa-sidebar-panel,
-        .wa-welcome-screen,
-        .wa-modal-card,
-        .wa-details-panel {
-          color: #0f172a !important;
-        }
-        .wa-app button,
-        .wa-app input,
-        .wa-app textarea,
-        .wa-app select {
-          font: inherit;
-        }
-        .wa-sidebar-panel,
-        .wa-sidebar-panel button,
-        .wa-room-card,
-        .wa-user-card,
-        .wa-call-log-card,
-        .wa-search-result-card,
-        .wa-profile-card,
-        .wa-settings-card,
-        .wa-settings-row,
-        .wa-section-label,
-        .wa-empty,
-        .wa-brand {
-          color: #0f172a !important;
-        }
-        .wa-room-title,
-        .wa-user-name,
-        .wa-call-name,
-        .wa-header-title,
-        .wa-profile-text,
-        .wa-message-author,
-        .wa-details-title,
-        .wa-modal-title,
-        .wa-welcome-content h1,
-        .wa-welcome-content h2,
-        .wa-home-card-title,
-        .wa-settings-title {
-          color: #0b1220 !important;
-          opacity: 1 !important;
-          text-shadow: none !important;
-          -webkit-text-fill-color: currentColor !important;
-        }
-        .wa-room-sub,
-        .wa-user-sub,
-        .wa-call-sub,
-        .wa-header-sub,
-        .wa-profile-sub,
-        .wa-message-time,
-        .wa-welcome-tagline,
-        .wa-welcome-intro,
-        .wa-settings-sub,
-        .wa-empty,
-        .wa-section-label {
-          color: #475569 !important;
-          opacity: 1 !important;
-          -webkit-text-fill-color: currentColor !important;
-        }
-        .wa-input,
-        .wa-search-input,
-        .wa-message-input,
-        .wa-composer textarea,
-        .wa-composer input {
-          color: #0f172a !important;
-          caret-color: var(--accent-color) !important;
-          background-color: #ffffff !important;
-          border-color: #cbd5e1 !important;
-        }
-        .wa-input::placeholder,
-        .wa-search-input::placeholder,
-        .wa-message-input::placeholder,
-        .wa-composer textarea::placeholder,
-        .wa-composer input::placeholder {
-          color: #64748b !important;
-          opacity: 1 !important;
-        }
-        .wa-icon-btn,
-        .wa-mini-btn,
-        .wa-profile-edit {
-          color: #1e293b !important;
-          background: #f8fafc !important;
-          border: 1px solid #cbd5e1 !important;
-        }
-        .wa-icon-btn:hover,
-        .wa-mini-btn:hover {
-          color: #020617 !important;
-          background: #e2e8f0 !important;
-          border-color: #94a3b8 !important;
-        }
-        .wa-send-btn,
-        .wa-primary-btn,
-        .wa-rail-btn.active {
-          color: #ffffff !important;
-          -webkit-text-fill-color: #ffffff !important;
-        }
-        .wa-message-row:not(.mine) .wa-bubble,
-        .wa-message-row:not(.mine) .wa-bubble * {
-          color: #111827 !important;
-          -webkit-text-fill-color: currentColor !important;
-        }
-        .wa-message-row.mine .wa-bubble,
-        .wa-message-row.mine .wa-bubble * {
-          color: #07111f !important;
-          -webkit-text-fill-color: currentColor !important;
-        }
-        .wa-bubble a { color: #075985 !important; text-decoration: underline; }
-        .wa-room-card,
-        .wa-user-card,
-        .wa-call-log-card,
-        .wa-search-result-card {
-          border-color: #e2e8f0 !important;
-        }
-        .wa-room-card.active {
-          background: color-mix(in srgb, var(--accent-color) 10%, #ffffff) !important;
-          border-color: color-mix(in srgb, var(--accent-color) 42%, #cbd5e1) !important;
-        }
-
-        @media (min-width: 901px) {
-          .wa-app {
-            display: grid !important;
-            grid-template-columns: minmax(360px, 400px) minmax(0, 1fr) !important;
-            grid-template-rows: minmax(0, 1fr) !important;
-            padding: 0 !important;
-            gap: 0 !important;
-          }
-          .wa-sidebar,
-          .wa-main {
-            width: 100% !important;
-            min-width: 0 !important;
-            height: 100% !important;
-            min-height: 0 !important;
-            max-height: none !important;
-            border-radius: 0 !important;
-          }
-          .wa-sidebar { grid-column: 1 !important; grid-row: 1 !important; }
-          .wa-main { grid-column: 2 !important; grid-row: 1 !important; }
-        }
-
-        @media (max-width: 900px) {
-          html, body, #root { height: 100dvh !important; }
-          body { width: 100vw !important; }
-          .wa-app {
-            display: block !important;
-            width: 100vw !important;
-            height: 100dvh !important;
-            min-height: 100dvh !important;
-            overflow: hidden !important;
-          }
-          .wa-app.has-active-chat {
-            display: block !important;
-          }
-          .wa-app.has-active-chat .wa-sidebar,
-          .wa-app.has-active-chat .wa-mobile-overlay {
-            display: none !important;
-          }
-          .wa-app.has-active-chat .wa-main {
-            position: fixed !important;
-            inset: 0 !important;
-            z-index: 100 !important;
-            display: grid !important;
-            grid-template-columns: minmax(0, 1fr) !important;
-            grid-template-rows: auto minmax(0, 1fr) auto !important;
-            width: 100vw !important;
-            height: 100dvh !important;
-            min-height: 0 !important;
-            max-height: 100dvh !important;
-            overflow: hidden !important;
-            border: 0 !important;
-            border-radius: 0 !important;
-            background: var(--chat-wallpaper) !important;
-          }
-          .wa-app.has-active-chat .wa-header {
-            position: relative !important;
-            inset: auto !important;
-            grid-column: 1 !important;
-            grid-row: 1 !important;
-            z-index: 5 !important;
-            display: flex !important;
-            flex: 0 0 auto !important;
-            width: 100% !important;
-            min-height: calc(64px + env(safe-area-inset-top)) !important;
-            height: auto !important;
-            padding: calc(8px + env(safe-area-inset-top)) 8px 8px !important;
-            background: #ffffff !important;
-            border-bottom: 1px solid #dbe3ed !important;
-            box-shadow: 0 2px 12px rgba(15,23,42,.08) !important;
-            backdrop-filter: none !important;
-          }
-          .wa-app.has-active-chat .wa-header-left {
-            display: flex !important;
-            align-items: center !important;
-            min-width: 0 !important;
-            flex: 1 1 auto !important;
-            gap: 8px !important;
-          }
-          .wa-app.has-active-chat .wa-header-left > .wa-icon-btn,
-          .wa-app.has-active-chat .wa-close-chat-btn {
-            display: grid !important;
-            flex: 0 0 40px !important;
-            width: 40px !important;
-            height: 40px !important;
-            place-items: center !important;
-          }
-          .wa-app.has-active-chat .wa-header-title-wrap {
-            min-width: 0 !important;
-            flex: 1 1 auto !important;
-          }
-          .wa-app.has-active-chat .wa-header-title {
-            color: #0b1220 !important;
-            font-size: 16px !important;
-            font-weight: 800 !important;
-            line-height: 1.2 !important;
-          }
-          .wa-app.has-active-chat .wa-header-sub {
-            color: #475569 !important;
-            font-size: 11px !important;
-            line-height: 1.2 !important;
-          }
-          .wa-app.has-active-chat .wa-header-right {
-            display: flex !important;
-            align-items: center !important;
-            gap: 4px !important;
-            flex: 0 0 auto !important;
-          }
-          .wa-app.has-active-chat .wa-header-right .wa-icon-btn {
-            display: grid !important;
-            width: 38px !important;
-            height: 38px !important;
-            min-width: 38px !important;
-            border: 0 !important;
-            background: transparent !important;
-          }
-          .wa-app.has-active-chat .wa-header-right .wa-icon-btn:hover {
-            background: #eef2f7 !important;
-          }
-          .wa-app.has-active-chat .wa-messages {
-            position: relative !important;
-            inset: auto !important;
-            grid-column: 1 !important;
-            grid-row: 2 !important;
-            width: 100% !important;
-            height: auto !important;
-            min-height: 0 !important;
-            max-height: none !important;
-            overflow-y: auto !important;
-            overflow-x: hidden !important;
-            padding: 14px 10px 18px !important;
-            scroll-padding-bottom: 18px !important;
-            -webkit-overflow-scrolling: touch !important;
-          }
-          .wa-app.has-active-chat .wa-message-row {
-            width: 100% !important;
-            max-width: none !important;
-          }
-          .wa-app.has-active-chat .wa-bubble {
-            max-width: 86% !important;
-            min-width: 0 !important;
-            font-size: 15px !important;
-            line-height: 1.42 !important;
-          }
-          .wa-app.has-active-chat .wa-composer {
-            position: relative !important;
-            inset: auto !important;
-            left: auto !important;
-            right: auto !important;
-            bottom: auto !important;
-            transform: none !important;
-            grid-column: 1 !important;
-            grid-row: 3 !important;
-            z-index: 6 !important;
-            width: 100% !important;
-            min-width: 0 !important;
-            min-height: calc(64px + env(safe-area-inset-bottom)) !important;
-            margin: 0 !important;
-            padding: 8px 8px calc(8px + env(safe-area-inset-bottom)) !important;
-            border: 0 !important;
-            border-top: 1px solid #dbe3ed !important;
-            border-radius: 0 !important;
-            background: #ffffff !important;
-            box-shadow: 0 -2px 12px rgba(15,23,42,.08) !important;
-            backdrop-filter: none !important;
-          }
-          .wa-app.has-active-chat .wa-input-wrap {
-            min-width: 0 !important;
-            border: 1px solid #cbd5e1 !important;
-            background: #f8fafc !important;
-          }
-          .wa-app.has-active-chat .wa-input,
-          .wa-app.has-active-chat .wa-composer textarea {
-            min-height: 44px !important;
-            max-height: 120px !important;
-            color: #0f172a !important;
-            background: transparent !important;
-          }
-        }
-
-
-        /* Desktop conversation alignment: full workspace, not a centred feed */
-        @media (min-width: 901px) {
-          .wa-main {
-            display: grid !important;
-            grid-template-rows: auto minmax(0, 1fr) auto !important;
-            overflow: hidden !important;
-          }
-          .wa-header { grid-row: 1 !important; }
-          .wa-chat,
-          .wa-messages {
-            grid-row: 2 !important;
-            width: 100% !important;
-            max-width: none !important;
-            min-width: 0 !important;
-            padding: 24px 34px 112px !important;
-          }
-          .wa-message-row {
-            width: 100% !important;
-            max-width: none !important;
-            margin-left: 0 !important;
-            margin-right: 0 !important;
-          }
-          .wa-message-row:not(.mine) {
-            justify-content: flex-start !important;
-            padding-right: 24% !important;
-          }
-          .wa-message-row.mine {
-            justify-content: flex-end !important;
-            padding-left: 24% !important;
-          }
-          .wa-bubble {
-            width: auto !important;
-            max-width: min(720px, 72%) !important;
-          }
-          .wa-message-row.mine .wa-bubble { margin-left: auto !important; }
-          .wa-message-row:not(.mine) .wa-bubble { margin-right: auto !important; }
-          .wa-composer {
-            left: 24px !important;
-            right: 24px !important;
-            bottom: 18px !important;
-            transform: none !important;
-            width: auto !important;
-            max-width: none !important;
-          }
-          .wa-mobile-back-btn { display: none !important; }
-          .wa-close-chat-btn { display: grid !important; }
-        }
-
-        /* Final desktop bubble width and mobile navigation corrections */
-        @media (min-width: 901px) {
-          .wa-message-row:not(.mine) {
-            padding-right: 8% !important;
-          }
-          .wa-message-row.mine {
-            padding-left: 18% !important;
-          }
-          .wa-message-row:not(.mine) .wa-bubble {
-            width: fit-content !important;
-            max-width: min(920px, 84%) !important;
-          }
-          .wa-message-row.mine .wa-bubble {
-            width: fit-content !important;
-            max-width: min(820px, 76%) !important;
-          }
-        }
-
-        @media (max-width: 900px) {
-          /* Never show the hamburger/menu control on mobile. */
-          .wa-desktop-menu-btn { display: none !important; }
-        }
-
-        /* Mobile chat navigation: back replaces the menu icon */
-        @media (max-width: 900px) {
-          .wa-app.has-active-chat .wa-desktop-menu-btn { display: none !important; }
-          .wa-app.has-active-chat .wa-mobile-back-btn {
-            display: grid !important;
-            flex: 0 0 40px !important;
-            width: 40px !important;
-            height: 40px !important;
-            place-items: center !important;
-            padding: 0 !important;
-            border: 0 !important;
-            background: transparent !important;
-            color: #0f172a !important;
-            font-size: 27px !important;
-            line-height: 1 !important;
-          }
-          .wa-app.has-active-chat .wa-mobile-back-btn:hover,
-          .wa-app.has-active-chat .wa-mobile-back-btn:active {
-            background: #eef2f7 !important;
-          }
-          .wa-app.has-active-chat .wa-close-chat-btn { display: none !important; }
-        }
-      `}</style>
 
       {showSidebar ? <div className="wa-mobile-overlay" onClick={() => setShowSidebar(false)} /> : null}
 
       <div data-theme={chatPrefs.theme || "light-grey"} className={`wa-app ${activeRoom ? "has-active-chat" : "no-active-chat"} bubble-${chatPrefs.bubbleShape} font-${chatPrefs.fontSize}`} style={{ "--app-color": chatPrefs.appColor, "--accent-color": chatPrefs.accentColor, "--chat-wallpaper": chatPrefs.wallpaper, "--chat-color": chatPrefs.chatColor, "--desktop-sidebar-width": `${desktopSidebarWidth}px` }}>
         <aside className={`wa-sidebar ${showSidebar ? "open" : ""}`}>
-          <nav className="wa-nav-rail" aria-label="Main navigation">
-            <button type="button" className="wa-rail-logo" title="Home" onClick={() => { setActiveRoomSlug(""); setShowChatDetails(false); }}>
-              <img src="/icons/icon-192.png" alt="Int-Messager" />
-            </button>
-            <div className="wa-rail-nav">
-              <button type="button" className={`wa-rail-btn ${sidebarMode === "chats" ? "active" : ""}`} onClick={() => setSidebarMode("chats")} title="Chats"><span>✉</span><small>Chats</small>{totalUnreadCount ? <b>{totalUnreadCount > 99 ? "99+" : totalUnreadCount}</b> : null}</button>
-              <button type="button" className={`wa-rail-btn ${sidebarMode === "people" ? "active" : ""}`} onClick={() => setSidebarMode("people")} title="Contacts"><span>◉</span><small>Contacts</small></button>
-              <button type="button" className={`wa-rail-btn ${sidebarMode === "calls" ? "active" : ""}`} onClick={() => setSidebarMode("calls")} title="Calls"><span>☎</span><small>Calls</small></button>
-              <button type="button" className={`wa-rail-btn ${sidebarMode === "settings" ? "active" : ""}`} onClick={() => setSidebarMode("settings")} title="Settings"><span>⚙</span><small>Settings</small></button>
-            </div>
-            <button type="button" className="wa-rail-profile" title="Edit profile" onClick={() => {
+          <NavigationRail
+            sidebarMode={sidebarMode}
+            totalUnreadCount={totalUnreadCount}
+            profile={profile}
+            avatar={<Avatar label={profile.displayName} src={profile.avatarUrl} />}
+            onHome={() => { setActiveRoomSlug(""); setShowChatDetails(false); }}
+            onModeChange={setSidebarMode}
+            onEditProfile={() => {
               setDisplayNameInput(profile.displayName || "");
               setProfileStatusInput(profile.profileStatus || "Available now");
               setProfileAvatarPreview(profile.avatarUrl || "");
               setShowProfileEditor(true);
-            }}><Avatar label={profile.displayName} src={profile.avatarUrl} /></button>
-          </nav>
+            }}
+          />
           <div className="wa-sidebar-panel">
           <div className="wa-brand"><img src="/icons/icon-192.png" alt="" /><span>Int-Messager</span><em>{sidebarMode}</em></div>
 
@@ -7251,6 +6470,29 @@ export default function App() {
               style={{ left: roomContextMenu.x, top: roomContextMenu.y }}
               onClick={(event) => event.stopPropagation()}
             >
+              {rooms.find((room) => room.slug === roomContextMenu.roomSlug)?.isSaved ? (
+                <button type="button" disabled title="Saved Messages always stays first">★ Saved Messages stays first</button>
+              ) : (
+                <button type="button" onClick={() => {
+                  const slug = roomContextMenu.roomSlug;
+                  const enabled = !(chatOrgPrefs.pinnedRooms || []).includes(slug);
+                  closeRoomContextMenu(); updateRoomPreference(slug, "pin", enabled);
+                }}>{(chatOrgPrefs.pinnedRooms || []).includes(roomContextMenu.roomSlug) ? "Unpin chat" : "Pin chat"}</button>
+              )}
+              <button type="button" onClick={() => {
+                const slug = roomContextMenu.roomSlug;
+                const enabled = !(chatOrgPrefs.archivedRooms || []).includes(slug);
+                closeRoomContextMenu(); updateRoomPreference(slug, "archive", enabled);
+              }}>{(chatOrgPrefs.archivedRooms || []).includes(roomContextMenu.roomSlug) ? "Restore chat" : "Archive chat"}</button>
+              <button type="button" onClick={() => {
+                const slug = roomContextMenu.roomSlug;
+                const enabled = !(chatOrgPrefs.mutedRooms || []).includes(slug);
+                closeRoomContextMenu(); updateRoomPreference(slug, "mute", enabled);
+              }}>{(chatOrgPrefs.mutedRooms || []).includes(roomContextMenu.roomSlug) ? "Unmute notifications" : "Mute notifications"}</button>
+              <button type="button" onClick={() => {
+                const slug = roomContextMenu.roomSlug;
+                closeRoomContextMenu(); updateRoomPreference(slug, "unread", true);
+              }}>Mark as unread</button>
               <button
                 type="button"
                 onClick={() => {
@@ -7277,18 +6519,24 @@ export default function App() {
 
           {sidebarMode === "chats" ? (
             <>
-              <div className="wa-section-label">Chats</div>
+              <div className="wa-chat-list-heading">
+                <div className="wa-section-label">{showArchivedChats ? "Archived chats" : "Chats"}</div>
+                <button type="button" className="wa-archive-toggle" onClick={() => setShowArchivedChats((value) => !value)}>
+                  {showArchivedChats ? "Back to chats" : `Archived (${(chatOrgPrefs.archivedRooms || []).length})`}
+                </button>
+              </div>
               {filteredRooms.map((room) => (
                 <button
                   key={room.slug}
                   type="button"
-                  className={`wa-room-card ${activeRoomSlug === room.slug ? "active" : ""}`}
+                  className={`wa-room-card ${activeRoomSlug === room.slug ? "active" : ""} ${(chatOrgPrefs.pinnedRooms || []).includes(room.slug) ? "pinned" : ""} ${room.isSaved ? "saved-messages" : ""}`}
                   onContextMenu={(event) => {
                     event.preventDefault();
-                    openRoomContextMenu(room, event);
+                    if (!room.isSaved) openRoomContextMenu(room, event);
                   }}
                   onTouchStart={(event) => {
                     roomLongPressTimerRef.current = window.setTimeout(() => {
+                      if (room.isSaved) return;
                       skipRoomClickRef.current = true;
                       openRoomContextMenu(room, event);
                     }, 550);
@@ -7315,6 +6563,9 @@ export default function App() {
                     setReplyTo(null);
                     setShowChatDetails(false);
                     setShowSidebar(false);
+                    if ((chatOrgPrefs.manuallyUnreadRooms || []).includes(room.slug)) {
+                      updateRoomPreference(room.slug, "unread", false);
+                    }
                   }}
                 >
                   <Avatar label={getRoomDisplayName(room, profile?.displayName, currentProfileId, profiles)} src={getRoomAvatarSrc(room)} />
@@ -7328,10 +6579,15 @@ export default function App() {
                         {getRoomDisplayName(room, profile?.displayName, currentProfileId, profiles)}
                       </div>
 
+                      <span className="wa-room-flags">
+                        {room.isSaved ? <span title="Saved Messages">⭐</span> : null}
+                        {(chatOrgPrefs.pinnedRooms || []).includes(room.slug) ? <span title="Pinned">📌</span> : null}
+                        {(chatOrgPrefs.mutedRooms || []).includes(room.slug) ? <span title="Muted">🔕</span> : null}
+                      </span>
                       {room.activeCall ? <span className="wa-call-badge">Live call</span> : null}
 
-                      {unreadCounts[room.slug] ? (
-                        <span className="wa-unread-badge">{unreadCounts[room.slug]}</span>
+                      {(unreadCounts[room.slug] || (chatOrgPrefs.manuallyUnreadRooms || []).includes(room.slug)) ? (
+                        <span className="wa-unread-badge">{unreadCounts[room.slug] || "•"}</span>
                       ) : null}
                     </div>
 
@@ -7393,11 +6649,17 @@ export default function App() {
                 <div className="wa-settings-note">This profile is synced and can be recovered by signing in on another device.</div>
                 <button className="wa-settings-btn v4-logout-btn" type="button" onClick={handleLogout}>Sign out on this device</button>
               </div>
+              <div className="wa-section-label">Security</div>
+              <DeviceSessions />
               <div className="wa-section-label">Chat view</div>
               <div className="wa-settings-card">
                 <div className="wa-settings-title">Personalize this device</div>
                 <button className="wa-settings-btn" type="button" onClick={requestBrowserNotifications}>Enable call/message notifications</button>
                 <div className="wa-settings-note">Allows call and message alerts while this app is minimized, in another tab, or behind another window.</div>
+                <label className="wa-settings-label archive-behaviour-setting">
+                  <span>Keep archived chats archived when new messages arrive</span>
+                  <input type="checkbox" checked={chatOrgPrefs.keepArchivedOnNewMessage !== false} onChange={(event) => updateArchiveBehaviour(event.target.checked)} />
+                </label>
                 <label className="wa-settings-label">Theme
                   <select className="wa-select" value={chatPrefs.theme || "light-grey"} onChange={(e) => updateChatPref("theme", e.target.value)}>
                     <option value="light-grey">Light Grey — recommended</option>
@@ -7421,6 +6683,15 @@ export default function App() {
                 </div>
                 <label className="wa-settings-label">Bubble style <select className="wa-select" value={chatPrefs.bubbleShape} onChange={(e) => updateChatPref("bubbleShape", e.target.value)}><option value="rounded">Rounded</option><option value="soft">Soft</option><option value="square">Compact square</option></select></label>
                 <label className="wa-settings-label">Font size <select className="wa-select" value={chatPrefs.fontSize} onChange={(e) => updateChatPref("fontSize", e.target.value)}><option value="small">Small</option><option value="normal">Normal</option><option value="large">Large</option></select></label>
+              </div>
+              <div className="wa-section-label">Developer tools</div>
+              <div className="wa-settings-card developer-tools-card">
+                <div className="wa-settings-title">Diagnostics</div>
+                <div className="wa-settings-note">Use these tools while developing or troubleshooting the PWA.</div>
+                <button className="wa-settings-btn" type="button" onClick={runDeveloperHealthCheck}>Run health check</button>
+                <button className="wa-settings-btn" type="button" onClick={() => { socket.emit("rooms_updated"); setDeveloperStatus("Sync requested."); }}>Force data refresh</button>
+                <button className="wa-settings-btn danger" type="button" onClick={resetDeveloperCache}>Clear cache and reset service worker</button>
+                {developerStatus ? <div className="developer-status">{developerStatus}</div> : null}
               </div>
             </>
           ) : (
@@ -7719,7 +6990,10 @@ export default function App() {
                   listenedMap={listenedMap}
                   markPlayed={markPlayed}
                   onReply={setReplyTo}
-                  onDelete={deleteMessage}
+                  onEdit={editMessage}
+                  onDeleteForMe={deleteMessageForMe}
+                  onDeleteForEveryone={deleteMessageForEveryone}
+                  onScrollToReply={scrollToMessage}
                   onOpenReactionPicker={openReactionPicker}
                   onStartLongPressReaction={startLongPressReaction}
                   onCancelLongPressReaction={cancelLongPressReaction}
@@ -7898,6 +7172,14 @@ export default function App() {
                   <button type="button" className="wa-home-action" onClick={() => { setSidebarMode("people"); setShowSidebar(true); }}>
                     <span className="wa-home-action-icon">✚</span>
                     New chat
+                  </button>
+                  <button type="button" className="wa-home-action" onClick={() => {
+                    const savedRoom = roomsSorted.find((room) => room.isSaved);
+                    if (savedRoom) openHomeRoom(savedRoom.slug);
+                  }}>
+                    <span>⭐</span>
+                    <strong>Saved Messages</strong>
+                    <small>Keep notes, links and files for yourself</small>
                   </button>
                   <button type="button" className="wa-home-action" onClick={() => openHomeRoom("general")}>
                     <span className="wa-home-action-icon">💬</span>
@@ -8249,7 +7531,7 @@ export default function App() {
               </div>
             ) : null}
 
-            {false && Object.keys(remoteScreenStreams).length ? (
+            {Object.keys(remoteScreenStreams).length ? (
               <div className="wa-screen-share-grid">
                 {Object.entries(remoteScreenStreams).map(([peerSocketId, stream]) => (
                   <video
