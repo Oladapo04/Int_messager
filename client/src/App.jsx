@@ -9,7 +9,7 @@ import "./styles/premium-v474.css";
 import "./themes.css";
 import AuthScreen from "./components/auth/AuthScreen";
 import NavigationRail from "./components/layout/NavigationRail";
-import MessageActions from "./components/chat/MessageActions";
+import MessageActions, { DesktopMessageContextMenu, MobileMessageActionSheet } from "./components/chat/MessageActions";
 import { editMessageRequest, deleteMessageRequest } from "./services/messageService";
 
 const API_BASE = "";
@@ -3029,7 +3029,7 @@ function MessageBubble({
   onDeleteForMe,
   onDeleteForEveryone,
   onScrollToReply,
-  onOpenReactionPicker,
+  onOpenDesktopMenu,
   onStartLongPressReaction,
   onCancelLongPressReaction,
   onReact,
@@ -3102,21 +3102,11 @@ function MessageBubble({
         {mine ? <span>{message.status || "sent"}</span> : null}
         {!message.isDeleted ? (
           <MessageActions
-            message={message}
-            mine={mine}
-            isStarred={isStarredByMe}
-            isPinned={isPinned}
-            onReact={(event) => {
+            onOpen={(event) => {
+              event.stopPropagation();
               const rect = event.currentTarget.getBoundingClientRect();
-              onOpenReactionPicker(message, { x: rect.left + rect.width / 2, y: rect.top - 8 });
+              onOpenDesktopMenu(message, { x: rect.right + 8, y: rect.top });
             }}
-            onReply={() => onReply(message)}
-            onForward={() => onForward(message)}
-            onToggleStar={() => onToggleStar(message)}
-            onTogglePin={() => onTogglePin(message)}
-            onEdit={() => onEdit(message)}
-            onDeleteForMe={() => onDeleteForMe(message)}
-            onDeleteForEveryone={() => onDeleteForEveryone(message)}
           />
         ) : null}
       </div>
@@ -3128,6 +3118,14 @@ function MessageBubble({
       <div
         className={`wa-message-row mine ${String(message._id || "") === String(highlightedMessageId || "") ? "search-highlight" : ""}`}
         data-message-id={String(message._id || "")}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          onOpenDesktopMenu(message, { x: event.clientX, y: event.clientY });
+        }}
+        onTouchStart={(e) => onStartLongPressReaction(message, e)}
+        onTouchEnd={onCancelLongPressReaction}
+        onTouchMove={onCancelLongPressReaction}
+        onTouchCancel={onCancelLongPressReaction}
       >
         <div className="wa-bubble mine">{content}</div>
       </div>
@@ -3138,13 +3136,14 @@ function MessageBubble({
     <div
       className={`wa-message-row other ${String(message._id || "") === String(highlightedMessageId || "") ? "search-highlight" : ""}`}
       data-message-id={String(message._id || "")}
-      onContextMenu={(e) => {
-        e.preventDefault();
-        onOpenReactionPicker(message, { x: e.clientX, y: e.clientY });
+      onContextMenu={(event) => {
+        event.preventDefault();
+        onOpenDesktopMenu(message, { x: event.clientX, y: event.clientY });
       }}
       onTouchStart={(e) => onStartLongPressReaction(message, e)}
       onTouchEnd={onCancelLongPressReaction}
       onTouchMove={onCancelLongPressReaction}
+      onTouchCancel={onCancelLongPressReaction}
     >
       <div className="wa-message-other-wrap">
         <Avatar label={senderDisplayName} src={senderAvatarUrl} className="message" />
@@ -3234,6 +3233,8 @@ export default function App() {
   const [isDragOver, setIsDragOver] = useState(false);
   const [listenedMap, setListenedMap] = useState(loadPlayedMap);
   const [reactionPicker, setReactionPicker] = useState(null);
+  const [mobileMessageActions, setMobileMessageActions] = useState(null);
+  const [desktopMessageActions, setDesktopMessageActions] = useState(null);
   const [chatEmojiPicker, setChatEmojiPicker] = useState(null);
   const [showSidebar, setShowSidebar] = useState(false);
   const [chatSearch, setChatSearch] = useState("");
@@ -6167,10 +6168,25 @@ export default function App() {
     });
   }
 
+  function openDesktopMessageMenu(message, position) {
+    if (window.matchMedia("(max-width: 760px)").matches) return;
+    const menuWidth = 286;
+    const menuHeight = 430;
+    const x = Math.min(Math.max(10, position.x), Math.max(10, window.innerWidth - menuWidth - 10));
+    const y = Math.min(Math.max(10, position.y), Math.max(10, window.innerHeight - menuHeight - 10));
+    setReactionPicker(null);
+    setDesktopMessageActions({ message, position: { x, y } });
+  }
+
   function startLongPressReaction(message, event) {
     window.clearTimeout(longPressTimerRef.current);
+    const touch = event.touches?.[0];
     longPressTimerRef.current = window.setTimeout(() => {
-      const touch = event.touches?.[0];
+      if (window.matchMedia("(max-width: 760px)").matches) {
+        if (navigator.vibrate) navigator.vibrate(18);
+        setMobileMessageActions({ message });
+        return;
+      }
       openReactionPicker(message, {
         x: touch?.clientX || window.innerWidth / 2,
         y: touch?.clientY || window.innerHeight / 2,
@@ -6994,7 +7010,7 @@ export default function App() {
                   onDeleteForMe={deleteMessageForMe}
                   onDeleteForEveryone={deleteMessageForEveryone}
                   onScrollToReply={scrollToMessage}
-                  onOpenReactionPicker={openReactionPicker}
+                  onOpenDesktopMenu={openDesktopMessageMenu}
                   onStartLongPressReaction={startLongPressReaction}
                   onCancelLongPressReaction={cancelLongPressReaction}
                   onReact={reactToMessage}
@@ -7303,6 +7319,53 @@ export default function App() {
           <button type="button" onClick={installPwaApp}>Install</button>
           <button type="button" className="ghost" onClick={() => setShowPwaInstallPrompt(false)}>Later</button>
         </div>
+      ) : null}
+
+      {desktopMessageActions?.message ? (
+        <DesktopMessageContextMenu
+          message={desktopMessageActions.message}
+          mine={String(desktopMessageActions.message.senderProfileId || "") === String(currentProfileId || "")}
+          isStarred={Array.isArray(desktopMessageActions.message.starredBy) && desktopMessageActions.message.starredBy.some((id) => String(id) === String(currentProfileId || ""))}
+          isPinned={Boolean(desktopMessageActions.message.pinned)}
+          position={desktopMessageActions.position}
+          onClose={() => setDesktopMessageActions(null)}
+          onReact={(emoji) => {
+            if (emoji === "+") {
+              openReactionPicker(desktopMessageActions.message, desktopMessageActions.position);
+            } else {
+              reactToMessage(desktopMessageActions.message._id, emoji);
+            }
+            setDesktopMessageActions(null);
+          }}
+          onReply={() => { setReplyTo(desktopMessageActions.message); setDesktopMessageActions(null); }}
+          onForward={() => { forwardMessage(desktopMessageActions.message); setDesktopMessageActions(null); }}
+          onToggleStar={() => { toggleStarMessage(desktopMessageActions.message); setDesktopMessageActions(null); }}
+          onTogglePin={() => { togglePinMessage(desktopMessageActions.message); setDesktopMessageActions(null); }}
+          onEdit={() => { editMessage(desktopMessageActions.message); setDesktopMessageActions(null); }}
+          onDeleteForMe={() => { deleteMessageForMe(desktopMessageActions.message); setDesktopMessageActions(null); }}
+          onDeleteForEveryone={() => { deleteMessageForEveryone(desktopMessageActions.message); setDesktopMessageActions(null); }}
+        />
+      ) : null}
+
+      {mobileMessageActions?.message ? (
+        <MobileMessageActionSheet
+          message={mobileMessageActions.message}
+          mine={String(mobileMessageActions.message.senderProfileId || "") === String(currentProfileId || "")}
+          isStarred={Array.isArray(mobileMessageActions.message.starredBy) && mobileMessageActions.message.starredBy.some((id) => String(id) === String(currentProfileId || ""))}
+          isPinned={Boolean(mobileMessageActions.message.pinned)}
+          onClose={() => setMobileMessageActions(null)}
+          onReact={(emoji) => {
+            reactToMessage(mobileMessageActions.message._id, emoji);
+            setMobileMessageActions(null);
+          }}
+          onReply={() => { setReplyTo(mobileMessageActions.message); setMobileMessageActions(null); }}
+          onForward={() => { forwardMessage(mobileMessageActions.message); setMobileMessageActions(null); }}
+          onToggleStar={() => { toggleStarMessage(mobileMessageActions.message); setMobileMessageActions(null); }}
+          onTogglePin={() => { togglePinMessage(mobileMessageActions.message); setMobileMessageActions(null); }}
+          onEdit={() => { editMessage(mobileMessageActions.message); setMobileMessageActions(null); }}
+          onDeleteForMe={() => { deleteMessageForMe(mobileMessageActions.message); setMobileMessageActions(null); }}
+          onDeleteForEveryone={() => { deleteMessageForEveryone(mobileMessageActions.message); setMobileMessageActions(null); }}
+        />
       ) : null}
 
       {reactionPicker ? (
