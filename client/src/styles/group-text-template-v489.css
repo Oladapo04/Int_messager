@@ -1,0 +1,131 @@
+/* Int-Messager v4.8.9 — dedicated WhatsApp-style group text template.
+   This file is intentionally loaded last and affects incoming group text only. */
+
+.wa-app .wa-bubble.wa-group-text-template {
+  box-sizing: border-box !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  grid-template-areas:
+    "sender sender"
+    "body body"
+    ". meta" !important;
+  column-gap: 10px !important;
+  row-gap: 2px !important;
+  width: max-content !important;
+  min-width: 154px !important;
+  max-width: min(66vw, 560px) !important;
+  padding: 7px 9px 5px !important;
+  background: #ffffff !important;
+  color: #111827 !important;
+  border: 1px solid rgba(17, 24, 39, 0.10) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 1px 1px rgba(17, 24, 39, 0.10) !important;
+  overflow: visible !important;
+}
+
+.wa-app .wa-bubble.wa-group-text-template .wa-group-text-sender {
+  grid-area: sender !important;
+  display: block !important;
+  width: 100% !important;
+  margin: 0 0 1px !important;
+  padding: 0 !important;
+  color: #0784c6 !important;
+  font-size: 12.5px !important;
+  font-weight: 700 !important;
+  line-height: 1.25 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.wa-app .wa-bubble.wa-group-text-template .wa-group-text-body {
+  grid-area: body !important;
+  display: block !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  color: #111827 !important;
+  font-size: 14px !important;
+  font-weight: 400 !important;
+  line-height: 1.42 !important;
+  white-space: pre-wrap !important;
+  overflow-wrap: anywhere !important;
+  word-break: normal !important;
+}
+
+.wa-app .wa-bubble.wa-group-text-template .wa-group-text-meta {
+  grid-area: meta !important;
+  justify-self: end !important;
+  align-self: end !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  width: max-content !important;
+  margin: 1px 0 0 12px !important;
+  padding: 0 !important;
+  gap: 4px !important;
+  color: #667085 !important;
+  font-size: 10.5px !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+}
+
+/* Hide legacy layout behaviour that previously merged name and body. */
+.wa-app .wa-bubble.wa-group-text-template > .wa-message-flag-row,
+.wa-app .wa-bubble.wa-group-text-template > .wa-forward-label,
+.wa-app .wa-bubble.wa-group-text-template > .wa-reply-card,
+.wa-app .wa-bubble.wa-group-text-template > .wa-reaction-bar {
+  grid-column: 1 / -1 !important;
+}
+
+/* WhatsApp-like tail only at the beginning of a sender sequence. */
+.wa-app .wa-message-row.other.sequence-start .wa-bubble.wa-group-text-template::before {
+  content: "" !important;
+  position: absolute !important;
+  left: -7px !important;
+  top: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+  border-top: 8px solid #ffffff !important;
+  border-left: 8px solid transparent !important;
+}
+
+.wa-app .wa-bubble.wa-group-text-template {
+  position: relative !important;
+}
+
+/* Sequence messages without a sender label are allowed to be more compact. */
+.wa-app .wa-message-row.other.sequence-middle .wa-bubble.wa-group-text-template,
+.wa-app .wa-message-row.other.sequence-end:not(.sequence-start) .wa-bubble.wa-group-text-template {
+  min-width: 96px !important;
+  row-gap: 1px !important;
+}
+
+/* Ensure the group row has enough usable width and a stable avatar gutter. */
+.wa-app .wa-message-row.other .wa-message-other-wrap {
+  width: 100% !important;
+  display: flex !important;
+  align-items: flex-end !important;
+  gap: 6px !important;
+}
+
+.wa-app .wa-message-row.other .wa-message-content-wrap {
+  min-width: 0 !important;
+  max-width: calc(100% - 38px) !important;
+}
+
+@media (max-width: 760px) {
+  .wa-app .wa-bubble.wa-group-text-template {
+    min-width: 146px !important;
+    max-width: min(82vw, 480px) !important;
+    padding: 7px 8px 5px !important;
+  }
+
+  .wa-app .wa-bubble.wa-group-text-template .wa-group-text-body {
+    font-size: 14.5px !important;
+  }
+
+  .wa-app .wa-message-row.other .wa-message-content-wrap {
+    max-width: calc(100vw - 54px) !important;
+  }
+}

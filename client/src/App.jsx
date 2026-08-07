@@ -7,9 +7,17 @@ import "./Version3.css";
 import "./styles/layout-v474.css";
 import "./styles/premium-v474.css";
 import "./themes.css";
+import "./styles/whatsapp-chat-v487.css";
+import "./styles/group-text-v488.css";
+import "./styles/group-text-template-v489.css";
+import "./styles/pdf-attachment-v4810.css";
 import AuthScreen from "./components/auth/AuthScreen";
 import NavigationRail from "./components/layout/NavigationRail";
 import MessageActions, { DesktopMessageContextMenu, MobileMessageActionSheet } from "./components/chat/MessageActions";
+import AttachmentRenderer from "./components/chat/AttachmentRenderer";
+import ConversationView from "./components/chat/ConversationView";
+import MessageList from "./components/chat/MessageList";
+import Composer from "./components/composer/Composer";
 import { editMessageRequest, deleteMessageRequest } from "./services/messageService";
 
 const API_BASE = "";
@@ -3037,6 +3045,8 @@ function MessageBubble({
   onToggleStar,
   onTogglePin,
   isGroupChat,
+  isSequenceStart = true,
+  isSequenceEnd = true,
   getProfileNameById = null,
   getProfileAvatarById = null,
 }) {
@@ -3054,9 +3064,13 @@ function MessageBubble({
   const senderAvatarUrl = !mine && typeof getProfileAvatarById === "function"
     ? getProfileAvatarById(message.senderProfileId)
     : "";
+  const isPlainTextMessage = !message.isDeleted && !["audio", "file", "image", "video"].includes(message.type || "text");
+  const useGroupTextTemplate = Boolean(!mine && isGroupChat && isPlainTextMessage);
 
   const content = (
     <>
+      {!mine && isGroupChat && isSequenceStart ? <div className="wa-sender-name wa-sender-name-inside wa-group-text-sender">{senderDisplayName}</div> : null}
+
       {message.forwardedFrom?.sender ? (
         <div className="wa-forward-label">Forwarded from {message.forwardedFrom.sender}</div>
       ) : null}
@@ -3089,14 +3103,14 @@ function MessageBubble({
           />
         </div>
       ) : message.type === "file" && !message.isDeleted ? (
-        <AttachmentPreview item={message} />
+        <AttachmentRenderer item={message} resolveMediaUrl={resolveMediaUrl} />
       ) : (
-        <div className={`wa-message-text ${message.isDeleted ? "deleted" : ""}`}>{message.content}</div>
+        <div className={`wa-message-text ${useGroupTextTemplate ? "wa-group-text-body" : ""} ${message.isDeleted ? "deleted" : ""}`}>{message.content}</div>
       )}
 
       <ReactionBar reactions={message.reactions} onReact={(emoji) => onReact(message._id, emoji)} />
 
-      <div className="wa-meta">
+      <div className={`wa-meta ${useGroupTextTemplate ? "wa-group-text-meta" : ""}`}> 
         <span>{formatTime(message.createdAt)}</span>
         {message.isEdited ? <span className="wa-edited-label">Edited</span> : null}
         {mine ? <span>{message.status || "sent"}</span> : null}
@@ -3116,7 +3130,7 @@ function MessageBubble({
   if (mine) {
     return (
       <div
-        className={`wa-message-row mine ${String(message._id || "") === String(highlightedMessageId || "") ? "search-highlight" : ""}`}
+        className={`wa-message-row mine ${isSequenceStart ? "sequence-start" : "sequence-middle"} ${isSequenceEnd ? "sequence-end" : ""} ${String(message._id || "") === String(highlightedMessageId || "") ? "search-highlight" : ""}`}
         data-message-id={String(message._id || "")}
         onContextMenu={(event) => {
           event.preventDefault();
@@ -3127,14 +3141,14 @@ function MessageBubble({
         onTouchMove={onCancelLongPressReaction}
         onTouchCancel={onCancelLongPressReaction}
       >
-        <div className="wa-bubble mine">{content}</div>
+        <div className={`wa-bubble mine wa-bubble-${message.type || "text"} ${isSequenceStart ? "sequence-start" : "sequence-middle"} ${isSequenceEnd ? "sequence-end" : ""} ${message.replyTo?.messageId ? "has-reply" : ""}`}>{content}</div>
       </div>
     );
   }
 
   return (
     <div
-      className={`wa-message-row other ${String(message._id || "") === String(highlightedMessageId || "") ? "search-highlight" : ""}`}
+      className={`wa-message-row other ${isSequenceStart ? "sequence-start" : "sequence-middle"} ${isSequenceEnd ? "sequence-end" : ""} ${String(message._id || "") === String(highlightedMessageId || "") ? "search-highlight" : ""}`}
       data-message-id={String(message._id || "")}
       onContextMenu={(event) => {
         event.preventDefault();
@@ -3146,11 +3160,10 @@ function MessageBubble({
       onTouchCancel={onCancelLongPressReaction}
     >
       <div className="wa-message-other-wrap">
-        <Avatar label={senderDisplayName} src={senderAvatarUrl} className="message" />
+        {isGroupChat ? (isSequenceEnd ? <Avatar label={senderDisplayName} src={senderAvatarUrl} className="message" /> : <span className="wa-avatar-spacer" aria-hidden="true" />) : null}
 
         <div className="wa-message-content-wrap">
-          {isGroupChat ? <div className="wa-sender-name">{senderDisplayName}</div> : null}
-          <div className="wa-bubble">{content}</div>
+          <div className={`wa-bubble wa-bubble-${message.type || "text"} ${useGroupTextTemplate ? "wa-group-text-template" : ""} ${isSequenceStart ? "sequence-start" : "sequence-middle"} ${isSequenceEnd ? "sequence-end" : ""} ${message.replyTo?.messageId ? "has-reply" : ""}`}>{content}</div>
         </div>
       </div>
     </div>
@@ -3784,7 +3797,7 @@ export default function App() {
   const groupedMessages = useMemo(() => groupMessagesByDay(filteredMessages), [filteredMessages]);
 
   const pendingUploadsForRoom = pendingUploads.filter((item) => item.roomSlug === activeRoomSlug);
-  const isGroupChat = activeRoom ? activeRoom.slug === "general" : true;
+  const isGroupChat = activeRoom ? !activeRoom.isDirect && activeRoom.type !== "saved" : false;
   const activeRoomHasCall = Boolean(activeRoom?.activeCall);
   const currentCallRoomSlug = callRoomSlug || activeRoomSlug;
   const currentCallRoom = roomsSorted.find((room) => room.slug === currentCallRoomSlug) || activeRoom;
@@ -6939,7 +6952,8 @@ export default function App() {
               </section>
             </main>
           ) : activeRoom ? (
-            <>
+            <ConversationView
+              messageArea={(
           <main
             ref={messageListRef}
             className={`wa-chat ${isDragOver ? "drag-over" : ""}`}
@@ -6990,15 +7004,12 @@ export default function App() {
               <div className="wa-empty">No messages yet.</div>
             ) : null}
 
-            {groupedMessages.map((entry, index) =>
-              entry.type === "day" ? (
-                <div key={`day-${entry.label}-${index}`} className="wa-day-separator">
-                  <div className="wa-day-pill">{entry.label}</div>
-                </div>
-              ) : (
+            <MessageList
+              groupedMessages={groupedMessages}
+              renderMessage={(message, index, sequence) => (
                 <MessageBubble
-                  key={entry.message._id || `${entry.message.createdAt}-${index}`}
-                  message={entry.message}
+                  key={message._id || `${message.createdAt}-${index}`}
+                  message={message}
                   highlightedMessageId={highlightedSearchMessageId}
                   currentProfileId={currentProfileId}
                   activeAudioId={activeAudioId}
@@ -7018,11 +7029,13 @@ export default function App() {
                   onToggleStar={toggleStarMessage}
                   onTogglePin={togglePinMessage}
                   isGroupChat={isGroupChat}
+                  isSequenceStart={sequence?.isSequenceStart}
+                  isSequenceEnd={sequence?.isSequenceEnd}
                   getProfileNameById={getProfileNameById}
                   getProfileAvatarById={getProfileAvatarById}
                 />
-              )
-            )}
+              )}
+            />
 
             {pendingUploadsForRoom.map((item) => (
               <div key={item.tempId} className="wa-message-row mine pending">
@@ -7056,8 +7069,9 @@ export default function App() {
               </div>
             ))}
           </main>
-
-          <footer className="wa-composer">
+              )}
+              composer={(
+          <Composer>
             <button
               type="button"
               className="wa-icon-btn"
@@ -7166,8 +7180,9 @@ export default function App() {
             <button type="button" className="wa-send-btn" onClick={handleSendMessage}>
               Send
             </button>
-          </footer>
-            </>
+          </Composer>
+              )}
+            />
           ) : (
             <main className="wa-welcome-screen">
               <div className="wa-welcome-content">

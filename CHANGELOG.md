@@ -1,16 +1,10 @@
-# Int-Messager Changelog
+# Changelog
 
-## Version 4.8.0
+## 4.8.10
 
-### Added
-- Edit sent text messages within a 15-minute window.
-- Delete messages for the current user only.
-- Delete your own messages for everyone within a 15-minute window.
-- Dedicated message action component and message API service.
-- Clickable reply previews that jump to the original message.
-- Cross-device synchronization for edits and private deletions.
-
-### Improved
-- Edited messages display an `Edited` marker.
-- Reply snapshots update when original messages are edited or deleted.
-- Message actions are separated from the main application component.
+- Added a dedicated PDF attachment card.
+- Added two-line PDF filename wrapping.
+- Improved PDF size/type metadata.
+- Separated Open and Download controls.
+- Added mobile action stacking and responsive sizing.
+- Preserved group text, private chat and non-PDF attachment layouts.

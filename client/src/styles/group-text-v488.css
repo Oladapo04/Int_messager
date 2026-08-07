@@ -1,0 +1,89 @@
+/* Int-Messager v4.8.8 — focused group text layout correction.
+   Loaded after whatsapp-chat-v487.css so it owns group text geometry. */
+
+/* Keep group text content in a real vertical stack. */
+.wa-app .wa-message-row.other .wa-bubble-text {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  width: fit-content !important;
+  min-width: 126px !important;
+  max-width: min(68vw, 620px) !important;
+  padding: 7px 9px 5px !important;
+}
+
+/* Sender name must never share the same line as the message body. */
+.wa-app .wa-message-row.other .wa-bubble-text .wa-sender-name-inside {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 0 3px !important;
+  padding: 0 !important;
+  line-height: 1.2 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+/* Group text starts on a fresh line and receives usable reading width. */
+.wa-app .wa-message-row.other .wa-bubble-text .wa-message-text {
+  display: block !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1.4 !important;
+  white-space: pre-wrap !important;
+  overflow-wrap: anywhere !important;
+}
+
+/* Metadata remains compact, beneath the text, and never squeezes it. */
+.wa-app .wa-message-row.other .wa-bubble-text .wa-meta {
+  align-self: flex-end !important;
+  display: flex !important;
+  width: auto !important;
+  margin: 3px 0 0 18px !important;
+  padding: 0 !important;
+  line-height: 1 !important;
+}
+
+/* Keep sender sequences aligned without creating a giant left gutter. */
+.wa-app .wa-message-row.other .wa-message-other-wrap {
+  align-items: flex-end !important;
+  gap: 6px !important;
+}
+
+.wa-app .wa-message-row.other .wa-message-content-wrap {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  min-width: 0 !important;
+  max-width: calc(100% - 36px) !important;
+}
+
+/* Short group messages should look compact, not like vertical pills. */
+.wa-app .wa-message-row.other.sequence-start .wa-bubble-text {
+  min-width: 132px !important;
+}
+
+/* Subsequent messages can be slightly tighter because the name is hidden. */
+.wa-app .wa-message-row.other.sequence-middle .wa-bubble-text,
+.wa-app .wa-message-row.other.sequence-end:not(.sequence-start) .wa-bubble-text {
+  min-width: 86px !important;
+}
+
+@media (max-width: 760px) {
+  .wa-app .wa-message-row.other .wa-bubble-text {
+    min-width: 118px !important;
+    max-width: min(82vw, 520px) !important;
+  }
+
+  .wa-app .wa-message-row.other.sequence-start .wa-bubble-text {
+    min-width: 124px !important;
+  }
+
+  .wa-app .wa-message-row.other .wa-message-content-wrap {
+    max-width: calc(100vw - 58px) !important;
+  }
+}
