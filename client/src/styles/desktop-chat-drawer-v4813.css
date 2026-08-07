@@ -1,0 +1,87 @@
+/* Int-Messager v4.8.13 — desktop chat info as overlay drawer */
+@media (min-width: 901px) {
+  .wa-main { position: relative !important; overflow: hidden !important; }
+  .wa-details-overlay {
+    position: absolute; inset: 0; z-index: 80; border: 0; padding: 0; margin: 0;
+    background: rgba(15,23,42,.18); backdrop-filter: blur(1px); cursor: default;
+  }
+  .wa-details-page {
+    position: absolute !important; top: 0 !important; right: 0 !important; bottom: 0 !important; left: auto !important;
+    z-index: 81 !important; width: min(390px,36vw) !important; min-width: 340px !important; max-width: 420px !important;
+    height: 100% !important; margin: 0 !important; padding: 0 !important; overflow-x: hidden !important; overflow-y: auto !important;
+    background: #f4f6f8 !important; border: 0 !important; border-left: 1px solid #d8dee6 !important; border-radius: 0 !important;
+    box-shadow: -16px 0 40px rgba(15,23,42,.16) !important; animation: intDrawerIn .18s ease-out both; scrollbar-width: thin;
+  }
+  @keyframes intDrawerIn { from { transform: translateX(28px); opacity: .65; } to { transform: translateX(0); opacity: 1; } }
+  .wa-details-topbar {
+    position: sticky !important; top: 0 !important; z-index: 4 !important; height: 56px !important;
+    display: flex !important; align-items: center !important; gap: 10px !important; padding: 0 14px !important; margin: 0 !important;
+    background: rgba(255,255,255,.97) !important; border: 0 !important; border-bottom: 1px solid #e3e7ec !important;
+    color: #111827 !important; backdrop-filter: blur(12px);
+  }
+  .wa-details-topbar strong { font-size: 16px !important; line-height: 1 !important; font-weight: 700 !important; color: #111827 !important; }
+  .wa-details-back {
+    order: 2; margin-left: auto !important; width: 34px !important; min-width: 34px !important; height: 34px !important;
+    padding: 0 !important; border: 0 !important; border-radius: 50% !important; background: transparent !important;
+    color: #334155 !important; font-size: 0 !important; box-shadow: none !important; cursor: pointer;
+  }
+  .wa-details-back::before { content: "×" !important; display: block; font-size: 24px !important; line-height: 32px !important; font-weight: 400; }
+  .wa-details-back:hover { background: #edf1f5 !important; }
+  .wa-details-hero {
+    margin: 0 0 8px !important; padding: 24px 20px 20px !important; background: #fff !important;
+    border: 0 !important; border-bottom: 1px solid #e6e9ee !important; border-radius: 0 !important; text-align: center !important; box-shadow: none !important;
+  }
+  .wa-details-hero .wa-avatar, .wa-details-hero .details {
+    width: 72px !important; min-width: 72px !important; height: 72px !important; margin: 0 auto 12px !important;
+    font-size: 24px !important; box-shadow: none !important;
+  }
+  .wa-details-hero h2 { margin: 0 !important; font-size: 19px !important; line-height: 1.25 !important; font-weight: 700 !important; color: #111827 !important; }
+  .wa-details-hero p { margin: 5px 0 0 !important; font-size: 13px !important; line-height: 1.35 !important; color: #667085 !important; }
+  .wa-details-actions {
+    display: grid !important; grid-template-columns: repeat(3,1fr) !important; gap: 8px !important;
+    margin: 0 !important; padding: 10px 12px !important; background: transparent !important; border: 0 !important;
+  }
+  .wa-details-actions button {
+    min-width: 0 !important; min-height: 62px !important; height: auto !important; padding: 9px 6px !important;
+    display: flex !important; flex-direction: column !important; justify-content: center !important; align-items: center !important; gap: 5px !important;
+    border: 1px solid #e2e7ed !important; border-radius: 12px !important; background: #fff !important; color: #1f2937 !important;
+    font-size: 12px !important; line-height: 1.25 !important; font-weight: 600 !important; box-shadow: none !important;
+  }
+  .wa-details-actions button:hover { background: #f8fafc !important; border-color: #d7dde5 !important; }
+  .wa-details-actions button:nth-child(n+4) { display: none !important; }
+  .wa-details-card, .wa-settings-card.wa-details-card {
+    margin: 8px 12px !important; padding: 0 !important; overflow: hidden !important; background: #fff !important;
+    border: 1px solid #e3e7ec !important; border-radius: 12px !important; box-shadow: none !important;
+  }
+  .wa-details-card-title, .wa-details-card .wa-settings-title {
+    margin: 0 !important; padding: 13px 15px 10px !important; font-size: 13px !important; line-height: 1.3 !important; font-weight: 700 !important; color: #111827 !important;
+  }
+  .wa-details-card .wa-settings-label {
+    min-height: 48px !important; margin: 0 !important; padding: 10px 15px !important; display: flex !important; align-items: center !important;
+    justify-content: space-between !important; gap: 12px !important; border: 0 !important; border-top: 1px solid #edf0f3 !important;
+    font-size: 13px !important; line-height: 1.25 !important; color: #334155 !important;
+  }
+  .wa-details-card .wa-select {
+    width: auto !important; min-width: 120px !important; max-width: 168px !important; height: 34px !important; margin: 0 !important;
+    padding: 0 30px 0 10px !important; border-radius: 8px !important; font-size: 12px !important;
+  }
+  .wa-details-card .wa-color-input { width: 34px !important; min-width: 34px !important; height: 30px !important; padding: 2px !important; border-radius: 8px !important; }
+  .wa-details-card .wa-empty, .wa-details-card > .wa-empty {
+    margin: 0 !important; padding: 4px 15px 14px !important; font-size: 12px !important; color: #667085 !important; background: transparent !important;
+  }
+  .wa-media-grid { display: grid !important; grid-template-columns: repeat(3,minmax(0,1fr)) !important; gap: 6px !important; padding: 0 12px 12px !important; }
+  .wa-media-item {
+    min-width: 0 !important; min-height: 76px !important; padding: 8px !important; display: flex !important; flex-direction: column !important;
+    align-items: center !important; justify-content: center !important; gap: 5px !important; border: 1px solid #e8ebef !important;
+    border-radius: 9px !important; background: #f8fafc !important; color: #334155 !important; text-decoration: none !important; overflow: hidden;
+  }
+  .wa-media-item small { width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; font-size: 10px !important; }
+  .wa-details-card.danger-zone { margin-top: 14px !important; margin-bottom: 18px !important; border-color: #f1d1d1 !important; }
+  .wa-details-card.danger-zone .wa-danger-text-btn {
+    width: 100% !important; min-height: 44px !important; padding: 11px 15px !important; border: 0 !important;
+    border-top: 1px solid #f6e1e1 !important; border-radius: 0 !important; background: #fff !important; color: #c62828 !important;
+    text-align: left !important; font-size: 12px !important; font-weight: 600 !important; box-shadow: none !important;
+  }
+  .wa-details-card.danger-zone .wa-danger-text-btn:hover { background: #fff8f8 !important; }
+}
+@media (max-width: 900px) { .wa-details-overlay { display: none !important; } }

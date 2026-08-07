@@ -11,6 +11,9 @@ import "./styles/whatsapp-chat-v487.css";
 import "./styles/group-text-v488.css";
 import "./styles/group-text-template-v489.css";
 import "./styles/pdf-attachment-v4810.css";
+import "./styles/mobile-chat-header-v4811.css";
+import "./styles/desktop-chat-details-v4812.css";
+import "./styles/desktop-chat-drawer-v4813.css";
 import AuthScreen from "./components/auth/AuthScreen";
 import NavigationRail from "./components/layout/NavigationRail";
 import MessageActions, { DesktopMessageContextMenu, MobileMessageActionSheet } from "./components/chat/MessageActions";
@@ -3258,6 +3261,7 @@ export default function App() {
   const [messageSearch, setMessageSearch] = useState("");
   const [showMessageSearch, setShowMessageSearch] = useState(false);
   const [showChatDetails, setShowChatDetails] = useState(false);
+  const [showMobileChatMenu, setShowMobileChatMenu] = useState(false);
   const [unreadCounts, setUnreadCounts] = useState({});
   const [sidebarMode, setSidebarMode] = useState("chats");
   const [developerStatus, setDeveloperStatus] = useState("");
@@ -6782,6 +6786,7 @@ export default function App() {
                     setReplyTo(null);
                     setShowChatDetails(false);
                     setShowMessageSearch(false);
+                    setShowMobileChatMenu(false);
                     setSidebarMode("chats");
                     setShowSidebar(false);
                   }}
@@ -6846,7 +6851,7 @@ export default function App() {
 
               <button
                 type="button"
-                className="wa-icon-btn"
+                className="wa-icon-btn wa-header-export-btn"
                 onClick={() => exportChat("txt")}
                 title="Export chat as text"
               >
@@ -6855,7 +6860,7 @@ export default function App() {
 
               <button
                 type="button"
-                className="wa-icon-btn"
+                className="wa-icon-btn wa-header-search-btn"
                 onClick={() => setShowMessageSearch((v) => !v)}
                 title="Search messages"
               >
@@ -6870,6 +6875,7 @@ export default function App() {
                   setReplyTo(null);
                   setShowChatDetails(false);
                   setShowMessageSearch(false);
+                  setShowMobileChatMenu(false);
                   setSidebarMode("chats");
                   setShowSidebar(false);
                 }}
@@ -6878,6 +6884,50 @@ export default function App() {
               >
                 ✕
               </button>
+
+              <button
+                type="button"
+                className="wa-icon-btn wa-mobile-chat-more-btn"
+                onClick={() => setShowMobileChatMenu((value) => !value)}
+                title="More chat options"
+                aria-label="More chat options"
+                aria-expanded={showMobileChatMenu}
+              >
+                ⋮
+              </button>
+
+              {showMobileChatMenu ? (
+                <>
+                  <button
+                    type="button"
+                    className="wa-mobile-chat-menu-backdrop"
+                    aria-label="Close chat menu"
+                    onClick={() => setShowMobileChatMenu(false)}
+                  />
+                  <div className="wa-mobile-chat-menu" role="menu">
+                    <button type="button" role="menuitem" onClick={() => { setShowMobileChatMenu(false); setShowChatDetails(true); }}>
+                      Chat info
+                    </button>
+                    <button type="button" role="menuitem" onClick={() => { setShowMobileChatMenu(false); setShowMessageSearch(true); }}>
+                      Search
+                    </button>
+                    <button type="button" role="menuitem" onClick={() => { setShowMobileChatMenu(false); exportChat("txt"); }}>
+                      Export chat
+                    </button>
+                    <button type="button" role="menuitem" className="danger" onClick={() => {
+                      setShowMobileChatMenu(false);
+                      setActiveRoomSlug("");
+                      setReplyTo(null);
+                      setShowChatDetails(false);
+                      setShowMessageSearch(false);
+                      setSidebarMode("chats");
+                      setShowSidebar(false);
+                    }}>
+                      Close chat
+                    </button>
+                  </div>
+                </>
+              ) : null}
               </div>
             ) : null}
           </header>
@@ -6898,60 +6948,8 @@ export default function App() {
           {recordingError ? <div className="wa-error">{recordingError}</div> : null}
           {callError ? <div className="wa-error">{callError}</div> : null}
 
-          {activeRoom && showChatDetails ? (
-            <main className="wa-details-page">
-              <div className="wa-details-topbar">
-                <button type="button" className="wa-details-back" onClick={() => setShowChatDetails(false)} title="Back to chat">← Back</button>
-                <strong>Chat details</strong>
-              </div>
-              <section className="wa-details-hero">
-                <Avatar label={getRoomDisplayName(activeRoom, profile?.displayName, currentProfileId, profiles)} src={getRoomAvatarSrc(activeRoom)} className="details" />
-                <h2>{getRoomDisplayName(activeRoom, profile?.displayName, currentProfileId, profiles)}</h2>
-                <p>{activeRoom?.isDirect ? (activeRoomOtherProfile?.profileStatus || "No status") : "General group chat"}</p>
-              </section>
-
-              <section className="wa-details-actions">
-                <button type="button" onClick={startCall}>☎ Audio call</button>
-                <button type="button" onClick={startVideoCall}>📹 Video call</button>
-                <button type="button" onClick={() => setShowMessageSearch(true)}>🔍 Search</button>
-                <button type="button" onClick={() => exportChat("txt")}>⬇ Export TXT</button>
-                <button type="button" onClick={() => exportChat("json")}>⬇ Export JSON</button>
-                <button type="button" onClick={() => clearChatHistory()}>Clear history</button>
-              </section>
-
-              <section className="wa-settings-card wa-details-card">
-                <div className="wa-settings-title">Chat theme</div>
-                <label className="wa-settings-label">Wallpaper <input className="wa-color-input" type="color" value={chatPrefs.wallpaper} onChange={(e) => updateChatPref("wallpaper", e.target.value)} /></label>
-                <label className="wa-settings-label">Bubble style <select className="wa-select" value={chatPrefs.bubbleShape} onChange={(e) => updateChatPref("bubbleShape", e.target.value)}><option value="rounded">Rounded</option><option value="soft">Soft</option><option value="square">Compact square</option></select></label>
-                <label className="wa-settings-label">Font size <select className="wa-select" value={chatPrefs.fontSize} onChange={(e) => updateChatPref("fontSize", e.target.value)}><option value="small">Small</option><option value="normal">Normal</option><option value="large">Large</option></select></label>
-              </section>
-
-              <section className="wa-details-card">
-                <div className="wa-details-card-title">Starred messages in this chat</div>
-                <div className="wa-empty">⭐ {activeStarredCount} starred message{activeStarredCount === 1 ? "" : "s"}</div>
-              </section>
-
-              <section className="wa-details-card">
-                <div className="wa-details-card-title">Media in this chat</div>
-                {activeRoomMedia.length ? (
-                  <div className="wa-media-grid">
-                    {activeRoomMedia.map((message) => (
-                      <a key={message._id} href={resolveMediaUrl(message.fileUrl)} target="_blank" rel="noreferrer" className="wa-media-item">
-                        <span>{message.type === "audio" ? "🎤" : "📎"}</span>
-                        <small>{message.fileName || message.content || "Media"}</small>
-                      </a>
-                    ))}
-                  </div>
-                ) : <div className="wa-empty">No media shared yet.</div>}
-              </section>
-
-              <section className="wa-details-card danger-zone">
-                <div className="wa-details-card-title">Chat management</div>
-                <button type="button" className="wa-danger-text-btn" onClick={() => clearChatHistory()}>Clear history for me</button>
-                <button type="button" className="wa-danger-text-btn" onClick={() => hideChatForMe(activeRoomSlug)}>Delete chat from my list</button>
-              </section>
-            </main>
-          ) : activeRoom ? (
+          {activeRoom ? (
+            <>
             <ConversationView
               messageArea={(
           <main
@@ -7183,6 +7181,69 @@ export default function App() {
           </Composer>
               )}
             />
+              {showChatDetails ? (
+                <>
+                  <button
+                    type="button"
+                    className="wa-details-overlay"
+                    aria-label="Close chat details"
+                    onClick={() => setShowChatDetails(false)}
+                  />
+            <aside className="wa-details-page" aria-label="Chat details">
+              <div className="wa-details-topbar">
+                <button type="button" className="wa-details-back" onClick={() => setShowChatDetails(false)} title="Back to chat">← Back</button>
+                <strong>Chat details</strong>
+              </div>
+              <section className="wa-details-hero">
+                <Avatar label={getRoomDisplayName(activeRoom, profile?.displayName, currentProfileId, profiles)} src={getRoomAvatarSrc(activeRoom)} className="details" />
+                <h2>{getRoomDisplayName(activeRoom, profile?.displayName, currentProfileId, profiles)}</h2>
+                <p>{activeRoom?.isDirect ? (activeRoomOtherProfile?.profileStatus || "No status") : "General group chat"}</p>
+              </section>
+
+              <section className="wa-details-actions">
+                <button type="button" onClick={startCall}>☎ Audio call</button>
+                <button type="button" onClick={startVideoCall}>📹 Video call</button>
+                <button type="button" onClick={() => setShowMessageSearch(true)}>🔍 Search</button>
+                <button type="button" onClick={() => exportChat("txt")}>⬇ Export TXT</button>
+                <button type="button" onClick={() => exportChat("json")}>⬇ Export JSON</button>
+                <button type="button" onClick={() => clearChatHistory()}>Clear history</button>
+              </section>
+
+              <section className="wa-settings-card wa-details-card">
+                <div className="wa-settings-title">Chat theme</div>
+                <label className="wa-settings-label">Wallpaper <input className="wa-color-input" type="color" value={chatPrefs.wallpaper} onChange={(e) => updateChatPref("wallpaper", e.target.value)} /></label>
+                <label className="wa-settings-label">Bubble style <select className="wa-select" value={chatPrefs.bubbleShape} onChange={(e) => updateChatPref("bubbleShape", e.target.value)}><option value="rounded">Rounded</option><option value="soft">Soft</option><option value="square">Compact square</option></select></label>
+                <label className="wa-settings-label">Font size <select className="wa-select" value={chatPrefs.fontSize} onChange={(e) => updateChatPref("fontSize", e.target.value)}><option value="small">Small</option><option value="normal">Normal</option><option value="large">Large</option></select></label>
+              </section>
+
+              <section className="wa-details-card">
+                <div className="wa-details-card-title">Starred messages in this chat</div>
+                <div className="wa-empty">⭐ {activeStarredCount} starred message{activeStarredCount === 1 ? "" : "s"}</div>
+              </section>
+
+              <section className="wa-details-card">
+                <div className="wa-details-card-title">Media in this chat</div>
+                {activeRoomMedia.length ? (
+                  <div className="wa-media-grid">
+                    {activeRoomMedia.map((message) => (
+                      <a key={message._id} href={resolveMediaUrl(message.fileUrl)} target="_blank" rel="noreferrer" className="wa-media-item">
+                        <span>{message.type === "audio" ? "🎤" : "📎"}</span>
+                        <small>{message.fileName || message.content || "Media"}</small>
+                      </a>
+                    ))}
+                  </div>
+                ) : <div className="wa-empty">No media shared yet.</div>}
+              </section>
+
+              <section className="wa-details-card danger-zone">
+                <div className="wa-details-card-title">Chat management</div>
+                <button type="button" className="wa-danger-text-btn" onClick={() => clearChatHistory()}>Clear history for me</button>
+                <button type="button" className="wa-danger-text-btn" onClick={() => hideChatForMe(activeRoomSlug)}>Delete chat from my list</button>
+              </section>
+            </aside>
+                </>
+              ) : null}
+            </>
           ) : (
             <main className="wa-welcome-screen">
               <div className="wa-welcome-content">
