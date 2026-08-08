@@ -1,0 +1,233 @@
+/* Int-Messager v4.8.14
+   Responsive chat details isolation.
+   Desktop keeps the v4.8.13 overlay drawer.
+   Mobile gets a dedicated full-screen chat-info page and cannot inherit desktop drawer sizing. */
+
+/* Desktop: explicitly keep drawer behaviour. */
+@media (min-width: 901px) {
+  .wa-details-page {
+    box-sizing: border-box !important;
+  }
+}
+
+/* Mobile/tablet chat-info restoration */
+@media (max-width: 900px) {
+  /* The desktop dimming layer must never participate in mobile layout. */
+  .wa-details-overlay {
+    display: none !important;
+  }
+
+  /* Chat info is a real full-screen mobile page, not a narrow drawer. */
+  .wa-main > .wa-details-page,
+  .wa-details-page {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 250 !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    margin: 0 !important;
+    padding: 0 0 max(18px, env(safe-area-inset-bottom)) !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain !important;
+    background: #f2f4f7 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    transform: none !important;
+    animation: intMobileChatInfoIn .18s ease-out both !important;
+  }
+
+  @keyframes intMobileChatInfoIn {
+    from { transform: translateX(14px); opacity: .8; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+
+  /* Native messaging-app style top bar. */
+  .wa-details-page .wa-details-topbar {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 5 !important;
+    display: grid !important;
+    grid-template-columns: 44px 1fr 44px !important;
+    align-items: center !important;
+    min-height: calc(56px + env(safe-area-inset-top)) !important;
+    padding: env(safe-area-inset-top) 8px 0 !important;
+    margin: 0 !important;
+    background: rgba(255,255,255,.97) !important;
+    color: #111827 !important;
+    border: 0 !important;
+    border-bottom: 1px solid #e4e7ec !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    backdrop-filter: blur(14px) !important;
+  }
+
+  .wa-details-page .wa-details-topbar strong {
+    grid-column: 2 !important;
+    justify-self: center !important;
+    font-size: 16px !important;
+    line-height: 1.2 !important;
+    font-weight: 700 !important;
+    color: #111827 !important;
+  }
+
+  .wa-details-page .wa-details-back {
+    grid-column: 1 !important;
+    width: 40px !important;
+    min-width: 40px !important;
+    height: 40px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 50% !important;
+    background: transparent !important;
+    color: #162033 !important;
+    font-size: 0 !important;
+    box-shadow: none !important;
+  }
+  .wa-details-page .wa-details-back::before {
+    content: "‹" !important;
+    display: block !important;
+    font-size: 38px !important;
+    line-height: 36px !important;
+    font-weight: 400 !important;
+  }
+
+  /* Compact profile hero like WhatsApp/Telegram info screen. */
+  .wa-details-page .wa-details-hero {
+    margin: 0 0 8px !important;
+    padding: 22px 16px 18px !important;
+    background: #fff !important;
+    border: 0 !important;
+    border-bottom: 1px solid #e8eaed !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    text-align: center !important;
+  }
+  .wa-details-page .wa-details-hero .wa-avatar,
+  .wa-details-page .wa-details-hero .details {
+    width: 76px !important;
+    min-width: 76px !important;
+    height: 76px !important;
+    margin: 0 auto 10px !important;
+    font-size: 26px !important;
+  }
+  .wa-details-page .wa-details-hero h2 {
+    margin: 0 !important;
+    font-size: 20px !important;
+    line-height: 1.25 !important;
+    color: #111827 !important;
+  }
+  .wa-details-page .wa-details-hero p {
+    margin: 4px 0 0 !important;
+    font-size: 13px !important;
+    line-height: 1.35 !important;
+    color: #667085 !important;
+  }
+
+  /* Only primary actions should be prominent on mobile. */
+  .wa-details-page .wa-details-actions {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+    padding: 8px 10px 10px !important;
+    margin: 0 0 8px !important;
+    background: #fff !important;
+    border: 0 !important;
+    border-bottom: 1px solid #e8eaed !important;
+  }
+  .wa-details-page .wa-details-actions button {
+    min-width: 0 !important;
+    min-height: 56px !important;
+    padding: 8px 4px !important;
+    border: 1px solid #e2e6eb !important;
+    border-radius: 12px !important;
+    background: #fff !important;
+    color: #1f2937 !important;
+    font-size: 12px !important;
+    line-height: 1.2 !important;
+    font-weight: 600 !important;
+    box-shadow: none !important;
+  }
+  .wa-details-page .wa-details-actions button:nth-child(n+4) {
+    display: none !important;
+  }
+
+  /* Settings/details become edge-to-edge list cards. */
+  .wa-details-page .wa-details-card,
+  .wa-details-page .wa-settings-card.wa-details-card {
+    margin: 8px 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    border: 0 !important;
+    border-top: 1px solid #e8eaed !important;
+    border-bottom: 1px solid #e8eaed !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    overflow: hidden !important;
+  }
+  .wa-details-page .wa-details-card-title,
+  .wa-details-page .wa-details-card .wa-settings-title {
+    margin: 0 !important;
+    padding: 13px 16px 9px !important;
+    font-size: 13px !important;
+    line-height: 1.3 !important;
+    font-weight: 700 !important;
+    color: #111827 !important;
+  }
+  .wa-details-page .wa-settings-label {
+    min-height: 50px !important;
+    margin: 0 !important;
+    padding: 10px 16px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 12px !important;
+    border: 0 !important;
+    border-top: 1px solid #edf0f2 !important;
+    font-size: 13px !important;
+    color: #344054 !important;
+  }
+  .wa-details-page .wa-select {
+    width: auto !important;
+    min-width: 118px !important;
+    max-width: 52vw !important;
+    height: 36px !important;
+    margin: 0 !important;
+    font-size: 13px !important;
+  }
+  .wa-details-page .wa-color-input {
+    width: 38px !important;
+    min-width: 38px !important;
+    height: 32px !important;
+  }
+  .wa-details-page .wa-empty {
+    padding: 4px 16px 14px !important;
+    font-size: 12px !important;
+    color: #667085 !important;
+  }
+  .wa-details-page .wa-media-grid {
+    grid-template-columns: repeat(3, minmax(0,1fr)) !important;
+    padding: 0 10px 12px !important;
+    gap: 5px !important;
+  }
+
+  .wa-details-page .danger-zone {
+    margin-bottom: calc(12px + env(safe-area-inset-bottom)) !important;
+  }
+  .wa-details-page .wa-danger-text-btn {
+    min-height: 48px !important;
+    padding: 11px 16px !important;
+    text-align: left !important;
+    color: #d92d20 !important;
+    background: #fff !important;
+    border: 0 !important;
+    border-top: 1px solid #f2e3e3 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+}

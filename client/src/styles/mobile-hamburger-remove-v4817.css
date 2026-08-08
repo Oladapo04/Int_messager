@@ -1,0 +1,40 @@
+/* Int-Messager 4.8.17 — permanently remove desktop hamburger from mobile */
+
+/*
+  The hamburger is a desktop sidebar toggle. It must never appear anywhere
+  in the mobile UI, whether a room is active, Chat Info is open, or the
+  conversation is in a transitional state.
+*/
+@media (max-width: 900px) {
+  .wa-desktop-menu-btn,
+  .wa-app .wa-desktop-menu-btn,
+  .wa-app.has-active-chat .wa-desktop-menu-btn,
+  .wa-header .wa-desktop-menu-btn,
+  .wa-header-left .wa-desktop-menu-btn {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    width: 0 !important;
+    min-width: 0 !important;
+    max-width: 0 !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    overflow: hidden !important;
+    position: absolute !important;
+    clip: rect(0 0 0 0) !important;
+    clip-path: inset(50%) !important;
+  }
+}
+
+/* Desktop keeps its sidebar toggle. */
+@media (min-width: 901px) {
+  .wa-desktop-menu-btn {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+  }
+}

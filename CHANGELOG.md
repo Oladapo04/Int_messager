@@ -1,9 +1,8 @@
-# Changelog
+# Changelog — 4.8.17
 
-## 4.8.13
-- Fixed desktop Chat Details replacing the conversation.
-- Converted Chat Details into an overlay right drawer.
-- Preserved the active conversation behind the drawer.
-- Added click-outside dismissal and compact close control.
-- Reduced profile and action-card sizing.
-- Kept mobile chat layout unchanged.
+- Removed the desktop hamburger control from all mobile layouts (`<= 900px`).
+- The rule applies globally instead of only when `.has-active-chat` is present.
+- Added layout-neutral safeguards so the hidden button cannot reserve header space.
+- Desktop hamburger/sidebar toggle remains available at `>= 901px`.
+- No changes to the approved mobile Chat Info appearance.
+- No changes to the desktop three-column Chat Info layout from 4.8.16.
