@@ -1,0 +1,42 @@
+/* Int-Messager v4.10.8a — profile icon position hotfix
+   Deliberately touches only the navigation profile control. */
+
+/* Keep the profile avatar comfortably inside the bottom of the vertical rail. */
+.wa-nav-rail .wa-rail-profile {
+  flex: 0 0 46px !important;
+  width: 46px !important;
+  height: 46px !important;
+  margin-top: auto !important;
+  margin-bottom: max(26px, calc(env(safe-area-inset-bottom, 0px) + 14px)) !important;
+  position: relative !important;
+  inset: auto !important;
+  transform: none !important;
+  z-index: 3 !important;
+}
+
+.wa-nav-rail .wa-rail-profile .wa-avatar {
+  width: 46px !important;
+  height: 46px !important;
+  max-width: 46px !important;
+  max-height: 46px !important;
+}
+
+/* On shorter desktop-height windows, reserve slightly more breathing room. */
+@media (min-width: 901px) and (max-height: 760px) {
+  .wa-nav-rail {
+    gap: 12px !important;
+    padding-top: 12px !important;
+  }
+
+  .wa-nav-rail .wa-rail-profile {
+    margin-bottom: max(18px, calc(env(safe-area-inset-bottom, 0px) + 10px)) !important;
+  }
+}
+
+/* Preserve the existing mobile bottom-navigation behaviour where the profile
+   control is intentionally hidden by the established layout. */
+@media (max-width: 900px) {
+  .wa-nav-rail .wa-rail-profile {
+    margin-bottom: 0 !important;
+  }
+}

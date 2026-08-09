@@ -34,6 +34,9 @@ import "./styles/privacy-controls-v4104.css";
 import "./styles/call-experience-v4105.css";
 import "./styles/disappearing-messages-v4107.css";
 import "./styles/mobile-navigation-composer-v4108.css";
+import "./styles/profile-icon-position-v4108a.css";
+import "./styles/drafts-scheduled-v4109.css";
+import "./styles/glass-navigation-v4110.css";
 import AuthScreen from "./components/auth/AuthScreen";
 import NavigationRail from "./components/layout/NavigationRail";
 import MessageActions, { DesktopMessageContextMenu, MobileMessageActionSheet } from "./components/chat/MessageActions";
@@ -65,6 +68,55 @@ const PWA_BEFORE_INSTALL_PROMPT = "beforeinstallprompt";
 const ACCOUNT_INSTALL_ID_KEY = "int_messager_account_install_id_v4";
 const DESKTOP_SIDEBAR_WIDTH_KEY = "int_messager_desktop_sidebar_width_v44";
 const APPEARANCE_MODE_KEY = "int_messager_appearance_mode_v491";
+const DRAFTS_STORAGE_PREFIX = "int_messager_drafts_v4109";
+
+function draftStorageKey(profileId) {
+  return `${DRAFTS_STORAGE_PREFIX}:${String(profileId || "guest")}`;
+}
+
+function loadDraftMap(profileId) {
+  if (!profileId) return {};
+  try {
+    const parsed = JSON.parse(localStorage.getItem(draftStorageKey(profileId)) || "{}");
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveDraftMap(profileId, drafts) {
+  if (!profileId) return;
+  try {
+    localStorage.setItem(draftStorageKey(profileId), JSON.stringify(drafts || {}));
+  } catch {
+    // Draft persistence is best-effort when browser storage is unavailable.
+  }
+}
+
+function defaultScheduleInputValue(minutesAhead = 10) {
+  const date = new Date(Date.now() + Math.max(1, Number(minutesAhead) || 10) * 60 * 1000);
+  date.setSeconds(0, 0);
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60 * 1000);
+  return local.toISOString().slice(0, 16);
+}
+
+function formatScheduledMessageTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Scheduled";
+  return date.toLocaleString([], {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function compactDraftPreview(value, maxLength = 58) {
+  const text = String(value || "").replace(/\s+/g, " ").trim();
+  if (text.length <= maxLength) return text;
+  return `${text.slice(0, maxLength - 1)}…`;
+}
 
 function formatRecordingTime(totalSeconds = 0) {
   const safeSeconds = Math.max(0, Number(totalSeconds) || 0);
@@ -3329,6 +3381,13 @@ export default function App() {
   const [showLaunchScreen, setShowLaunchScreen] = useState(true);
   const [messagesByRoom, setMessagesByRoom] = useState({});
   const [messageInput, setMessageInput] = useState("");
+  const [draftsByRoom, setDraftsByRoom] = useState({});
+  const [scheduledMessages, setScheduledMessages] = useState([]);
+  const [showScheduleMessage, setShowScheduleMessage] = useState(false);
+  const [scheduleContent, setScheduleContent] = useState("");
+  const [scheduleAt, setScheduleAt] = useState(() => defaultScheduleInputValue());
+  const [scheduleBusy, setScheduleBusy] = useState(false);
+  const [scheduleNotice, setScheduleNotice] = useState("");
   const [error, setError] = useState("");
   const [typingName, setTypingName] = useState("");
   const [recordingName, setRecordingName] = useState("");
@@ -3535,6 +3594,32 @@ export default function App() {
 
   const currentProfileId = profile?.profileId || profile?._id;
   const canChat = Boolean(profile?.nameLocked && profile?.displayName);
+
+  useEffect(() => {
+    if (!currentProfileId) {
+      setDraftsByRoom({});
+      setScheduledMessages([]);
+      return;
+    }
+    setDraftsByRoom(loadDraftMap(currentProfileId));
+  }, [currentProfileId]);
+
+  useEffect(() => {
+    if (!activeRoomSlug) {
+      setMessageInput("");
+      return;
+    }
+    const nextDraft = draftsByRoom[activeRoomSlug] || "";
+    setMessageInput((current) => (current === nextDraft ? current : nextDraft));
+  }, [activeRoomSlug, currentProfileId, draftsByRoom]);
+
+  useEffect(() => {
+    if (!currentProfileId) return undefined;
+    loadScheduledMessages();
+    const handleScheduledMessagesUpdated = () => loadScheduledMessages();
+    socket.on("scheduled_messages_updated", handleScheduledMessagesUpdated);
+    return () => socket.off("scheduled_messages_updated", handleScheduledMessagesUpdated);
+  }, [currentProfileId, installId]);
 
   async function loadPrivacySettings() {
     if (!canChat) return;
@@ -5357,7 +5442,10 @@ export default function App() {
         favoriteContacts: payload.data?.favoriteContacts || current.favoriteContacts || [],
       } : current);
       setContactManageNotice(shouldBlock ? `${target?.displayName || "Contact"} blocked.` : `${target?.displayName || "Contact"} unblocked.`);
-      if (shouldBlock && activeDirectContactId === String(targetProfileId)) setMessageInput("");
+      if (shouldBlock && activeDirectContactId === String(targetProfileId)) {
+        setMessageInput("");
+        updateDraftForRoom(activeRoomSlug, "");
+      }
     } catch (err) {
       setError(err?.message || `Failed to ${shouldBlock ? "block" : "unblock"} contact`);
     } finally {
@@ -6072,6 +6160,101 @@ export default function App() {
     }
   }
 
+  function updateDraftForRoom(roomSlug, value) {
+    if (!roomSlug) return;
+    setDraftsByRoom((current) => {
+      const next = { ...current };
+      if (String(value || "").trim()) next[roomSlug] = value;
+      else delete next[roomSlug];
+      saveDraftMap(currentProfileId, next);
+      return next;
+    });
+  }
+
+  async function loadScheduledMessages() {
+    if (!currentProfileId) return;
+    try {
+      const response = await authFetch(`${API_BASE}/api/scheduled-messages`, {
+        headers: { "x-install-id": installId },
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload?.success === false) throw new Error(payload?.error || "Failed to load scheduled messages");
+      setScheduledMessages(Array.isArray(payload?.data) ? payload.data : []);
+    } catch (err) {
+      console.error("scheduled messages load error:", err);
+    }
+  }
+
+  function openScheduleMessageDialog() {
+    if (!activeRoomSlug) return;
+    if (activeDirectContactBlocked) {
+      setError("Unblock this contact before scheduling messages.");
+      return;
+    }
+    setScheduleContent(messageInput || draftsByRoom[activeRoomSlug] || "");
+    setScheduleAt(defaultScheduleInputValue());
+    setScheduleNotice("");
+    setShowScheduleMessage(true);
+    setShowMobileChatMenu(false);
+  }
+
+  async function submitScheduledMessage() {
+    const content = scheduleContent.trim();
+    if (!activeRoomSlug || !content) {
+      setScheduleNotice("Enter the message you want to schedule.");
+      return;
+    }
+    const sendAtDate = new Date(scheduleAt);
+    if (Number.isNaN(sendAtDate.getTime())) {
+      setScheduleNotice("Choose a valid date and time.");
+      return;
+    }
+
+    setScheduleBusy(true);
+    setScheduleNotice("");
+    try {
+      const response = await authFetch(`${API_BASE}/api/scheduled-messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-install-id": installId },
+        body: JSON.stringify({
+          roomSlug: activeRoomSlug,
+          content,
+          sendAt: sendAtDate.toISOString(),
+          replyToMessageId: replyTo?._id || null,
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload?.success === false) throw new Error(payload?.error || "Failed to schedule message");
+
+      setScheduledMessages((current) => [...current.filter((item) => String(item._id) !== String(payload.data?._id)), payload.data].filter(Boolean).sort((a, b) => new Date(a.sendAt) - new Date(b.sendAt)));
+      updateDraftForRoom(activeRoomSlug, "");
+      setReplyTo(null);
+      setScheduleContent("");
+      setShowScheduleMessage(false);
+      setError("");
+    } catch (err) {
+      setScheduleNotice(err?.message || "Failed to schedule message");
+    } finally {
+      setScheduleBusy(false);
+    }
+  }
+
+  async function cancelScheduledMessage(scheduledMessageId) {
+    if (!scheduledMessageId) return;
+    if (!window.confirm("Cancel this scheduled message?")) return;
+    try {
+      const response = await authFetch(`${API_BASE}/api/scheduled-messages/${encodeURIComponent(scheduledMessageId)}`, {
+        method: "DELETE",
+        headers: { "x-install-id": installId },
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload?.success === false) throw new Error(payload?.error || "Failed to cancel scheduled message");
+      setScheduledMessages((current) => current.filter((item) => String(item._id) !== String(scheduledMessageId)));
+    } catch (err) {
+      setError(err?.message || "Failed to cancel scheduled message");
+    }
+  }
+
   function sendTyping() {
     if (!activeRoomSlug || !canChat) return;
     socket.emit("typing", { roomSlug: activeRoomSlug, installId });
@@ -6100,6 +6283,7 @@ export default function App() {
       replyToMessageId: replyTo?._id || null,
     });
     setMessageInput("");
+    updateDraftForRoom(activeRoomSlug, "");
     setReplyTo(null);
     stopTypingNow();
     setError("");
@@ -6982,6 +7166,35 @@ export default function App() {
         }}
       />
 
+      {showScheduleMessage ? (
+        <div className="wa-schedule-modal-backdrop" data-appearance={resolvedAppearance} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !scheduleBusy) setShowScheduleMessage(false); }}>
+          <section className="wa-schedule-modal" role="dialog" aria-modal="true" aria-label="Schedule message">
+            <div className="wa-schedule-modal-head">
+              <div>
+                <strong>Schedule message</strong>
+                <small>{getRoomDisplayName(activeRoom, profile?.displayName, currentProfileId, profiles) || "Conversation"}</small>
+              </div>
+              <button type="button" disabled={scheduleBusy} onClick={() => setShowScheduleMessage(false)} aria-label="Close">×</button>
+            </div>
+            <label className="wa-schedule-field">
+              Message
+              <textarea value={scheduleContent} onChange={(e) => setScheduleContent(e.target.value)} maxLength={4000} rows={5} placeholder="Write the message to send later" autoFocus />
+              <small>{scheduleContent.length}/4000</small>
+            </label>
+            <label className="wa-schedule-field">
+              Send on
+              <input type="datetime-local" value={scheduleAt} min={defaultScheduleInputValue(1)} onChange={(e) => setScheduleAt(e.target.value)} />
+            </label>
+            {replyTo ? <div className="wa-schedule-reply-note">Replying to {replyTo.sender}: {compactDraftPreview(replyTo.fileName || replyTo.content, 72)}</div> : null}
+            {scheduleNotice ? <div className="wa-schedule-notice">{scheduleNotice}</div> : null}
+            <div className="wa-schedule-modal-actions">
+              <button type="button" className="secondary" disabled={scheduleBusy} onClick={() => setShowScheduleMessage(false)}>Cancel</button>
+              <button type="button" className="primary" disabled={scheduleBusy || !scheduleContent.trim() || !scheduleAt} onClick={submitScheduledMessage}>{scheduleBusy ? "Scheduling…" : "Schedule message"}</button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
       {showCreateGroup ? (
         <div className="wa-group-modal-backdrop" data-appearance={resolvedAppearance} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowCreateGroup(false); }}>
           <section className="wa-group-modal" role="dialog" aria-modal="true" aria-label="Create group">
@@ -7247,7 +7460,10 @@ export default function App() {
                   {showArchivedChats ? "Back to chats" : `Archived (${(chatOrgPrefs.archivedRooms || []).length})`}
                 </button>
               </div>
-              {filteredRooms.map((room) => (
+              {filteredRooms.map((room) => {
+                const roomDraft = draftsByRoom[room.slug] || "";
+                const scheduledCount = scheduledMessages.filter((item) => item.roomSlug === room.slug && ["pending", "processing"].includes(item.status)).length;
+                return (
                 <button
                   key={room.slug}
                   type="button"
@@ -7305,6 +7521,7 @@ export default function App() {
                         {room.isSaved ? <span title="Saved Messages">⭐</span> : null}
                         {(chatOrgPrefs.pinnedRooms || []).includes(room.slug) ? <span title="Pinned">📌</span> : null}
                         {(chatOrgPrefs.mutedRooms || []).includes(room.slug) ? <span title="Muted">🔕</span> : null}
+                        {scheduledCount ? <span className="wa-scheduled-room-flag" title={`${scheduledCount} scheduled message${scheduledCount === 1 ? "" : "s"}`}>🕒{scheduledCount > 1 ? scheduledCount : ""}</span> : null}
                       </span>
                       {room.activeCall ? <span className="wa-call-badge">Live call</span> : null}
 
@@ -7319,11 +7536,14 @@ export default function App() {
                     >
                       {room.activeCall
                         ? `${room.activeCallParticipants?.length || 1} in voice call`
-                        : room.lastMessageText || (room.slug === "general" ? "Public room" : room.slug)}
+                        : roomDraft.trim()
+                          ? <><span className="wa-draft-label">Draft:</span> {compactDraftPreview(roomDraft)}</>
+                          : room.lastMessageText || (room.slug === "general" ? "Public room" : room.slug)}
                     </div>
                   </div>
                 </button>
-              ))}
+                );
+              })}
             </>
           ) : sidebarMode === "calls" ? (
             <>
@@ -7737,6 +7957,9 @@ export default function App() {
                     <button type="button" role="menuitem" onClick={() => { setShowMobileChatMenu(false); setShowMessageSearch(true); }}>
                       Search
                     </button>
+                    <button type="button" role="menuitem" onClick={openScheduleMessageDialog}>
+                      Schedule message
+                    </button>
                     <button type="button" role="menuitem" onClick={() => { setShowMobileChatMenu(false); exportChat("txt"); }}>
                       Export chat
                     </button>
@@ -7985,7 +8208,9 @@ export default function App() {
                 className="wa-input"
                 value={messageInput}
                 onChange={(e) => {
-                  setMessageInput(e.target.value);
+                  const nextValue = e.target.value;
+                  setMessageInput(nextValue);
+                  updateDraftForRoom(activeRoomSlug, nextValue);
                   sendTyping();
                 }}
                 onKeyDown={(e) => {
@@ -8030,6 +8255,7 @@ export default function App() {
                 <button type="button" onClick={startCall}><span className="wa-voice-call-icon" aria-hidden="true">📞︎</span> Audio call</button>
                 <button type="button" onClick={startVideoCall}>📹 Video call</button>
                 <button type="button" onClick={() => setShowMessageSearch(true)}>🔍 Search</button>
+                <button type="button" onClick={openScheduleMessageDialog}>🕒 Schedule</button>
                 <button type="button" onClick={() => exportChat("txt")}>⬇ Export TXT</button>
                 <button type="button" onClick={() => exportChat("json")}>⬇ Export JSON</button>
                 <button type="button" onClick={() => clearChatHistory()}>Clear history</button>
@@ -8212,6 +8438,29 @@ export default function App() {
                 {activeRoom?.isGroup && !currentUserIsGroupAdmin ? <small>Only group admins can change this setting.</small> : null}
                 {activeRoomSlug === "general" && profile?.role !== "admin" ? <small>Only an Int-Messager administrator can change this setting for General.</small> : null}
                 {disappearingNotice ? <div className="wa-disappearing-notice">{disappearingNotice}</div> : null}
+              </section>
+
+              <section className="wa-details-card wa-scheduled-card">
+                <div className="wa-scheduled-card-head">
+                  <div>
+                    <div className="wa-details-card-title">Scheduled messages</div>
+                    <small>Messages waiting to be sent from this chat.</small>
+                  </div>
+                  <button type="button" className="wa-scheduled-add-btn" onClick={openScheduleMessageDialog}>+ Schedule</button>
+                </div>
+                {scheduledMessages.filter((item) => item.roomSlug === activeRoomSlug && ["pending", "processing"].includes(item.status)).length ? (
+                  <div className="wa-scheduled-list">
+                    {scheduledMessages.filter((item) => item.roomSlug === activeRoomSlug && ["pending", "processing"].includes(item.status)).map((item) => (
+                      <div className="wa-scheduled-item" key={item._id}>
+                        <div className="wa-scheduled-item-copy">
+                          <strong>{compactDraftPreview(item.content, 90)}</strong>
+                          <small>{item.status === "processing" ? "Sending now…" : `Sends ${formatScheduledMessageTime(item.sendAt)}`}</small>
+                        </div>
+                        <button type="button" disabled={item.status === "processing"} onClick={() => cancelScheduledMessage(item._id)}>Cancel</button>
+                      </div>
+                    ))}
+                  </div>
+                ) : <div className="wa-scheduled-empty">No scheduled messages in this chat.</div>}
               </section>
 
               <section className="wa-details-card danger-zone">

@@ -1,7 +1,14 @@
-# v4.10.8
+# v4.10.10 — Glass Navigation Buttons
 
-- Fixed clipped user/profile icon at the bottom of the navigation rail.
-- Added viewport-safe sizing to prevent rail footer clipping.
-- Fixed Send button overflow on narrow composer widths.
-- Improved mobile composer child shrinking at <=900px and <=390px.
-- Preserved all prior messaging, privacy, call, admin and disappearing-message features.
+## Added
+- Glassmorphism styling for the `Chats`, `Contacts`, `Calls`, and `Settings` buttons.
+- Light translucent blur treatment similar to modern messaging app navigation.
+- Dark-mode compatible glass treatment.
+
+## Updated
+- Active and hover states for the sidebar mode buttons.
+- Unread badge contrast within the glass buttons.
+
+## Preserved
+- Existing profile icon positioning fix.
+- Existing composer/send button layout.

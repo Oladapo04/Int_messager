@@ -368,6 +368,13 @@ const messageSchema = new mongoose.Schema(
     editedAt: { type: Date, default: null },
     hiddenFor: [{ type: mongoose.Schema.Types.ObjectId, ref: "Profile" }],
     expiresAt: { type: Date, default: null, index: true },
+    scheduledMessageId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "ScheduledMessage",
+      unique: true,
+      sparse: true,
+      index: true,
+    },
 
     status: {
       type: String,
@@ -433,6 +440,27 @@ const profileSchema = new mongoose.Schema(
 const Room = mongoose.model("Room", roomSchema);
 const Message = mongoose.model("Message", messageSchema);
 const Profile = mongoose.model("Profile", profileSchema);
+
+const scheduledMessageSchema = new mongoose.Schema(
+  {
+    roomSlug: { type: String, required: true, index: true, trim: true },
+    senderProfileId: { type: mongoose.Schema.Types.ObjectId, ref: "Profile", required: true, index: true },
+    senderName: { type: String, required: true, trim: true },
+    content: { type: String, required: true, trim: true },
+    replyTo: { type: Object, default: null },
+    sendAt: { type: Date, required: true, index: true },
+    status: { type: String, enum: ["pending", "processing", "sent", "cancelled", "failed"], default: "pending", index: true },
+    processingAt: { type: Date, default: null },
+    sentAt: { type: Date, default: null },
+    cancelledAt: { type: Date, default: null },
+    failureReason: { type: String, default: "" },
+    deliveredMessageId: { type: mongoose.Schema.Types.ObjectId, ref: "Message", default: null },
+  },
+  { timestamps: true }
+);
+scheduledMessageSchema.index({ senderProfileId: 1, status: 1, sendAt: 1 });
+scheduledMessageSchema.index({ status: 1, sendAt: 1 });
+const ScheduledMessage = mongoose.model("ScheduledMessage", scheduledMessageSchema);
 
 const sessionSchema = new mongoose.Schema({
   sessionId: { type: String, required: true, unique: true, index: true },
@@ -1241,6 +1269,152 @@ async function notifyMissedCallPush(log) {
       })
     )
   );
+}
+
+
+function scheduledMessageResponseShape(item) {
+  if (!item) return null;
+  return {
+    _id: item._id,
+    roomSlug: item.roomSlug,
+    senderProfileId: item.senderProfileId,
+    content: item.content,
+    replyTo: item.replyTo || null,
+    sendAt: item.sendAt,
+    status: item.status,
+    sentAt: item.sentAt || null,
+    cancelledAt: item.cancelledAt || null,
+    failureReason: item.failureReason || "",
+    deliveredMessageId: item.deliveredMessageId || null,
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt,
+  };
+}
+
+function emitScheduledMessagesUpdated(profileId, roomSlug = "") {
+  const socketIds = profileSockets[String(profileId || "")];
+  if (!socketIds) return;
+  socketIds.forEach((socketId) => {
+    io.to(socketId).emit("scheduled_messages_updated", { roomSlug: roomSlug || "" });
+  });
+}
+
+async function dispatchScheduledMessage(scheduleDoc) {
+  if (!scheduleDoc?._id) return;
+
+  const schedule = scheduleDoc.toObject ? scheduleDoc.toObject() : scheduleDoc;
+  const [profile, room] = await Promise.all([
+    Profile.findById(schedule.senderProfileId),
+    Room.findOne({ slug: schedule.roomSlug }),
+  ]);
+
+  if (!profile || (profile.accountStatus || "active") === "suspended" || !profile.nameLocked || !profile.displayName) {
+    await ScheduledMessage.updateOne(
+      { _id: schedule._id },
+      { $set: { status: "failed", failureReason: "Sender account is unavailable", processingAt: null } }
+    );
+    emitScheduledMessagesUpdated(schedule.senderProfileId, schedule.roomSlug);
+    return;
+  }
+
+  if (!room || !profileCanAccessRoom(profile, room)) {
+    await ScheduledMessage.updateOne(
+      { _id: schedule._id },
+      { $set: { status: "failed", failureReason: "Conversation is no longer available", processingAt: null } }
+    );
+    emitScheduledMessagesUpdated(profile._id, schedule.roomSlug);
+    return;
+  }
+
+  const directBlock = await directRoomBlockState(room, profile._id);
+  if (directBlock.blocked) {
+    await ScheduledMessage.updateOne(
+      { _id: schedule._id },
+      { $set: { status: "failed", failureReason: "Direct messaging is no longer available for this contact", processingAt: null } }
+    );
+    emitScheduledMessagesUpdated(profile._id, schedule.roomSlug);
+    return;
+  }
+
+  // Idempotency: a recovered worker must never create the same scheduled message twice.
+  let message = await Message.findOne({ scheduledMessageId: schedule._id });
+  let createdNow = false;
+  if (!message) {
+    message = await Message.create({
+      roomSlug: schedule.roomSlug,
+      sender: profile.displayName,
+      senderProfileId: profile._id,
+      content: schedule.content,
+      isEncrypted: false,
+      type: "text",
+      status: "sent",
+      replyTo: schedule.replyTo || null,
+      forwardedFrom: null,
+      expiresAt: disappearingExpiryForRoom(room),
+      scheduledMessageId: schedule._id,
+    });
+    createdNow = true;
+  }
+
+  if (createdNow) {
+    await Room.updateOne(
+      { slug: schedule.roomSlug },
+      { $set: { lastMessageText: messagePreviewText(message), lastMessageAt: message.createdAt } }
+    );
+    await restoreArchivedRoomForNewMessage(schedule.roomSlug, profile._id);
+    const plainMessage = message.toObject({ flattenMaps: true });
+    await emitMessageToRoomParticipants(schedule.roomSlug, plainMessage, io);
+    await emitUnreadCountsForRoom(schedule.roomSlug, io);
+    await notifyMessagePush(schedule.roomSlug, plainMessage, profile._id);
+    io.emit("rooms_updated");
+  }
+
+  await ScheduledMessage.updateOne(
+    { _id: schedule._id },
+    {
+      $set: {
+        status: "sent",
+        sentAt: message.createdAt || new Date(),
+        deliveredMessageId: message._id,
+        processingAt: null,
+        failureReason: "",
+      },
+    }
+  );
+  emitScheduledMessagesUpdated(profile._id, schedule.roomSlug);
+}
+
+async function processDueScheduledMessages() {
+  const now = new Date();
+  const staleProcessing = new Date(Date.now() - 2 * 60 * 1000);
+  let processed = 0;
+
+  while (processed < 50) {
+    const schedule = await ScheduledMessage.findOneAndUpdate(
+      {
+        sendAt: { $lte: now },
+        $or: [
+          { status: "pending" },
+          { status: "processing", processingAt: { $lte: staleProcessing } },
+        ],
+      },
+      { $set: { status: "processing", processingAt: new Date(), failureReason: "" } },
+      { sort: { sendAt: 1 }, returnDocument: "after" }
+    );
+
+    if (!schedule) break;
+    processed += 1;
+    try {
+      await dispatchScheduledMessage(schedule);
+    } catch (error) {
+      console.error("scheduled message dispatch error:", error);
+      await ScheduledMessage.updateOne(
+        { _id: schedule._id },
+        { $set: { status: "failed", failureReason: "Scheduled delivery failed", processingAt: null } }
+      ).catch(() => null);
+      emitScheduledMessagesUpdated(schedule.senderProfileId, schedule.roomSlug);
+    }
+  }
 }
 
 function safeExportFileName(name) {
@@ -2875,6 +3049,114 @@ app.get("/api/rooms", async (req, res) => {
 });
 
 
+
+/* =========================
+   SCHEDULED MESSAGES
+========================= */
+
+app.get("/api/scheduled-messages", async (req, res) => {
+  try {
+    const currentProfile = (await getAuthenticatedProfile(req)) || await getProfileByInstallId(getInstallId(req));
+    if (!currentProfile) return res.status(401).json({ success: false, error: "Please sign in again" });
+
+    const roomSlug = String(req.query?.roomSlug || "").trim();
+    const query = {
+      senderProfileId: currentProfile._id,
+      status: { $in: ["pending", "processing"] },
+    };
+    if (roomSlug) query.roomSlug = roomSlug;
+
+    const items = await ScheduledMessage.find(query).sort({ sendAt: 1 }).lean();
+    return res.json({ success: true, data: items.map(scheduledMessageResponseShape) });
+  } catch (error) {
+    console.error("scheduled messages list error:", error);
+    return res.status(500).json({ success: false, error: "Failed to load scheduled messages" });
+  }
+});
+
+app.post("/api/scheduled-messages", async (req, res) => {
+  try {
+    const currentProfile = (await getAuthenticatedProfile(req)) || await getProfileByInstallId(getInstallId(req));
+    if (!currentProfile) return res.status(401).json({ success: false, error: "Please sign in again" });
+
+    const roomSlug = String(req.body?.roomSlug || "").trim();
+    const content = String(req.body?.content || "").trim();
+    const sendAt = new Date(req.body?.sendAt || "");
+    const replyToMessageId = req.body?.replyToMessageId || null;
+
+    if (!roomSlug || !content) return res.status(400).json({ success: false, error: "Conversation and message are required" });
+    if (content.length > 4000) return res.status(400).json({ success: false, error: "Scheduled messages are limited to 4,000 characters" });
+    if (Number.isNaN(sendAt.getTime())) return res.status(400).json({ success: false, error: "Choose a valid date and time" });
+
+    const minSendAt = Date.now() + 30 * 1000;
+    const maxSendAt = Date.now() + 365 * 24 * 60 * 60 * 1000;
+    if (sendAt.getTime() < minSendAt) return res.status(400).json({ success: false, error: "Schedule the message at least 30 seconds from now" });
+    if (sendAt.getTime() > maxSendAt) return res.status(400).json({ success: false, error: "Scheduled messages can be set up to one year ahead" });
+
+    const room = await Room.findOne({ slug: roomSlug });
+    if (!room || !profileCanAccessRoom(currentProfile, room)) {
+      return res.status(403).json({ success: false, error: "You do not have access to this conversation" });
+    }
+
+    const directBlock = await directRoomBlockState(room, currentProfile._id);
+    if (directBlock.blocked) {
+      return res.status(403).json({
+        success: false,
+        error: directBlock.blockedByMe ? "Unblock this contact before scheduling messages" : "This contact is not available for direct messaging",
+      });
+    }
+
+    let replyTo = null;
+    if (replyToMessageId) {
+      const sourceReplyMessage = await Message.findById(replyToMessageId);
+      if (sourceReplyMessage && sourceReplyMessage.roomSlug === roomSlug && !sourceReplyMessage.isDeleted) {
+        replyTo = buildReplyPayload(sourceReplyMessage);
+      }
+    }
+
+    const scheduled = await ScheduledMessage.create({
+      roomSlug,
+      senderProfileId: currentProfile._id,
+      senderName: currentProfile.displayName || "User",
+      content,
+      replyTo,
+      sendAt,
+      status: "pending",
+    });
+
+    emitScheduledMessagesUpdated(currentProfile._id, roomSlug);
+    return res.status(201).json({ success: true, data: scheduledMessageResponseShape(scheduled) });
+  } catch (error) {
+    console.error("schedule message error:", error);
+    return res.status(500).json({ success: false, error: "Failed to schedule message" });
+  }
+});
+
+app.delete("/api/scheduled-messages/:scheduledMessageId", async (req, res) => {
+  try {
+    const currentProfile = (await getAuthenticatedProfile(req)) || await getProfileByInstallId(getInstallId(req));
+    if (!currentProfile) return res.status(401).json({ success: false, error: "Please sign in again" });
+
+    const scheduled = await ScheduledMessage.findOne({
+      _id: req.params.scheduledMessageId,
+      senderProfileId: currentProfile._id,
+    });
+    if (!scheduled) return res.status(404).json({ success: false, error: "Scheduled message not found" });
+    if (scheduled.status !== "pending") {
+      return res.status(409).json({ success: false, error: scheduled.status === "processing" ? "This message is already being sent" : "This scheduled message can no longer be cancelled" });
+    }
+
+    scheduled.status = "cancelled";
+    scheduled.cancelledAt = new Date();
+    await scheduled.save();
+    emitScheduledMessagesUpdated(currentProfile._id, scheduled.roomSlug);
+    return res.json({ success: true, data: scheduledMessageResponseShape(scheduled) });
+  } catch (error) {
+    console.error("cancel scheduled message error:", error);
+    return res.status(500).json({ success: false, error: "Failed to cancel scheduled message" });
+  }
+});
+
 app.get("/api/messages/search", async (req, res) => {
   try {
     const installId = getInstallId(req);
@@ -4426,7 +4708,12 @@ app.get(
         slug: "general",
         isDirect: false,
       });
- }
+    }
+
+    await processDueScheduledMessages().catch((error) => console.error("initial scheduled message processing error:", error));
+    setInterval(() => {
+      processDueScheduledMessages().catch((error) => console.error("scheduled message processing error:", error));
+    }, 10 * 1000).unref?.();
 
     server.listen(PORT, "0.0.0.0", () => {
       console.log(`Server running on http://localhost:${PORT}`);
