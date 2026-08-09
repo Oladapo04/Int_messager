@@ -1367,6 +1367,46 @@ app.post("/api/auth/change-password", async (req, res) => {
    ADMIN API
 ========================= */
 
+app.get("/api/admin/access", async (req, res) => {
+  try {
+    const profile = await getAuthenticatedProfile(req);
+    if (!profile) {
+      return res.status(401).json({ success: false, error: "Sign in required" });
+    }
+
+    const adminEmails = configuredAdminEmails();
+    const email = normalizeEmail(profile.email);
+    const configured = Boolean(email && adminEmails.has(email));
+    const allowed = profile.role === "admin" || configured;
+
+    if (configured && profile.role !== "admin") {
+      profile.role = "admin";
+      await profile.save();
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        allowed,
+        role: configured ? "admin" : (profile.role || "user"),
+        email: profile.email || "",
+        accountStatus: profile.accountStatus || "active",
+        configured,
+        configuredAdminCount: adminEmails.size,
+        serverConfigured: adminEmails.size > 0,
+        message: allowed
+          ? "Admin access is enabled for this account."
+          : adminEmails.size === 0
+            ? "ADMIN_EMAILS is not configured on the server."
+            : "This signed-in email is not listed in ADMIN_EMAILS.",
+      },
+    });
+  } catch (error) {
+    console.error("admin access diagnostic error:", error);
+    return res.status(500).json({ success: false, error: "Failed to check admin access" });
+  }
+});
+
 app.get("/api/admin/dashboard", requireAdmin, async (req, res) => {
   try {
     const now = new Date();
@@ -1550,6 +1590,54 @@ app.patch("/api/admin/users/:profileId/status", requireAdmin, async (req, res) =
   } catch (error) {
     console.error("admin status update error:", error);
     return res.status(500).json({ success: false, error: "Failed to update account status" });
+  }
+});
+
+
+app.post("/api/admin/users/:profileId/send-password-reset", requireAdmin, async (req, res) => {
+  try {
+    const target = await Profile.findById(req.params.profileId)
+      .select("+passwordResetTokenHash +passwordResetExpiresAt displayName email accountStatus");
+    if (!target) return res.status(404).json({ success: false, error: "User not found" });
+    if (!target.email) {
+      return res.status(400).json({
+        success: false,
+        error: "This user does not have an email address. A reset link cannot be delivered.",
+      });
+    }
+
+    const { token, tokenHash } = createPasswordResetToken();
+    target.passwordResetTokenHash = tokenHash;
+    target.passwordResetExpiresAt = new Date(Date.now() + PASSWORD_RESET_EXPIRES_MINUTES * 60 * 1000);
+    target.passwordResetRequestedAt = new Date();
+    await target.save();
+
+    const resetUrl = `${APP_BASE_URL}/?resetToken=${encodeURIComponent(token)}&email=${encodeURIComponent(target.email)}`;
+    const delivery = await notificationService.passwordReset(target, resetUrl, PASSWORD_RESET_EXPIRES_MINUTES);
+
+    const payload = {
+      success: true,
+      message: delivery?.delivered
+        ? `Password reset instructions were sent to ${target.email}.`
+        : "Password reset link generated successfully.",
+      data: {
+        email: target.email,
+        expiresInMinutes: PASSWORD_RESET_EXPIRES_MINUTES,
+        delivered: Boolean(delivery?.delivered),
+      },
+    };
+
+    if (process.env.NODE_ENV !== "production" && delivery?.developmentPreview) {
+      payload.data.developmentResetUrl = resetUrl;
+    }
+
+    return res.json(payload);
+  } catch (error) {
+    console.error("admin password reset error:", error);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to create password reset request",
+    });
   }
 });
 

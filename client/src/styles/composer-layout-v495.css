@@ -1,0 +1,106 @@
+/* Int-Messager v4.9.5
+   Conversation/composer boundary fix.
+   The composer gets a dedicated layout row instead of visually floating over messages. */
+
+.wa-main {
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+  overflow: hidden !important;
+}
+
+.wa-main > .wa-header,
+.wa-main > .wa-message-search-wrap,
+.wa-main > .wa-error {
+  flex: 0 0 auto !important;
+}
+
+.wa-conversation-stack {
+  position: relative !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  min-width: 0 !important;
+  width: 100% !important;
+  display: grid !important;
+  grid-template-rows: minmax(0, 1fr) auto !important;
+  overflow: hidden !important;
+  isolation: isolate;
+}
+
+.wa-conversation-message-area {
+  grid-row: 1 !important;
+  min-height: 0 !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.wa-conversation-message-area > .wa-chat {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  height: auto !important;
+  max-height: 100% !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  overscroll-behavior-y: contain;
+  padding-bottom: 24px !important;
+  scroll-padding-bottom: 24px !important;
+}
+
+.wa-conversation-composer-area {
+  grid-row: 2 !important;
+  position: relative !important;
+  z-index: 12 !important;
+  flex: 0 0 auto !important;
+  min-width: 0 !important;
+  width: 100% !important;
+  background: var(--wa-composer-boundary-bg, rgba(248, 250, 252, 0.96));
+  border-top: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.wa-conversation-composer-area > .wa-composer,
+.wa-conversation-composer-area .wa-composer {
+  position: relative !important;
+  inset: auto !important;
+  bottom: auto !important;
+  transform: none !important;
+  z-index: 1 !important;
+  width: 100% !important;
+  margin: 0 !important;
+  flex: 0 0 auto !important;
+}
+
+/* Large visual attachments may be tall, but they must remain inside the scroll area. */
+.wa-conversation-message-area .wa-image-preview,
+.wa-conversation-message-area video,
+.wa-conversation-message-area .wa-attachment-card,
+.wa-conversation-message-area .wa-pdf-card {
+  max-width: 100% !important;
+}
+
+/* Dark-mode boundary without changing the approved theme itself. */
+.wa-app[data-appearance="dark"] .wa-conversation-composer-area {
+  --wa-composer-boundary-bg: rgba(15, 23, 42, 0.96);
+  border-top-color: rgba(148, 163, 184, 0.16);
+}
+
+@media (max-width: 900px) {
+  .wa-main {
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+  }
+
+  .wa-conversation-message-area > .wa-chat {
+    /* No 90px fake spacer is needed now: the composer owns a real row. */
+    padding-bottom: 18px !important;
+    scroll-padding-bottom: 18px !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .wa-conversation-composer-area {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}

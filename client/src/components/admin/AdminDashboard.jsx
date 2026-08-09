@@ -25,7 +25,7 @@ function StatCard({ label, value, hint }) {
   );
 }
 
-export default function AdminDashboard({ open, onClose }) {
+export default function AdminDashboard({ open, onClose, appearance = "light" }) {
   const [summary, setSummary] = useState(null);
   const [users, setUsers] = useState([]);
   const [query, setQuery] = useState("");
@@ -36,6 +36,7 @@ export default function AdminDashboard({ open, onClose }) {
   const [selectedUser, setSelectedUser] = useState(null);
   const [actionBusy, setActionBusy] = useState(false);
   const [notice, setNotice] = useState("");
+  const [developmentResetUrl, setDevelopmentResetUrl] = useState("");
 
   const loadSummary = useCallback(async () => {
     const response = await apiFetch("/api/admin/dashboard");
@@ -124,6 +125,47 @@ export default function AdminDashboard({ open, onClose }) {
     }
   }
 
+  async function sendPasswordReset() {
+    if (!selectedProfile?._id) return;
+    if (!selectedProfile.email) {
+      setError("This user does not have an email address, so a password reset link cannot be sent.");
+      return;
+    }
+    if (!window.confirm(`Send a password reset link to ${selectedProfile.email}?`)) return;
+
+    setActionBusy(true);
+    setNotice("");
+    setError("");
+    setDevelopmentResetUrl("");
+    try {
+      const response = await apiFetch(
+        `/api/admin/users/${encodeURIComponent(selectedProfile._id)}/send-password-reset`,
+        { method: "POST" }
+      );
+      const payload = await response.json();
+      if (!response.ok || !payload?.success) {
+        throw new Error(payload?.error || "Failed to send password reset");
+      }
+
+      setNotice(payload.message || `Password reset instructions were sent to ${selectedProfile.email}.`);
+      setDevelopmentResetUrl(payload.data?.developmentResetUrl || "");
+    } catch (err) {
+      setError(err?.message || "Failed to send password reset");
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
+  async function copyDevelopmentResetLink() {
+    if (!developmentResetUrl) return;
+    try {
+      await navigator.clipboard.writeText(developmentResetUrl);
+      setNotice("Development reset link copied to clipboard.");
+    } catch {
+      window.prompt("Copy this reset link:", developmentResetUrl);
+    }
+  }
+
   async function revokeSessions() {
     if (!selectedProfile?._id) return;
     if (!window.confirm(`Sign ${selectedProfile.displayName || "this user"} out on every device?`)) return;
@@ -146,10 +188,10 @@ export default function AdminDashboard({ open, onClose }) {
   if (!open) return null;
 
   return (
-    <div className="admin-shell" role="dialog" aria-modal="true" aria-label="Int-Messager administration">
+    <div className="admin-shell" data-appearance={appearance} role="dialog" aria-modal="true" aria-label="Int-Messager administration">
       <header className="admin-topbar">
         <div>
-          <button type="button" className="admin-back" onClick={onClose}>← Back</button>
+          <button type="button" className="admin-back" onClick={onClose}>← Back to Settings</button>
           <h1>Admin Dashboard</h1>
           <p>Users, sessions and account access</p>
         </div>
@@ -193,7 +235,7 @@ export default function AdminDashboard({ open, onClose }) {
                   type="button"
                   key={user._id}
                   className={`admin-user-row ${selectedId === user._id ? "selected" : ""}`}
-                  onClick={() => setSelectedId(user._id)}
+                  onClick={() => { setSelectedId(user._id); setDevelopmentResetUrl(""); setNotice(""); setError(""); }}
                 >
                   <span className="admin-user-avatar">
                     {user.avatarUrl ? <img src={user.avatarUrl} alt="" /> : initials(user.displayName)}
@@ -253,15 +295,57 @@ export default function AdminDashboard({ open, onClose }) {
                   )) : <div className="admin-empty compact">No active sessions.</div>}
                 </section>
 
-                <div className="admin-account-actions">
-                  <button type="button" onClick={revokeSessions} disabled={actionBusy}>Sign out all devices</button>
-                  {selectedProfile.accountStatus === "suspended" ? (
-                    <button type="button" className="success" onClick={() => updateStatus("active")} disabled={actionBusy}>Reactivate account</button>
-                  ) : (
-                    <button type="button" className="danger" onClick={() => updateStatus("suspended")} disabled={actionBusy || selectedProfile.role === "admin"}>Suspend account</button>
-                  )}
-                </div>
-                {selectedProfile.role === "admin" ? <p className="admin-protection-note">Admin accounts cannot be suspended from this screen.</p> : null}
+                <section className="admin-security-section">
+                  <div className="admin-security-heading">
+                    <div>
+                      <h3>Security</h3>
+                      <p>Reset access without viewing or choosing the user&apos;s password.</p>
+                    </div>
+                  </div>
+
+                  <div className="admin-security-card">
+                    <div>
+                      <strong>Password reset</strong>
+                      <span>
+                        {selectedProfile.email
+                          ? `Send a secure, time-limited reset link to ${selectedProfile.email}.`
+                          : "This account has no email address, so email password reset is unavailable."}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      className="admin-reset-password-btn"
+                      onClick={sendPasswordReset}
+                      disabled={actionBusy || !selectedProfile.email}
+                    >
+                      {actionBusy ? "Please wait…" : "Send password reset"}
+                    </button>
+                  </div>
+
+                  {developmentResetUrl ? (
+                    <div className="admin-dev-reset">
+                      <strong>Development reset link</strong>
+                      <p>Email delivery is not configured, so use this link for local testing. Do not expose it publicly.</p>
+                      <div className="admin-dev-reset-row">
+                        <input value={developmentResetUrl} readOnly aria-label="Development password reset link" />
+                        <button type="button" onClick={copyDevelopmentResetLink}>Copy</button>
+                      </div>
+                    </div>
+                  ) : null}
+                </section>
+
+                <section className="admin-management-section">
+                  <h3>Account controls</h3>
+                  <div className="admin-account-actions">
+                    <button type="button" onClick={revokeSessions} disabled={actionBusy}>Sign out all devices</button>
+                    {selectedProfile.accountStatus === "suspended" ? (
+                      <button type="button" className="success" onClick={() => updateStatus("active")} disabled={actionBusy}>Reactivate account</button>
+                    ) : (
+                      <button type="button" className="danger" onClick={() => updateStatus("suspended")} disabled={actionBusy || selectedProfile.role === "admin"}>Suspend account</button>
+                    )}
+                  </div>
+                  {selectedProfile.role === "admin" ? <p className="admin-protection-note">Admin accounts cannot be suspended from this screen.</p> : null}
+                </section>
               </>
             ) : (
               <div className="admin-detail-placeholder">

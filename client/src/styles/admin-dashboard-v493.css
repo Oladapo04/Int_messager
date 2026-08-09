@@ -1,0 +1,397 @@
+/* Int-Messager v4.9.3 — Admin workspace layout fix */
+
+/* The dashboard is an app-level screen, never part of the active conversation. */
+.admin-shell {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 20000 !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  min-width: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  background: #f4f6f8 !important;
+}
+
+.admin-topbar {
+  flex: 0 0 auto !important;
+  min-height: 76px !important;
+  padding: 12px 20px !important;
+}
+
+.admin-scroll {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  padding: 16px 20px 20px !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.admin-alert,
+.admin-stats,
+.admin-workspace {
+  width: 100% !important;
+  max-width: 1600px !important;
+}
+
+.admin-stats {
+  flex: 0 0 auto !important;
+  margin: 0 auto 14px !important;
+}
+
+.admin-workspace {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  margin: 0 auto !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1.45fr) minmax(340px, .8fr) !important;
+  gap: 14px !important;
+  align-items: stretch !important;
+}
+
+.admin-users-panel,
+.admin-user-detail {
+  min-height: 0 !important;
+  height: 100% !important;
+}
+
+.admin-users-panel {
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+
+.admin-section-heading,
+.admin-filters {
+  flex: 0 0 auto !important;
+}
+
+.admin-user-list {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.admin-user-detail {
+  position: relative !important;
+  top: auto !important;
+  max-height: none !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.admin-detail-profile {
+  position: sticky;
+  top: -18px;
+  z-index: 2;
+  margin: -18px -18px 0;
+  padding: 18px 18px 16px;
+  background: #fff;
+}
+
+.admin-account-actions {
+  padding-bottom: 8px;
+}
+
+/* Dark appearance keeps the new sticky detail header coherent. */
+[data-appearance="dark"] ~ .admin-shell .admin-detail-profile,
+html[data-appearance="dark"] .admin-detail-profile,
+body[data-appearance="dark"] .admin-detail-profile,
+.wa-app[data-appearance="dark"] ~ .admin-shell .admin-detail-profile {
+  background: #111827;
+}
+
+@media (max-width: 1250px) {
+  .admin-workspace {
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 390px) !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .admin-shell {
+    padding-top: env(safe-area-inset-top, 0px) !important;
+    padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+  }
+
+  .admin-topbar {
+    min-height: 62px !important;
+    padding: 9px 12px !important;
+  }
+
+  .admin-scroll {
+    display: block !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+    padding: 10px 10px calc(18px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  .admin-stats {
+    margin-bottom: 10px !important;
+  }
+
+  .admin-workspace {
+    display: block !important;
+    min-height: auto !important;
+  }
+
+  .admin-users-panel {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .admin-user-list {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  .admin-user-detail {
+    display: none !important;
+    position: fixed !important;
+    inset: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px) 0 !important;
+    z-index: 20020 !important;
+    width: 100vw !important;
+    height: auto !important;
+    max-height: none !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    padding: 16px !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .admin-user-detail.open {
+    display: block !important;
+  }
+
+  .admin-detail-profile {
+    top: -16px;
+    margin: -16px -16px 0;
+    padding: 16px 16px 14px;
+  }
+
+  .admin-detail-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .admin-account-actions {
+    padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@media (max-width: 520px) {
+  .admin-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .admin-stat-card {
+    min-height: 94px;
+  }
+
+  .admin-user-row {
+    grid-template-columns: 40px minmax(0, 1fr) auto !important;
+    gap: 8px !important;
+    padding: 10px !important;
+  }
+
+  .admin-user-main small {
+    max-width: 100%;
+  }
+
+  .admin-status-pill {
+    padding: 4px 6px;
+  }
+}
+
+/* Dark mode for the app-level admin overlay. */
+.admin-shell[data-appearance="dark"] { background: #0b1118 !important; color: #f1f5f9 !important; }
+.admin-shell[data-appearance="dark"] .admin-topbar,
+.admin-shell[data-appearance="dark"] .admin-stat-card,
+.admin-shell[data-appearance="dark"] .admin-users-panel,
+.admin-shell[data-appearance="dark"] .admin-user-detail,
+.admin-shell[data-appearance="dark"] .admin-user-row,
+.admin-shell[data-appearance="dark"] .admin-detail-profile { background: #111923 !important; color: #f1f5f9 !important; border-color: #293746 !important; }
+.admin-shell[data-appearance="dark"] .admin-user-row:hover { background: #172330 !important; }
+.admin-shell[data-appearance="dark"] .admin-user-row.selected { background: #172b43 !important; }
+.admin-shell[data-appearance="dark"] .admin-topbar p,
+.admin-shell[data-appearance="dark"] .admin-stat-card span,
+.admin-shell[data-appearance="dark"] .admin-stat-card small,
+.admin-shell[data-appearance="dark"] .admin-section-heading p,
+.admin-shell[data-appearance="dark"] .admin-user-main small,
+.admin-shell[data-appearance="dark"] .admin-user-date,
+.admin-shell[data-appearance="dark"] .admin-detail-profile p,
+.admin-shell[data-appearance="dark"] .admin-detail-grid span,
+.admin-shell[data-appearance="dark"] .admin-device-row small,
+.admin-shell[data-appearance="dark"] .admin-device-row > span,
+.admin-shell[data-appearance="dark"] .admin-protection-note,
+.admin-shell[data-appearance="dark"] .admin-empty { color: #94a3b8 !important; }
+.admin-shell[data-appearance="dark"] .admin-detail-placeholder strong { color: #f1f5f9 !important; }
+.admin-shell[data-appearance="dark"] .admin-filters input,
+.admin-shell[data-appearance="dark"] .admin-filters select,
+.admin-shell[data-appearance="dark"] .admin-refresh,
+.admin-shell[data-appearance="dark"] .admin-account-actions button { background: #16212d !important; color: #f1f5f9 !important; border-color: #344657 !important; }
+
+
+/* v4.9.4 admin password reset */
+.admin-security-section,
+.admin-management-section {
+  margin-top: 18px;
+}
+
+.admin-security-section h3,
+.admin-management-section h3 {
+  margin: 0 0 10px;
+  font-size: 15px;
+}
+
+.admin-security-heading p {
+  margin: -4px 0 12px;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.admin-security-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid #dbe3ec;
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.admin-security-card > div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.admin-security-card strong {
+  font-size: 13px;
+}
+
+.admin-security-card span {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.admin-reset-password-btn {
+  min-height: 38px;
+  padding: 9px 13px;
+  border: 1px solid #2563eb;
+  border-radius: 10px;
+  background: #2563eb;
+  color: #fff;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.admin-reset-password-btn:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+.admin-dev-reset {
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid #f59e0b;
+  border-radius: 12px;
+  background: #fffbeb;
+}
+
+.admin-dev-reset > strong {
+  font-size: 13px;
+  color: #92400e;
+}
+
+.admin-dev-reset p {
+  margin: 5px 0 9px;
+  color: #92400e;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.admin-dev-reset-row {
+  display: flex;
+  gap: 8px;
+}
+
+.admin-dev-reset-row input {
+  min-width: 0;
+  flex: 1 1 auto;
+  padding: 9px 10px;
+  border: 1px solid #f0c36a;
+  border-radius: 9px;
+  background: #fff;
+  color: #334155;
+  font-size: 11px;
+}
+
+.admin-dev-reset-row button {
+  flex: 0 0 auto;
+  padding: 8px 12px;
+  border: 1px solid #d97706;
+  border-radius: 9px;
+  background: #fff;
+  color: #92400e;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.admin-management-section {
+  padding-bottom: 8px;
+}
+
+.admin-shell[data-appearance="dark"] .admin-security-heading p,
+.admin-shell[data-appearance="dark"] .admin-security-card span {
+  color: #94a3b8;
+}
+
+.admin-shell[data-appearance="dark"] .admin-security-card {
+  background: #16212d;
+  border-color: #344657;
+}
+
+.admin-shell[data-appearance="dark"] .admin-dev-reset {
+  background: #2a2113;
+  border-color: #8a5a12;
+}
+
+.admin-shell[data-appearance="dark"] .admin-dev-reset > strong,
+.admin-shell[data-appearance="dark"] .admin-dev-reset p {
+  color: #fbbf24;
+}
+
+.admin-shell[data-appearance="dark"] .admin-dev-reset-row input {
+  background: #111923;
+  color: #f1f5f9;
+  border-color: #6b4b17;
+}
+
+@media (max-width: 600px) {
+  .admin-security-card {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-reset-password-btn {
+    width: 100%;
+  }
+
+  .admin-dev-reset-row {
+    flex-direction: column;
+  }
+
+  .admin-dev-reset-row button {
+    width: 100%;
+  }
+}

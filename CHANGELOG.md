@@ -1,15 +1,8 @@
-# v4.9.0
+# v4.9.5
 
-## Admin Dashboard
-
-- Added server-side `user` / `admin` roles.
-- Added account status (`active` / `suspended`).
-- Added `ADMIN_EMAILS` administrator bootstrap configuration.
-- Added protected `/api/admin/*` routes.
-- Added dashboard statistics and searchable user management.
-- Added per-user account/device/activity details.
-- Added suspend/reactivate controls.
-- Added forced session revocation.
-- Suspended accounts are denied login and normal profile access.
-- Added responsive admin UI integrated into the existing Int-Messager Settings area.
-- Private message content is not exposed through the Admin Dashboard.
+- Fixed message composer overlapping the last chat message/attachment.
+- Added a dedicated conversation layout stack.
+- Message history now owns the scrollable area above the composer.
+- Composer now reserves real layout height instead of relying on bottom padding.
+- Added mobile safe-area handling.
+- Existing message bubble, image, PDF, admin dashboard, and dark-mode designs are unchanged.

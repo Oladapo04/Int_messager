@@ -20,6 +20,10 @@ import "./styles/desktop-chat-info-pane-v4816.css";
 import "./styles/mobile-hamburger-remove-v4817.css";
 import "./styles/black-call-icon-v4818.css";
 import "./styles/admin-dashboard-v490.css";
+import "./styles/dark-mode-v491.css";
+import "./styles/admin-access-v492.css";
+import "./styles/admin-dashboard-v493.css";
+import "./styles/composer-layout-v495.css";
 import AuthScreen from "./components/auth/AuthScreen";
 import NavigationRail from "./components/layout/NavigationRail";
 import MessageActions, { DesktopMessageContextMenu, MobileMessageActionSheet } from "./components/chat/MessageActions";
@@ -50,6 +54,7 @@ const CHAT_PREFS_KEY = "int_messager_chat_prefs_v1";
 const PWA_BEFORE_INSTALL_PROMPT = "beforeinstallprompt";
 const ACCOUNT_INSTALL_ID_KEY = "int_messager_account_install_id_v4";
 const DESKTOP_SIDEBAR_WIDTH_KEY = "int_messager_desktop_sidebar_width_v44";
+const APPEARANCE_MODE_KEY = "int_messager_appearance_mode_v491";
 
 function formatRecordingTime(totalSeconds = 0) {
   const safeSeconds = Math.max(0, Number(totalSeconds) || 0);
@@ -3280,7 +3285,22 @@ export default function App() {
   const [roomContextMenu, setRoomContextMenu] = useState(null);
   const [chatOrgPrefs, setChatOrgPrefs] = useState({ pinnedRooms: [], archivedRooms: [], mutedRooms: [], manuallyUnreadRooms: [], keepArchivedOnNewMessage: true });
   const [showArchivedChats, setShowArchivedChats] = useState(false);
+  const [appearanceMode, setAppearanceMode] = useState(() => {
+    const saved = localStorage.getItem(APPEARANCE_MODE_KEY);
+    return ["light", "dark", "system"].includes(saved) ? saved : "system";
+  });
+  const [systemPrefersDark, setSystemPrefersDark] = useState(() =>
+    window.matchMedia?.("(prefers-color-scheme: dark)")?.matches || false
+  );
   const [showAdminDashboard, setShowAdminDashboard] = useState(false);
+
+  useEffect(() => {
+    if (profile?.role !== "admin" && showAdminDashboard) {
+      setShowAdminDashboard(false);
+    }
+  }, [profile?.role, showAdminDashboard]);
+  const [adminAccessCheck, setAdminAccessCheck] = useState(null);
+  const [adminAccessBusy, setAdminAccessBusy] = useState(false);
 
   const [isRecording, setIsRecording] = useState(false);
   const [recordingError, setRecordingError] = useState("");
@@ -3311,6 +3331,25 @@ export default function App() {
       window.removeEventListener("appinstalled", handlePwaInstalled);
     };
   }, []);
+
+  useEffect(() => {
+    const media = window.matchMedia?.("(prefers-color-scheme: dark)");
+    if (!media) return undefined;
+    const syncSystemAppearance = (event) => setSystemPrefersDark(Boolean(event.matches));
+    setSystemPrefersDark(Boolean(media.matches));
+    media.addEventListener?.("change", syncSystemAppearance);
+    return () => media.removeEventListener?.("change", syncSystemAppearance);
+  }, []);
+
+  const resolvedAppearance = appearanceMode === "system"
+    ? (systemPrefersDark ? "dark" : "light")
+    : appearanceMode;
+
+  useEffect(() => {
+    localStorage.setItem(APPEARANCE_MODE_KEY, appearanceMode);
+    document.documentElement.dataset.intMessagerAppearance = resolvedAppearance;
+    document.documentElement.style.colorScheme = resolvedAppearance;
+  }, [appearanceMode, resolvedAppearance]);
 
   async function installPwaApp() {
     if (!pwaInstallPrompt) {
@@ -4044,6 +4083,35 @@ export default function App() {
     setDisplayNameInput(data.profile.displayName || "");
     setProfileStatusInput(data.profile.profileStatus || "Available now");
     setAuthChecked(true);
+  }
+
+  async function checkAdminAccess({ openWhenAllowed = false } = {}) {
+    setAdminAccessBusy(true);
+    setAdminAccessCheck(null);
+    try {
+      const response = await authFetch("/api/admin/access");
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload?.success) {
+        throw new Error(payload?.error || "Failed to check admin access");
+      }
+      const data = payload.data || {};
+      setAdminAccessCheck(data);
+      if (data.allowed) {
+        setProfile((current) => current ? { ...current, role: "admin" } : current);
+        setSession((current) => current ? { ...current, role: "admin" } : current);
+        if (openWhenAllowed) {
+          setSidebarMode("settings");
+          setShowSidebar(false);
+          setShowAdminDashboard(true);
+        }
+      }
+      return data;
+    } catch (error) {
+      setAdminAccessCheck({ allowed: false, message: error?.message || "Failed to check admin access" });
+      return null;
+    } finally {
+      setAdminAccessBusy(false);
+    }
   }
 
   function handleLogout() {
@@ -6396,9 +6464,19 @@ export default function App() {
     <>
       <StyleTag />
 
-      {showSidebar ? <div className="wa-mobile-overlay" onClick={() => setShowSidebar(false)} /> : null}
+      <AdminDashboard
+        open={showAdminDashboard}
+        appearance={resolvedAppearance}
+        onClose={() => {
+          setShowAdminDashboard(false);
+          setSidebarMode("settings");
+          setShowSidebar(true);
+        }}
+      />
 
-      <div data-theme={chatPrefs.theme || "light-grey"} className={`wa-app ${activeRoom ? "has-active-chat" : "no-active-chat"} bubble-${chatPrefs.bubbleShape} font-${chatPrefs.fontSize}`} style={{ "--app-color": chatPrefs.appColor, "--accent-color": chatPrefs.accentColor, "--chat-wallpaper": chatPrefs.wallpaper, "--chat-color": chatPrefs.chatColor, "--desktop-sidebar-width": `${desktopSidebarWidth}px` }}>
+      {showSidebar && !showAdminDashboard ? <div className="wa-mobile-overlay" onClick={() => setShowSidebar(false)} /> : null}
+
+      <div data-theme={chatPrefs.theme || "light-grey"} data-appearance={resolvedAppearance} className={`wa-app ${activeRoom ? "has-active-chat" : "no-active-chat"} bubble-${chatPrefs.bubbleShape} font-${chatPrefs.fontSize}`} style={{ "--app-color": chatPrefs.appColor, "--accent-color": chatPrefs.accentColor, "--chat-wallpaper": chatPrefs.wallpaper, "--chat-color": chatPrefs.chatColor, "--desktop-sidebar-width": `${desktopSidebarWidth}px` }}>
         <aside className={`wa-sidebar ${showSidebar ? "open" : ""}`}>
           <NavigationRail
             sidebarMode={sidebarMode}
@@ -6692,10 +6770,20 @@ export default function App() {
               {profile?.role === "admin" ? (
                 <>
                   <div className="wa-section-label">Administration</div>
-                  <div className="wa-settings-card">
+                  <div className="wa-settings-card admin-access-card">
                     <div className="wa-settings-title">Admin Dashboard</div>
-                    <div className="wa-settings-note">View registered users, account activity and active sessions. Suspend access or sign a user out across devices.</div>
-                    <button className="wa-settings-btn admin-launch-btn" type="button" onClick={() => setShowAdminDashboard(true)}>Open Admin Dashboard</button>
+                    <div className="wa-settings-note">View registered users, account activity and active sessions. Suspend access, send password resets, or sign a user out across devices.</div>
+                    <button
+                      className="wa-settings-btn admin-launch-btn"
+                      type="button"
+                      onClick={() => {
+                        setSidebarMode("settings");
+                        setShowSidebar(false);
+                        setShowAdminDashboard(true);
+                      }}
+                    >
+                      Open Admin Dashboard
+                    </button>
                   </div>
                 </>
               ) : null}
@@ -6710,7 +6798,26 @@ export default function App() {
                   <span>Keep archived chats archived when new messages arrive</span>
                   <input type="checkbox" checked={chatOrgPrefs.keepArchivedOnNewMessage !== false} onChange={(event) => updateArchiveBehaviour(event.target.checked)} />
                 </label>
-                <label className="wa-settings-label">Theme
+                <div className="wa-appearance-setting">
+                  <div>
+                    <div className="wa-settings-title">Appearance</div>
+                    <div className="wa-settings-note">Choose light mode, dark mode, or follow this device automatically.</div>
+                  </div>
+                  <div className="wa-appearance-segmented" role="group" aria-label="App appearance">
+                    {["light", "dark", "system"].map((mode) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        className={appearanceMode === mode ? "active" : ""}
+                        aria-pressed={appearanceMode === mode}
+                        onClick={() => setAppearanceMode(mode)}
+                      >
+                        {mode === "light" ? "☀ Light" : mode === "dark" ? "◐ Dark" : "◉ System"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <label className="wa-settings-label">Chat palette
                   <select className="wa-select" value={chatPrefs.theme || "light-grey"} onChange={(e) => updateChatPref("theme", e.target.value)}>
                     <option value="light-grey">Light Grey — recommended</option>
                     <option value="bright-white">Bright White</option>
@@ -6782,7 +6889,6 @@ export default function App() {
         />
 
         <section className="wa-main">
-          <AdminDashboard open={showAdminDashboard} onClose={() => setShowAdminDashboard(false)} />
           <header className="wa-header">
             <div className="wa-header-left">
               <button
