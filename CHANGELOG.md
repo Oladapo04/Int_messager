@@ -1,8 +1,15 @@
-# Changelog — 4.8.17
+# v4.9.0
 
-- Removed the desktop hamburger control from all mobile layouts (`<= 900px`).
-- The rule applies globally instead of only when `.has-active-chat` is present.
-- Added layout-neutral safeguards so the hidden button cannot reserve header space.
-- Desktop hamburger/sidebar toggle remains available at `>= 901px`.
-- No changes to the approved mobile Chat Info appearance.
-- No changes to the desktop three-column Chat Info layout from 4.8.16.
+## Admin Dashboard
+
+- Added server-side `user` / `admin` roles.
+- Added account status (`active` / `suspended`).
+- Added `ADMIN_EMAILS` administrator bootstrap configuration.
+- Added protected `/api/admin/*` routes.
+- Added dashboard statistics and searchable user management.
+- Added per-user account/device/activity details.
+- Added suspend/reactivate controls.
+- Added forced session revocation.
+- Suspended accounts are denied login and normal profile access.
+- Added responsive admin UI integrated into the existing Int-Messager Settings area.
+- Private message content is not exposed through the Admin Dashboard.

@@ -96,6 +96,7 @@ const SMTP_SECURE = String(process.env.SMTP_SECURE || "false").toLowerCase() ===
 const SMTP_USER = process.env.SMTP_USER || "";
 const SMTP_PASS = process.env.SMTP_PASS || "";
 const SMTP_FROM = process.env.SMTP_FROM || "Int-Messager <no-reply@int-messager.local>";
+const ADMIN_EMAILS_RAW = process.env.ADMIN_EMAILS || "";
 
 if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
   webPush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
@@ -386,6 +387,10 @@ const profileSchema = new mongoose.Schema(
     phone: { type: String, unique: true, sparse: true, index: true, trim: true },
     passwordHash: { type: String, default: "" },
     accountVerified: { type: Boolean, default: true },
+    role: { type: String, enum: ["user", "admin"], default: "user", index: true },
+    accountStatus: { type: String, enum: ["active", "suspended"], default: "active", index: true },
+    suspendedAt: { type: Date, default: null },
+    suspendedReason: { type: String, default: "", trim: true },
     lastLoginAt: { type: Date, default: null },
     passwordResetTokenHash: { type: String, default: "", select: false },
     passwordResetExpiresAt: { type: Date, default: null, select: false },
@@ -567,6 +572,29 @@ function normalizeEmail(value) {
   return String(value || "").trim().toLowerCase();
 }
 
+function configuredAdminEmails() {
+  return new Set(
+    String(ADMIN_EMAILS_RAW || "")
+      .split(",")
+      .map((value) => normalizeEmail(value))
+      .filter(Boolean)
+  );
+}
+
+function isConfiguredAdminEmail(email) {
+  const normalized = normalizeEmail(email);
+  return Boolean(normalized && configuredAdminEmails().has(normalized));
+}
+
+async function ensureConfiguredAdminRole(profile) {
+  if (!profile) return profile;
+  if (isConfiguredAdminEmail(profile.email) && profile.role !== "admin") {
+    profile.role = "admin";
+    await profile.save();
+  }
+  return profile;
+}
+
 function normalizePhone(value) {
   return String(value || "").replace(/[^+\d]/g, "").trim();
 }
@@ -690,6 +718,8 @@ function authResponse(profile, sessionId = "") {
       manuallyUnreadRooms: profile.manuallyUnreadRooms || [],
       nameLocked: profile.nameLocked,
       activeChat: profile.activeChat,
+      role: profile.role || (isConfiguredAdminEmail(profile.email) ? "admin" : "user"),
+      accountStatus: profile.accountStatus || "active",
     },
   };
 }
@@ -705,7 +735,9 @@ function normalizeDirectSlug(profileIdA, profileIdB) {
 
 async function getProfileByInstallId(installId) {
   if (!installId) return null;
-  return Profile.findOne({ installId });
+  const profile = await Profile.findOne({ installId });
+  if (!profile || (profile.accountStatus || "active") === "suspended") return null;
+  return profile;
 }
 
 async function ensureSavedMessagesRoom(profile) {
@@ -1078,6 +1110,63 @@ function buildChatExportText(room, messages) {
   return lines.join("\n");
 }
 
+async function getAuthenticatedProfile(req) {
+  const payload = verifyAuthToken(getBearerToken(req));
+  if (!payload?.profileId) return null;
+  const profile = await Profile.findById(payload.profileId);
+  if (!profile) return null;
+  await ensureConfiguredAdminRole(profile);
+  return profile;
+}
+
+async function requireAdmin(req, res, next) {
+  try {
+    const profile = await getAuthenticatedProfile(req);
+    if (!profile) return res.status(401).json({ success: false, error: "Sign in required" });
+    if ((profile.accountStatus || "active") === "suspended") {
+      return res.status(403).json({ success: false, error: "This account is suspended" });
+    }
+    if (profile.role !== "admin" && !isConfiguredAdminEmail(profile.email)) {
+      return res.status(403).json({ success: false, error: "Admin access required" });
+    }
+    req.adminProfile = profile;
+    return next();
+  } catch (error) {
+    console.error("admin authorization error:", error);
+    return res.status(500).json({ success: false, error: "Failed to verify admin access" });
+  }
+}
+
+function registeredProfileQuery() {
+  return {
+    $or: [
+      { email: { $exists: true, $nin: [null, ""] } },
+      { phone: { $exists: true, $nin: [null, ""] } },
+    ],
+  };
+}
+
+function adminUserShape(profile, lastActiveAt = null) {
+  const id = String(profile._id);
+  return {
+    _id: id,
+    displayName: profile.displayName || "",
+    username: profile.username || "",
+    email: profile.email || "",
+    phone: profile.phone || "",
+    avatarUrl: profile.avatarUrl || "",
+    profileStatus: profile.profileStatus || "Available now",
+    role: profile.role || "user",
+    accountStatus: profile.accountStatus || "active",
+    accountVerified: profile.accountVerified !== false,
+    createdAt: profile.createdAt,
+    updatedAt: profile.updatedAt,
+    lastLoginAt: profile.lastLoginAt || null,
+    lastActiveAt: lastActiveAt || null,
+    online: Boolean(profileSockets[id]?.size),
+  };
+}
+
 /* =========================
    API ROUTES
 ========================= */
@@ -1108,6 +1197,7 @@ app.post("/api/auth/register", async (req, res) => {
     profile.activeChat = true;
     profile.lastLoginAt = new Date();
     await profile.save();
+    await ensureConfiguredAdminRole(profile);
 
     const sessionId = await createAuthSession(profile, req);
     notificationService.welcome(profile).catch((error) => console.warn("Welcome email failed:", error.message));
@@ -1194,6 +1284,11 @@ app.post("/api/auth/login", async (req, res) => {
       return res.status(401).json({ success: false, error: "Incorrect email, phone number, or password" });
     }
 
+    await ensureConfiguredAdminRole(profile);
+    if ((profile.accountStatus || "active") === "suspended") {
+      return res.status(403).json({ success: false, error: "This account has been suspended. Contact the administrator if you believe this is a mistake." });
+    }
+
     profile.lastLoginAt = new Date();
     profile.activeChat = true;
     await profile.save();
@@ -1217,6 +1312,10 @@ app.get("/api/auth/me", async (req, res) => {
   }
   const profile = await Profile.findById(payload.profileId);
   if (!profile) return res.status(401).json({ success: false, error: "Account no longer exists" });
+  await ensureConfiguredAdminRole(profile);
+  if ((profile.accountStatus || "active") === "suspended") {
+    return res.status(403).json({ success: false, error: "This account has been suspended" });
+  }
   return res.json({ success: true, data: authResponse(profile, payload.sessionId || "") });
 });
 
@@ -1264,6 +1363,223 @@ app.post("/api/auth/change-password", async (req, res) => {
   }
 });
 
+/* =========================
+   ADMIN API
+========================= */
+
+app.get("/api/admin/dashboard", requireAdmin, async (req, res) => {
+  try {
+    const now = new Date();
+    const startOfToday = new Date(now);
+    startOfToday.setHours(0, 0, 0, 0);
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const registeredQuery = registeredProfileQuery();
+    const onlineProfileIds = Object.entries(profileSockets)
+      .filter(([, sockets]) => sockets?.size)
+      .map(([profileId]) => profileId);
+
+    const [totalUsers, activeTodayByLogin, activeTodayBySession, newThisWeek, suspendedUsers, totalMessages] = await Promise.all([
+      Profile.countDocuments(registeredQuery),
+      Profile.countDocuments({ $and: [registeredQuery, { lastLoginAt: { $gte: startOfToday } }] }),
+      AuthSession.distinct("profileId", { lastActiveAt: { $gte: startOfToday }, revokedAt: null }),
+      Profile.countDocuments({ $and: [registeredQuery, { createdAt: { $gte: sevenDaysAgo } }] }),
+      Profile.countDocuments({ $and: [registeredQuery, { accountStatus: "suspended" }] }),
+      Message.countDocuments({}),
+    ]);
+
+    const onlineRegistered = onlineProfileIds.length
+      ? await Profile.countDocuments({ $and: [registeredQuery, { _id: { $in: onlineProfileIds } }] })
+      : 0;
+    const activeTodayIds = new Set((activeTodayBySession || []).map((id) => String(id)));
+    const activeToday = Math.max(activeTodayByLogin, activeTodayIds.size);
+
+    return res.json({
+      success: true,
+      data: {
+        totalUsers,
+        onlineNow: onlineRegistered,
+        activeToday,
+        newThisWeek,
+        suspendedUsers,
+        totalMessages,
+        generatedAt: now,
+      },
+    });
+  } catch (error) {
+    console.error("admin dashboard error:", error);
+    return res.status(500).json({ success: false, error: "Failed to load admin dashboard" });
+  }
+});
+
+app.get("/api/admin/users", requireAdmin, async (req, res) => {
+  try {
+    const q = String(req.query.q || "").trim();
+    const status = String(req.query.status || "all").trim().toLowerCase();
+    const limit = Math.max(1, Math.min(200, Number(req.query.limit || 100)));
+    const filters = [registeredProfileQuery()];
+
+    if (["active", "suspended"].includes(status)) filters.push({ accountStatus: status });
+    if (q) {
+      const matcher = new RegExp(escapeRegex(q), "i");
+      filters.push({
+        $or: [
+          { displayName: matcher },
+          { username: matcher },
+          { email: matcher },
+          { phone: matcher },
+        ],
+      });
+    }
+
+    const profiles = await Profile.find({ $and: filters })
+      .select("displayName username email phone avatarUrl profileStatus role accountStatus accountVerified lastLoginAt createdAt updatedAt")
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean();
+
+    const ids = profiles.map((profile) => profile._id);
+    const sessions = ids.length
+      ? await AuthSession.aggregate([
+          { $match: { profileId: { $in: ids }, revokedAt: null, expiresAt: { $gt: new Date() } } },
+          { $group: { _id: "$profileId", lastActiveAt: { $max: "$lastActiveAt" }, activeSessionCount: { $sum: 1 } } },
+        ])
+      : [];
+    const sessionMap = new Map(sessions.map((row) => [String(row._id), row]));
+
+    return res.json({
+      success: true,
+      data: {
+        users: profiles.map((profile) => {
+          const session = sessionMap.get(String(profile._id));
+          return {
+            ...adminUserShape(profile, session?.lastActiveAt || profile.lastLoginAt || null),
+            activeSessionCount: session?.activeSessionCount || 0,
+          };
+        }),
+      },
+    });
+  } catch (error) {
+    console.error("admin users error:", error);
+    return res.status(500).json({ success: false, error: "Failed to load users" });
+  }
+});
+
+app.get("/api/admin/users/:profileId", requireAdmin, async (req, res) => {
+  try {
+    const profile = await Profile.findById(req.params.profileId)
+      .select("displayName username email phone avatarUrl profileStatus role accountStatus accountVerified suspendedAt suspendedReason lastLoginAt createdAt updatedAt")
+      .lean();
+    if (!profile) return res.status(404).json({ success: false, error: "User not found" });
+
+    const sessions = await AuthSession.find({
+      profileId: profile._id,
+      revokedAt: null,
+      expiresAt: { $gt: new Date() },
+    })
+      .select("sessionId deviceName browser userAgent ipAddress lastActiveAt createdAt expiresAt")
+      .sort({ lastActiveAt: -1 })
+      .lean();
+
+    const [messageCount, callCount] = await Promise.all([
+      Message.countDocuments({ senderProfileId: profile._id }),
+      CallLog.countDocuments({ $or: [{ callerProfileId: profile._id }, { participantProfileIds: profile._id }] }),
+    ]);
+    const lastActiveAt = sessions[0]?.lastActiveAt || profile.lastLoginAt || null;
+
+    return res.json({
+      success: true,
+      data: {
+        profile: adminUserShape(profile, lastActiveAt),
+        online: Boolean(profileSockets[String(profile._id)]?.size),
+        lastActiveAt,
+        activeSessionCount: sessions.length,
+        messageCount,
+        callCount,
+        sessions: sessions.map((session) => ({
+          sessionId: session.sessionId,
+          deviceName: session.deviceName,
+          browser: session.browser,
+          userAgent: session.userAgent,
+          lastActiveAt: session.lastActiveAt,
+          createdAt: session.createdAt,
+          expiresAt: session.expiresAt,
+        })),
+      },
+    });
+  } catch (error) {
+    console.error("admin user detail error:", error);
+    return res.status(500).json({ success: false, error: "Failed to load user details" });
+  }
+});
+
+app.patch("/api/admin/users/:profileId/status", requireAdmin, async (req, res) => {
+  try {
+    const status = String(req.body?.status || "").trim().toLowerCase();
+    if (!["active", "suspended"].includes(status)) {
+      return res.status(400).json({ success: false, error: "Status must be active or suspended" });
+    }
+
+    const target = await Profile.findById(req.params.profileId);
+    if (!target) return res.status(404).json({ success: false, error: "User not found" });
+    if (String(target._id) === String(req.adminProfile._id)) {
+      return res.status(400).json({ success: false, error: "You cannot suspend your own admin account" });
+    }
+    if (target.role === "admin" && status === "suspended") {
+      return res.status(403).json({ success: false, error: "Admin accounts cannot be suspended from this dashboard" });
+    }
+
+    target.accountStatus = status;
+    target.suspendedAt = status === "suspended" ? new Date() : null;
+    target.suspendedReason = status === "suspended" ? String(req.body?.reason || "Suspended by administrator").slice(0, 200) : "";
+    if (status === "suspended") target.activeChat = false;
+    await target.save();
+
+    if (status === "suspended") {
+      await AuthSession.updateMany({ profileId: target._id, revokedAt: null }, { $set: { revokedAt: new Date() } });
+      const socketIds = profileSockets[String(target._id)];
+      if (socketIds) {
+        [...socketIds].forEach((socketId) => {
+          io.to(socketId).emit("account_suspended", { profileId: String(target._id) });
+          io.sockets.sockets.get(socketId)?.disconnect(true);
+        });
+      }
+    }
+
+    io.emit("profiles_updated");
+    return res.json({ success: true, data: adminUserShape(target, target.lastLoginAt) });
+  } catch (error) {
+    console.error("admin status update error:", error);
+    return res.status(500).json({ success: false, error: "Failed to update account status" });
+  }
+});
+
+app.post("/api/admin/users/:profileId/revoke-sessions", requireAdmin, async (req, res) => {
+  try {
+    const target = await Profile.findById(req.params.profileId).select("_id displayName role");
+    if (!target) return res.status(404).json({ success: false, error: "User not found" });
+    if (String(target._id) === String(req.adminProfile._id)) {
+      return res.status(400).json({ success: false, error: "Use your Security settings to manage your own sessions" });
+    }
+
+    const result = await AuthSession.updateMany(
+      { profileId: target._id, revokedAt: null },
+      { $set: { revokedAt: new Date() } }
+    );
+    const socketIds = profileSockets[String(target._id)];
+    if (socketIds) {
+      [...socketIds].forEach((socketId) => {
+        io.to(socketId).emit("session_revoked", { profileId: String(target._id) });
+        io.sockets.sockets.get(socketId)?.disconnect(true);
+      });
+    }
+
+    return res.json({ success: true, data: { revokedCount: result.modifiedCount || 0 } });
+  } catch (error) {
+    console.error("admin revoke sessions error:", error);
+    return res.status(500).json({ success: false, error: "Failed to revoke sessions" });
+  }
+});
+
 app.get("/api", (req, res) => {
   res.send("Server is working");
 });
@@ -1303,6 +1619,8 @@ app.post("/api/session/init", async (req, res) => {
         phone: profile.phone || "",
         nameLocked: profile.nameLocked,
         activeChat: profile.activeChat,
+        role: profile.role || (isConfiguredAdminEmail(profile.email) ? "admin" : "user"),
+        accountStatus: profile.accountStatus || "active",
       },
     });
   } catch (error) {
@@ -1383,6 +1701,8 @@ app.post("/api/session/set-name", async (req, res) => {
         phone: profile.phone || "",
         nameLocked: profile.nameLocked,
         activeChat: profile.activeChat,
+        role: profile.role || (isConfiguredAdminEmail(profile.email) ? "admin" : "user"),
+        accountStatus: profile.accountStatus || "active",
       },
     });
   } catch (error) {
@@ -1487,6 +1807,8 @@ app.post("/api/profile", (req, res) => {
           keepArchivedOnNewMessage: profile.keepArchivedOnNewMessage !== false,
           nameLocked: profile.nameLocked,
           activeChat: profile.activeChat,
+          role: profile.role || (isConfiguredAdminEmail(profile.email) ? "admin" : "user"),
+          accountStatus: profile.accountStatus || "active",
         },
       });
     } catch (error) {

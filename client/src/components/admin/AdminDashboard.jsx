@@ -1,0 +1,277 @@
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { apiFetch } from "../../services/api";
+
+function formatDate(value, withTime = false) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return withTime
+    ? date.toLocaleString([], { dateStyle: "medium", timeStyle: "short" })
+    : date.toLocaleDateString([], { dateStyle: "medium" });
+}
+
+function initials(name = "") {
+  const parts = String(name || "User").trim().split(/\s+/).filter(Boolean);
+  return parts.slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "U";
+}
+
+function StatCard({ label, value, hint }) {
+  return (
+    <article className="admin-stat-card">
+      <span>{label}</span>
+      <strong>{value ?? "—"}</strong>
+      <small>{hint}</small>
+    </article>
+  );
+}
+
+export default function AdminDashboard({ open, onClose }) {
+  const [summary, setSummary] = useState(null);
+  const [users, setUsers] = useState([]);
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState("all");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [selectedId, setSelectedId] = useState("");
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [actionBusy, setActionBusy] = useState(false);
+  const [notice, setNotice] = useState("");
+
+  const loadSummary = useCallback(async () => {
+    const response = await apiFetch("/api/admin/dashboard");
+    const payload = await response.json();
+    if (!response.ok || !payload?.success) throw new Error(payload?.error || "Failed to load admin dashboard");
+    setSummary(payload.data);
+  }, []);
+
+  const loadUsers = useCallback(async () => {
+    const params = new URLSearchParams();
+    if (query.trim()) params.set("q", query.trim());
+    if (status !== "all") params.set("status", status);
+    params.set("limit", "100");
+    const response = await apiFetch(`/api/admin/users?${params.toString()}`);
+    const payload = await response.json();
+    if (!response.ok || !payload?.success) throw new Error(payload?.error || "Failed to load users");
+    setUsers(payload.data?.users || []);
+  }, [query, status]);
+
+  const loadSelectedUser = useCallback(async (id) => {
+    if (!id) {
+      setSelectedUser(null);
+      return;
+    }
+    const response = await apiFetch(`/api/admin/users/${encodeURIComponent(id)}`);
+    const payload = await response.json();
+    if (!response.ok || !payload?.success) throw new Error(payload?.error || "Failed to load user details");
+    setSelectedUser(payload.data);
+  }, []);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      await Promise.all([loadSummary(), loadUsers()]);
+      if (selectedId) await loadSelectedUser(selectedId);
+    } catch (err) {
+      setError(err?.message || "Failed to refresh admin data");
+    } finally {
+      setLoading(false);
+    }
+  }, [loadSelectedUser, loadSummary, loadUsers, selectedId]);
+
+  useEffect(() => {
+    if (!open) return;
+    refresh();
+  }, [open, refresh]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const timer = setTimeout(() => {
+      loadUsers().catch((err) => setError(err?.message || "Failed to search users"));
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [open, loadUsers]);
+
+  useEffect(() => {
+    if (!selectedId) return;
+    loadSelectedUser(selectedId).catch((err) => setError(err?.message || "Failed to load user details"));
+  }, [loadSelectedUser, selectedId]);
+
+  const selectedProfile = selectedUser?.profile || null;
+  const activeUsers = useMemo(() => users.filter((user) => user.accountStatus !== "suspended").length, [users]);
+
+  async function updateStatus(nextStatus) {
+    if (!selectedProfile?._id) return;
+    const verb = nextStatus === "suspended" ? "suspend" : "reactivate";
+    if (!window.confirm(`Are you sure you want to ${verb} ${selectedProfile.displayName || "this account"}?`)) return;
+    setActionBusy(true);
+    setNotice("");
+    setError("");
+    try {
+      const response = await apiFetch(`/api/admin/users/${encodeURIComponent(selectedProfile._id)}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: nextStatus }),
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload?.success) throw new Error(payload?.error || `Failed to ${verb} account`);
+      setNotice(nextStatus === "suspended" ? "Account suspended and active sessions revoked." : "Account reactivated.");
+      await refresh();
+    } catch (err) {
+      setError(err?.message || `Failed to ${verb} account`);
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
+  async function revokeSessions() {
+    if (!selectedProfile?._id) return;
+    if (!window.confirm(`Sign ${selectedProfile.displayName || "this user"} out on every device?`)) return;
+    setActionBusy(true);
+    setNotice("");
+    setError("");
+    try {
+      const response = await apiFetch(`/api/admin/users/${encodeURIComponent(selectedProfile._id)}/revoke-sessions`, { method: "POST" });
+      const payload = await response.json();
+      if (!response.ok || !payload?.success) throw new Error(payload?.error || "Failed to revoke sessions");
+      setNotice("All active sessions for this account have been revoked.");
+      await refresh();
+    } catch (err) {
+      setError(err?.message || "Failed to revoke sessions");
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
+  if (!open) return null;
+
+  return (
+    <div className="admin-shell" role="dialog" aria-modal="true" aria-label="Int-Messager administration">
+      <header className="admin-topbar">
+        <div>
+          <button type="button" className="admin-back" onClick={onClose}>← Back</button>
+          <h1>Admin Dashboard</h1>
+          <p>Users, sessions and account access</p>
+        </div>
+        <button type="button" className="admin-refresh" onClick={refresh} disabled={loading}>{loading ? "Refreshing…" : "Refresh"}</button>
+      </header>
+
+      <div className="admin-scroll">
+        {error ? <div className="admin-alert error">{error}</div> : null}
+        {notice ? <div className="admin-alert success">{notice}</div> : null}
+
+        <section className="admin-stats" aria-label="Account statistics">
+          <StatCard label="Registered users" value={summary?.totalUsers} hint="Accounts with sign-in credentials" />
+          <StatCard label="Online now" value={summary?.onlineNow} hint="Connected to Int-Messager now" />
+          <StatCard label="Active today" value={summary?.activeToday} hint="Signed in or active today" />
+          <StatCard label="New this week" value={summary?.newThisWeek} hint="Accounts created in the last 7 days" />
+          <StatCard label="Suspended" value={summary?.suspendedUsers} hint={`${activeUsers} active in current results`} />
+          <StatCard label="Messages" value={summary?.totalMessages} hint="Total message records" />
+        </section>
+
+        <section className="admin-workspace">
+          <div className="admin-users-panel">
+            <div className="admin-section-heading">
+              <div>
+                <h2>Users</h2>
+                <p>{users.length} account{users.length === 1 ? "" : "s"} shown</p>
+              </div>
+            </div>
+
+            <div className="admin-filters">
+              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search name, email, phone or username" />
+              <select value={status} onChange={(event) => setStatus(event.target.value)}>
+                <option value="all">All accounts</option>
+                <option value="active">Active</option>
+                <option value="suspended">Suspended</option>
+              </select>
+            </div>
+
+            <div className="admin-user-list">
+              {users.map((user) => (
+                <button
+                  type="button"
+                  key={user._id}
+                  className={`admin-user-row ${selectedId === user._id ? "selected" : ""}`}
+                  onClick={() => setSelectedId(user._id)}
+                >
+                  <span className="admin-user-avatar">
+                    {user.avatarUrl ? <img src={user.avatarUrl} alt="" /> : initials(user.displayName)}
+                    <i className={user.online ? "online" : ""} />
+                  </span>
+                  <span className="admin-user-main">
+                    <strong>{user.displayName || "Unnamed user"}</strong>
+                    <small>{user.email || user.phone || user.username || "No contact identifier"}</small>
+                  </span>
+                  <span className={`admin-status-pill ${user.accountStatus === "suspended" ? "suspended" : user.online ? "online" : ""}`}>
+                    {user.accountStatus === "suspended" ? "Suspended" : user.online ? "Online" : "Active"}
+                  </span>
+                  <span className="admin-user-date">{formatDate(user.lastActiveAt || user.lastLoginAt, true)}</span>
+                </button>
+              ))}
+              {!users.length && !loading ? <div className="admin-empty">No users match this search.</div> : null}
+            </div>
+          </div>
+
+          <aside className={`admin-user-detail ${selectedProfile ? "open" : ""}`}>
+            {selectedProfile ? (
+              <>
+                <div className="admin-detail-profile">
+                  <span className="admin-detail-avatar">
+                    {selectedProfile.avatarUrl ? <img src={selectedProfile.avatarUrl} alt="" /> : initials(selectedProfile.displayName)}
+                  </span>
+                  <div>
+                    <h2>{selectedProfile.displayName || "Unnamed user"}</h2>
+                    <p>{selectedProfile.profileStatus || "No profile status"}</p>
+                    <span className={`admin-status-pill ${selectedProfile.accountStatus === "suspended" ? "suspended" : selectedUser.online ? "online" : ""}`}>
+                      {selectedProfile.accountStatus === "suspended" ? "Suspended" : selectedUser.online ? "Online now" : "Active account"}
+                    </span>
+                  </div>
+                  <button type="button" className="admin-detail-close" onClick={() => { setSelectedId(""); setSelectedUser(null); }}>×</button>
+                </div>
+
+                <div className="admin-detail-grid">
+                  <div><span>Email</span><strong>{selectedProfile.email || "—"}</strong></div>
+                  <div><span>Phone</span><strong>{selectedProfile.phone || "—"}</strong></div>
+                  <div><span>Username</span><strong>{selectedProfile.username ? `@${selectedProfile.username}` : "—"}</strong></div>
+                  <div><span>Role</span><strong>{selectedProfile.role || "user"}</strong></div>
+                  <div><span>Joined</span><strong>{formatDate(selectedProfile.createdAt, true)}</strong></div>
+                  <div><span>Last login</span><strong>{formatDate(selectedProfile.lastLoginAt, true)}</strong></div>
+                  <div><span>Last active</span><strong>{formatDate(selectedUser.lastActiveAt, true)}</strong></div>
+                  <div><span>Active devices</span><strong>{selectedUser.activeSessionCount ?? 0}</strong></div>
+                  <div><span>Messages sent</span><strong>{selectedUser.messageCount ?? 0}</strong></div>
+                  <div><span>Calls recorded</span><strong>{selectedUser.callCount ?? 0}</strong></div>
+                </div>
+
+                <section className="admin-device-section">
+                  <h3>Active sessions</h3>
+                  {selectedUser.sessions?.length ? selectedUser.sessions.map((session) => (
+                    <div className="admin-device-row" key={session.sessionId}>
+                      <div><strong>{session.deviceName || "Device"}</strong><small>{session.browser || "Browser session"}</small></div>
+                      <span>{formatDate(session.lastActiveAt, true)}</span>
+                    </div>
+                  )) : <div className="admin-empty compact">No active sessions.</div>}
+                </section>
+
+                <div className="admin-account-actions">
+                  <button type="button" onClick={revokeSessions} disabled={actionBusy}>Sign out all devices</button>
+                  {selectedProfile.accountStatus === "suspended" ? (
+                    <button type="button" className="success" onClick={() => updateStatus("active")} disabled={actionBusy}>Reactivate account</button>
+                  ) : (
+                    <button type="button" className="danger" onClick={() => updateStatus("suspended")} disabled={actionBusy || selectedProfile.role === "admin"}>Suspend account</button>
+                  )}
+                </div>
+                {selectedProfile.role === "admin" ? <p className="admin-protection-note">Admin accounts cannot be suspended from this screen.</p> : null}
+              </>
+            ) : (
+              <div className="admin-detail-placeholder">
+                <strong>Select a user</strong>
+                <span>Account details and controls will appear here.</span>
+              </div>
+            )}
+          </aside>
+        </section>
+      </div>
+    </div>
+  );
+}

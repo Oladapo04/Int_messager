@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import DeviceSessions from "./components/DeviceSessions";
+import AdminDashboard from "./components/admin/AdminDashboard";
 import { apiFetch as authFetch, AUTH_TOKEN_KEY } from "./services/api";
 import { buildRtcConfig, safeSetRemoteDescription, safeRestartIce, replaceOutgoingVideoTrack } from "./call/webrtcUtils";
 import io from "socket.io-client";
@@ -17,6 +18,8 @@ import "./styles/responsive-chat-details-v4814.css";
 import "./styles/fullscreen-chat-info-v4815.css";
 import "./styles/desktop-chat-info-pane-v4816.css";
 import "./styles/mobile-hamburger-remove-v4817.css";
+import "./styles/black-call-icon-v4818.css";
+import "./styles/admin-dashboard-v490.css";
 import AuthScreen from "./components/auth/AuthScreen";
 import NavigationRail from "./components/layout/NavigationRail";
 import MessageActions, { DesktopMessageContextMenu, MobileMessageActionSheet } from "./components/chat/MessageActions";
@@ -3277,6 +3280,7 @@ export default function App() {
   const [roomContextMenu, setRoomContextMenu] = useState(null);
   const [chatOrgPrefs, setChatOrgPrefs] = useState({ pinnedRooms: [], archivedRooms: [], mutedRooms: [], manuallyUnreadRooms: [], keepArchivedOnNewMessage: true });
   const [showArchivedChats, setShowArchivedChats] = useState(false);
+  const [showAdminDashboard, setShowAdminDashboard] = useState(false);
 
   const [isRecording, setIsRecording] = useState(false);
   const [recordingError, setRecordingError] = useState("");
@@ -3880,7 +3884,7 @@ export default function App() {
   }
 
   function getCallHistoryTypeLabel(call) {
-    return (call.callType || call.type) === "video" ? "📹 Video call" : "📞 Audio call";
+    return (call.callType || call.type) === "video" ? "📹 Video call" : "📞︎ Audio call";
   }
 
   async function startCallFromHistory(call) {
@@ -6685,6 +6689,16 @@ export default function App() {
                 <div className="wa-settings-note">This profile is synced and can be recovered by signing in on another device.</div>
                 <button className="wa-settings-btn v4-logout-btn" type="button" onClick={handleLogout}>Sign out on this device</button>
               </div>
+              {profile?.role === "admin" ? (
+                <>
+                  <div className="wa-section-label">Administration</div>
+                  <div className="wa-settings-card">
+                    <div className="wa-settings-title">Admin Dashboard</div>
+                    <div className="wa-settings-note">View registered users, account activity and active sessions. Suspend access or sign a user out across devices.</div>
+                    <button className="wa-settings-btn admin-launch-btn" type="button" onClick={() => setShowAdminDashboard(true)}>Open Admin Dashboard</button>
+                  </div>
+                </>
+              ) : null}
               <div className="wa-section-label">Security</div>
               <DeviceSessions />
               <div className="wa-section-label">Chat view</div>
@@ -6768,6 +6782,7 @@ export default function App() {
         />
 
         <section className="wa-main">
+          <AdminDashboard open={showAdminDashboard} onClose={() => setShowAdminDashboard(false)} />
           <header className="wa-header">
             <div className="wa-header-left">
               <button
@@ -6840,7 +6855,7 @@ export default function App() {
                 onClick={inCall ? () => joinCall() : startCall}
                 title={inCall ? "Open call" : activeRoomHasCall ? "Join call" : "Start audio call"}
               >
-                {activeRoomHasCall && !inCall ? "Join" : <span className="wa-call-icon">☎</span>}
+                {activeRoomHasCall && !inCall ? "Join" : <span className="wa-call-icon wa-voice-call-icon" aria-hidden="true">📞︎</span>}
               </button>
 
               <button
@@ -7204,7 +7219,7 @@ export default function App() {
               </section>
 
               <section className="wa-details-actions">
-                <button type="button" onClick={startCall}>☎ Audio call</button>
+                <button type="button" onClick={startCall}><span className="wa-voice-call-icon" aria-hidden="true">📞︎</span> Audio call</button>
                 <button type="button" onClick={startVideoCall}>📹 Video call</button>
                 <button type="button" onClick={() => setShowMessageSearch(true)}>🔍 Search</button>
                 <button type="button" onClick={() => exportChat("txt")}>⬇ Export TXT</button>
@@ -7616,7 +7631,7 @@ export default function App() {
 
             {!hasVisibleVideo ? (
               <div className="wa-audio-call-fill" aria-hidden="true">
-                <div className="wa-audio-call-pulse">☎</div>
+                <div className="wa-audio-call-pulse"><span className="wa-voice-call-icon" aria-hidden="true">📞︎</span></div>
               </div>
             ) : null}
 

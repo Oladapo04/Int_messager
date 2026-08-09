@@ -1,0 +1,43 @@
+/* Int-Messager v4.8.18 — monochrome voice-call handset */
+
+/*
+ * U+1F4DE followed by VS15 (FE0E) requests text presentation instead of
+ * the coloured emoji presentation. Segoe UI Symbol is preferred on Windows
+ * so the handset remains a clean monochrome icon.
+ */
+.wa-app .wa-voice-call-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #111 !important;
+  font-family: "Segoe UI Symbol", "Noto Sans Symbols 2", "Noto Sans Symbols", Arial, sans-serif !important;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 1;
+  text-shadow: none !important;
+  filter: none !important;
+}
+
+.wa-app .wa-header-right .wa-voice-call-icon {
+  width: 22px;
+  height: 22px;
+  font-size: 20px;
+}
+
+.wa-app .wa-details-actions .wa-voice-call-icon {
+  margin-right: 5px;
+  font-size: 18px;
+  vertical-align: -1px;
+}
+
+.wa-app .wa-audio-call-pulse .wa-voice-call-icon {
+  color: currentColor !important;
+  font-size: inherit;
+}
+
+@media (prefers-color-scheme: dark) {
+  .wa-app[data-theme="dark"] .wa-voice-call-icon,
+  .wa-app.theme-dark .wa-voice-call-icon {
+    color: #f5f5f5 !important;
+  }
+}
