@@ -167,14 +167,16 @@ async function notifyIncomingCall(socket, roomSlug, profileId, name, ioInstance,
     callType: callType === "video" ? "video" : "audio",
   };
 
-  // Only General is a public/group room. Every other room is treated as private.
-  if (roomSlug === "general") {
+  const room = await Room.findOne({ slug: roomSlug }).lean();
+  if (!room) return;
+
+  // Public General remains broadcast. Private/direct and managed groups only notify members.
+  if (!room.isDirect && !room.isGroup) {
     socket.broadcast.emit("call:incoming", payload);
     return;
   }
 
-  const room = await Room.findOne({ slug: roomSlug }).lean();
-  const participants = Array.isArray(room?.participants) ? room.participants : [];
+  const participants = Array.isArray(room.participants) ? room.participants : [];
   participants.forEach((participantId) => {
     const participantKey = String(participantId);
     if (participantKey === String(profileId || "")) return;
@@ -300,10 +302,14 @@ const roomSchema = new mongoose.Schema(
     slug: { type: String, required: true, unique: true, trim: true },
     isDirect: { type: Boolean, default: false },
     isSaved: { type: Boolean, default: false, index: true },
+    isGroup: { type: Boolean, default: false, index: true },
+    groupAvatarUrl: { type: String, default: "" },
     ownerProfileId: { type: mongoose.Schema.Types.ObjectId, ref: "Profile", default: null, index: true },
+    groupAdmins: [{ type: mongoose.Schema.Types.ObjectId, ref: "Profile" }],
     participants: [{ type: mongoose.Schema.Types.ObjectId, ref: "Profile" }],
     lastMessageText: { type: String, default: "" },
     lastMessageAt: { type: Date, default: null },
+    disappearingSeconds: { type: Number, enum: [0, 86400, 604800, 7776000], default: 0 },
   },
   { timestamps: true }
 );
@@ -361,6 +367,7 @@ const messageSchema = new mongoose.Schema(
     isEdited: { type: Boolean, default: false },
     editedAt: { type: Date, default: null },
     hiddenFor: [{ type: mongoose.Schema.Types.ObjectId, ref: "Profile" }],
+    expiresAt: { type: Date, default: null, index: true },
 
     status: {
       type: String,
@@ -392,6 +399,7 @@ const profileSchema = new mongoose.Schema(
     suspendedAt: { type: Date, default: null },
     suspendedReason: { type: String, default: "", trim: true },
     lastLoginAt: { type: Date, default: null },
+    lastSeenAt: { type: Date, default: null, index: true },
     passwordResetTokenHash: { type: String, default: "", select: false },
     passwordResetExpiresAt: { type: Date, default: null, select: false },
     passwordResetRequestedAt: { type: Date, default: null },
@@ -407,6 +415,13 @@ const profileSchema = new mongoose.Schema(
     mutedRooms: { type: [String], default: [] },
     manuallyUnreadRooms: { type: [String], default: [] },
     keepArchivedOnNewMessage: { type: Boolean, default: true },
+    savedContacts: [{ type: mongoose.Schema.Types.ObjectId, ref: "Profile" }],
+    favoriteContacts: [{ type: mongoose.Schema.Types.ObjectId, ref: "Profile" }],
+    blockedProfiles: [{ type: mongoose.Schema.Types.ObjectId, ref: "Profile" }],
+    lastSeenPrivacy: { type: String, enum: ["everyone", "contacts", "nobody"], default: "everyone" },
+    onlinePrivacy: { type: String, enum: ["everyone", "same_as_last_seen", "nobody"], default: "everyone" },
+    profilePhotoPrivacy: { type: String, enum: ["everyone", "contacts", "nobody"], default: "everyone" },
+    readReceipts: { type: Boolean, default: true },
     pushSubscriptions: {
       type: [Object],
       default: [],
@@ -431,6 +446,20 @@ const sessionSchema = new mongoose.Schema({
   revokedAt: { type: Date, default: null },
 }, { timestamps: true });
 const AuthSession = mongoose.model("AuthSession", sessionSchema);
+
+const adminAuditSchema = new mongoose.Schema({
+  actorProfileId: { type: mongoose.Schema.Types.ObjectId, ref: "Profile", required: true, index: true },
+  actorName: { type: String, default: "Administrator" },
+  actorEmail: { type: String, default: "" },
+  action: { type: String, required: true, index: true },
+  targetProfileId: { type: mongoose.Schema.Types.ObjectId, ref: "Profile", default: null, index: true },
+  targetName: { type: String, default: "" },
+  targetEmail: { type: String, default: "" },
+  details: { type: Object, default: {} },
+  ipAddress: { type: String, default: "" },
+}, { timestamps: true });
+adminAuditSchema.index({ createdAt: -1 });
+const AdminAudit = mongoose.model("AdminAudit", adminAuditSchema);
 
 
 const callLogSchema = new mongoose.Schema(
@@ -532,6 +561,11 @@ async function finishCallLog(roomSlug, statusOverride) {
     log.durationSeconds = Math.max(0, Math.round((endedAt.getTime() - new Date(durationStart).getTime()) / 1000));
   }
   await log.save();
+  if (log.status === "missed") {
+    notifyMissedCallPush(log.toObject ? log.toObject() : log).catch((error) =>
+      console.warn("missed call push failed:", error?.message || error)
+    );
+  }
 }
 
 /* =========================
@@ -716,16 +750,43 @@ function authResponse(profile, sessionId = "") {
       archivedRooms: profile.archivedRooms || [],
       mutedRooms: profile.mutedRooms || [],
       manuallyUnreadRooms: profile.manuallyUnreadRooms || [],
+      savedContacts: profile.savedContacts || [],
+      favoriteContacts: profile.favoriteContacts || [],
+      blockedProfiles: profile.blockedProfiles || [],
       nameLocked: profile.nameLocked,
       activeChat: profile.activeChat,
       role: profile.role || (isConfiguredAdminEmail(profile.email) ? "admin" : "user"),
       accountStatus: profile.accountStatus || "active",
+      lastSeenAt: profile.lastSeenAt || null,
+      online: Boolean(profileSockets[String(profile._id)]?.size),
     },
   };
 }
 
 function idsEqual(a, b) {
   return String(a) === String(b);
+}
+
+function profileHasBlocked(profile, targetProfileId) {
+  return Boolean(profile && (profile.blockedProfiles || []).some((id) => idsEqual(id, targetProfileId)));
+}
+
+async function directBlockState(profileIdA, profileIdB) {
+  if (!profileIdA || !profileIdB) return { blocked: false, blockedByMe: false, blockedMe: false };
+  const [a, b] = await Promise.all([
+    Profile.findById(profileIdA).select("blockedProfiles").lean(),
+    Profile.findById(profileIdB).select("blockedProfiles").lean(),
+  ]);
+  const blockedByMe = profileHasBlocked(a, profileIdB);
+  const blockedMe = profileHasBlocked(b, profileIdA);
+  return { blocked: blockedByMe || blockedMe, blockedByMe, blockedMe };
+}
+
+async function directRoomBlockState(room, currentProfileId) {
+  if (!room?.isDirect || room.isSaved) return { blocked: false, blockedByMe: false, blockedMe: false, otherProfileId: null };
+  const otherProfileId = (room.participants || []).find((id) => !idsEqual(id, currentProfileId));
+  if (!otherProfileId) return { blocked: false, blockedByMe: false, blockedMe: false, otherProfileId: null };
+  return { ...(await directBlockState(currentProfileId, otherProfileId)), otherProfileId };
 }
 
 function normalizeDirectSlug(profileIdA, profileIdB) {
@@ -776,20 +837,77 @@ async function ensurePublicRoom(roomSlug) {
 
 function profileCanAccessRoom(profile, room) {
   if (!profile || !room) return false;
-  if (!room.isDirect) return true;
-  return (room.participants || []).some((participantId) =>
-    idsEqual(participantId, profile._id)
-  );
+  if (room.isSaved) return idsEqual(room.ownerProfileId, profile._id);
+  if (room.isDirect || room.isGroup) {
+    return (room.participants || []).some((participantId) =>
+      idsEqual(participantId, profile._id)
+    );
+  }
+  // Legacy/public rooms (including General) remain visible to signed-in users.
+  return true;
 }
 
-function publicProfileShape(profile) {
+function roomAccessQuery(profileId) {
+  return {
+    $or: [
+      { isDirect: false, isGroup: { $ne: true }, isSaved: { $ne: true } },
+      { isDirect: true, participants: profileId },
+      { isGroup: true, participants: profileId },
+      { isSaved: true, ownerProfileId: profileId },
+    ],
+  };
+}
+
+function isGroupAdmin(room, profileId) {
+  if (!room?.isGroup || !profileId) return false;
+  return idsEqual(room.ownerProfileId, profileId) ||
+    (room.groupAdmins || []).some((id) => idsEqual(id, profileId));
+}
+
+function privacyAllowsViewer(profile, viewerProfileId, setting = "everyone") {
+  if (!profile) return false;
+  if (viewerProfileId && idsEqual(profile._id, viewerProfileId)) return true;
+  if (setting === "everyone") return true;
+  if (setting === "nobody") return false;
+  if (setting === "contacts") {
+    return (profile.savedContacts || []).some((id) => idsEqual(id, viewerProfileId));
+  }
+  return true;
+}
+
+function publicProfileShape(profile, viewerProfileId = null) {
+  const lastSeenAllowed = privacyAllowsViewer(
+    profile,
+    viewerProfileId,
+    profile.lastSeenPrivacy || "everyone"
+  );
+  const onlineRule = profile.onlinePrivacy || "everyone";
+  const onlineAllowed = onlineRule === "same_as_last_seen"
+    ? lastSeenAllowed
+    : privacyAllowsViewer(profile, viewerProfileId, onlineRule);
+  const photoAllowed = privacyAllowsViewer(
+    profile,
+    viewerProfileId,
+    profile.profilePhotoPrivacy || "everyone"
+  );
+
   return {
     _id: profile._id,
     displayName: profile.displayName,
     profileStatus: profile.profileStatus || "Available now",
-    avatarUrl: profile.avatarUrl || "",
+    avatarUrl: photoAllowed ? (profile.avatarUrl || "") : "",
     activeChat: profile.activeChat,
+    online: onlineAllowed ? Boolean(profileSockets[String(profile._id)]?.size) : false,
+    lastSeenAt: lastSeenAllowed ? (profile.lastSeenAt || null) : null,
+    presenceHidden: !onlineAllowed && !lastSeenAllowed,
   };
+}
+
+async function emitPresenceUpdate(profileId, ioInstance = io) {
+  if (!profileId) return;
+  // Presence values are viewer-specific because of privacy settings.
+  // Emit only an invalidation signal; clients reload /api/profiles, which applies privacy per viewer.
+  ioInstance.emit("presence_updated", { profileId: String(profileId) });
 }
 
 function roomResponseShape(room, currentProfileId) {
@@ -803,16 +921,40 @@ function roomResponseShape(room, currentProfileId) {
     slug: room.slug,
     isDirect: room.isDirect,
     isSaved: Boolean(room.isSaved),
+    isGroup: Boolean(room.isGroup),
+    groupAvatarUrl: room.groupAvatarUrl || "",
     ownerProfileId: room.ownerProfileId || null,
+    groupAdmins: room.groupAdmins || [],
     participants: room.participants || [],
     lastMessageText: room.lastMessageText || "",
     lastMessageAt: room.lastMessageAt,
+    disappearingSeconds: Number(room.disappearingSeconds || 0),
     activeCall: getCallParticipants(room.slug).length > 0,
     activeCallParticipants: getCallParticipants(room.slug),
     createdAt: room.createdAt,
     updatedAt: room.updatedAt,
     isParticipant,
   };
+}
+
+function disappearingExpiryForRoom(room, baseDate = new Date()) {
+  const seconds = Number(room?.disappearingSeconds || 0);
+  if (!seconds) return null;
+  return new Date(new Date(baseDate).getTime() + seconds * 1000);
+}
+
+async function purgeExpiredMessages(ioInstance = io) {
+  const now = new Date();
+  const expiredRows = await Message.find({ expiresAt: { $ne: null, $lte: now } })
+    .select("roomSlug")
+    .lean();
+  if (!expiredRows.length) return;
+
+  const roomSlugs = [...new Set(expiredRows.map((row) => row.roomSlug).filter(Boolean))];
+  await Message.deleteMany({ expiresAt: { $ne: null, $lte: now } });
+  await Promise.all(roomSlugs.map((roomSlug) => refreshRoomLastMessage(roomSlug)));
+  ioInstance.emit("messages_expired", { roomSlugs });
+  ioInstance.emit("rooms_updated");
 }
 
 function isEncryptedMessageContent(content) { return false; }
@@ -903,12 +1045,7 @@ async function updateMessageStatuses(roomSlug, currentProfileId, nextStatus) {
 async function getUnreadCountsForProfileId(profileId) {
   if (!profileId) return {};
 
-  const rooms = await Room.find({
-    $or: [
-      { isDirect: false },
-      { isDirect: true, participants: profileId },
-    ],
-  }).lean();
+  const rooms = await Room.find(roomAccessQuery(profileId)).lean();
 
   const counts = {};
 
@@ -944,7 +1081,7 @@ async function emitUnreadCountsForRoom(roomSlug, ioInstance) {
 
   const room = await Room.findOne({ slug: roomSlug }).lean();
 
-  if (room?.isDirect && Array.isArray(room.participants)) {
+  if ((room?.isDirect || room?.isGroup) && Array.isArray(room.participants)) {
     await Promise.all(
       room.participants.map((profileId) =>
         emitUnreadCountsForProfile(profileId, ioInstance)
@@ -1015,23 +1152,47 @@ async function notifyMessagePush(roomSlug, message, senderProfileId) {
   const room = await Room.findOne({ slug: roomSlug }).lean();
   if (!room) return;
 
-  const recipientIds = room.isDirect
-    ? (room.participants || []).filter((id) => String(id) !== String(senderProfileId || ""))
-    : Object.keys(profileSockets).filter((id) => String(id) !== String(senderProfileId || ""));
+  // Direct chats notify the other participant. Group/public rooms notify all
+  // registered accounts, including users who are currently offline, so push
+  // notifications remain useful when the app is closed.
+  const participantOnly = room.isDirect || room.isGroup;
+  const recipientProfiles = participantOnly
+    ? await Profile.find({
+        _id: { $in: (room.participants || []).filter((id) => String(id) !== String(senderProfileId || "")) },
+        accountStatus: { $ne: "suspended" },
+      }).select("_id mutedRooms").lean()
+    : await Profile.find({
+        _id: { $ne: senderProfileId },
+        accountStatus: { $ne: "suspended" },
+        $or: [{ email: { $exists: true, $ne: "" } }, { phone: { $exists: true, $ne: "" } }],
+      }).select("_id mutedRooms").lean();
 
-  const body =
+  const recipients = recipientProfiles.filter(
+    (profile) => !(profile.mutedRooms || []).includes(roomSlug)
+  );
+
+  const senderName = message.sender || "Someone";
+  const senderProfile = senderProfileId
+    ? await Profile.findById(senderProfileId).select("avatarUrl displayName").lean()
+    : null;
+  const preview =
     message.type === "audio"
-      ? `${message.sender || "Someone"}: Voice note`
+      ? "Voice note"
       : message.type === "file"
-        ? `${message.sender || "Someone"}: ${message.fileName || "Attachment"}`
-        : `${message.sender || "Someone"}: ${message.content || "New message"}`;
+        ? message.fileName || "Attachment"
+        : String(message.content || "New message").slice(0, 180);
+
+  const title = room.isDirect ? senderName : (room.name || "New message");
+  const body = room.isDirect ? preview : `${senderName}: ${preview}`;
 
   await Promise.all(
-    recipientIds.map((profileId) =>
-      sendPushToProfile(profileId, {
+    recipients.map((profile) =>
+      sendPushToProfile(profile._id, {
         type: "message",
-        title: room.name || "New message",
+        title,
         body,
+        senderName,
+        senderAvatarUrl: senderProfile?.avatarUrl || "",
         roomSlug,
         url: `/?room=${encodeURIComponent(roomSlug)}`,
         tag: `message-${roomSlug}`,
@@ -1044,7 +1205,7 @@ async function notifyCallPush(roomSlug, callerProfileId, callerName, callType = 
   const room = await Room.findOne({ slug: roomSlug }).lean();
   if (!room) return;
 
-  const recipientIds = room.isDirect
+  const recipientIds = (room.isDirect || room.isGroup)
     ? (room.participants || []).filter((id) => String(id) !== String(callerProfileId || ""))
     : Object.keys(profileSockets).filter((id) => String(id) !== String(callerProfileId || ""));
 
@@ -1057,6 +1218,26 @@ async function notifyCallPush(roomSlug, callerProfileId, callerName, callType = 
         roomSlug,
         url: `/?room=${encodeURIComponent(roomSlug)}&call=1`,
         tag: `call-${roomSlug}`,
+      })
+    )
+  );
+}
+
+async function notifyMissedCallPush(log) {
+  if (!log || log.status !== "missed") return;
+  const missedIds = Array.isArray(log.missedProfileIds) ? log.missedProfileIds : [];
+  if (!missedIds.length) return;
+  const roomSlug = log.roomSlug || "";
+  const callerName = log.callerName || "Someone";
+  await Promise.all(
+    missedIds.map((profileId) =>
+      sendPushToProfile(profileId, {
+        type: "missed-call",
+        title: `Missed ${log.callType === "video" ? "video" : "audio"} call`,
+        body: callerName,
+        roomSlug,
+        url: roomSlug ? `/?room=${encodeURIComponent(roomSlug)}` : "/",
+        tag: `missed-call-${roomSlug || String(log._id || "")}`,
       })
     )
   );
@@ -1134,6 +1315,26 @@ async function requireAdmin(req, res, next) {
   } catch (error) {
     console.error("admin authorization error:", error);
     return res.status(500).json({ success: false, error: "Failed to verify admin access" });
+  }
+}
+
+async function recordAdminAudit(req, { action, target = null, details = {} } = {}) {
+  try {
+    const actor = req?.adminProfile;
+    if (!actor || !action) return;
+    await AdminAudit.create({
+      actorProfileId: actor._id,
+      actorName: actor.displayName || "Administrator",
+      actorEmail: actor.email || "",
+      action: String(action).slice(0, 80),
+      targetProfileId: target?._id || null,
+      targetName: target?.displayName || "",
+      targetEmail: target?.email || "",
+      details: details && typeof details === "object" ? details : {},
+      ipAddress: String(req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "").split(",")[0].trim().slice(0, 120),
+    });
+  } catch (error) {
+    console.warn("admin audit write failed:", error?.message || error);
   }
 }
 
@@ -1391,6 +1592,8 @@ app.get("/api/admin/access", async (req, res) => {
         role: configured ? "admin" : (profile.role || "user"),
         email: profile.email || "",
         accountStatus: profile.accountStatus || "active",
+      lastSeenAt: profile.lastSeenAt || null,
+      online: Boolean(profileSockets[String(profile._id)]?.size),
         configured,
         configuredAdminCount: adminEmails.size,
         serverConfigured: adminEmails.size > 0,
@@ -1418,13 +1621,25 @@ app.get("/api/admin/dashboard", requireAdmin, async (req, res) => {
       .filter(([, sockets]) => sockets?.size)
       .map(([profileId]) => profileId);
 
-    const [totalUsers, activeTodayByLogin, activeTodayBySession, newThisWeek, suspendedUsers, totalMessages] = await Promise.all([
+    const [totalUsers, activeTodayByLogin, activeTodayBySession, newThisWeek, suspendedUsers, totalMessages, recentSessions, registrationRows, auditCount] = await Promise.all([
       Profile.countDocuments(registeredQuery),
       Profile.countDocuments({ $and: [registeredQuery, { lastLoginAt: { $gte: startOfToday } }] }),
       AuthSession.distinct("profileId", { lastActiveAt: { $gte: startOfToday }, revokedAt: null }),
       Profile.countDocuments({ $and: [registeredQuery, { createdAt: { $gte: sevenDaysAgo } }] }),
       Profile.countDocuments({ $and: [registeredQuery, { accountStatus: "suspended" }] }),
       Message.countDocuments({}),
+      AuthSession.find({ lastActiveAt: { $gte: sevenDaysAgo } })
+        .select("profileId deviceName browser lastActiveAt createdAt revokedAt")
+        .sort({ lastActiveAt: -1 })
+        .limit(12)
+        .populate("profileId", "displayName email")
+        .lean(),
+      Profile.aggregate([
+        { $match: { $and: [registeredQuery, { createdAt: { $gte: sevenDaysAgo } }] } },
+        { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }, count: { $sum: 1 } } },
+        { $sort: { _id: 1 } },
+      ]),
+      AdminAudit.countDocuments({ createdAt: { $gte: sevenDaysAgo } }),
     ]);
 
     const onlineRegistered = onlineProfileIds.length
@@ -1432,6 +1647,14 @@ app.get("/api/admin/dashboard", requireAdmin, async (req, res) => {
       : 0;
     const activeTodayIds = new Set((activeTodayBySession || []).map((id) => String(id)));
     const activeToday = Math.max(activeTodayByLogin, activeTodayIds.size);
+
+    const registrationMap = new Map((registrationRows || []).map((row) => [row._id, row.count]));
+    const registrationTrend = Array.from({ length: 7 }, (_, offset) => {
+      const date = new Date(startOfToday);
+      date.setDate(date.getDate() - (6 - offset));
+      const key = date.toISOString().slice(0, 10);
+      return { date: key, count: registrationMap.get(key) || 0 };
+    });
 
     return res.json({
       success: true,
@@ -1442,12 +1665,55 @@ app.get("/api/admin/dashboard", requireAdmin, async (req, res) => {
         newThisWeek,
         suspendedUsers,
         totalMessages,
+        auditActionsThisWeek: auditCount,
+        registrationTrend,
+        recentSessions: (recentSessions || []).map((session) => ({
+          sessionId: session.sessionId,
+          profileId: session.profileId?._id || session.profileId || null,
+          displayName: session.profileId?.displayName || "User",
+          email: session.profileId?.email || "",
+          deviceName: session.deviceName || "Device",
+          browser: session.browser || "",
+          lastActiveAt: session.lastActiveAt,
+          createdAt: session.createdAt,
+          revoked: Boolean(session.revokedAt),
+        })),
         generatedAt: now,
       },
     });
   } catch (error) {
     console.error("admin dashboard error:", error);
     return res.status(500).json({ success: false, error: "Failed to load admin dashboard" });
+  }
+});
+
+app.get("/api/admin/audit", requireAdmin, async (req, res) => {
+  try {
+    const limit = Math.max(1, Math.min(200, Number(req.query.limit || 100)));
+    const action = String(req.query.action || "").trim();
+    const filter = action ? { action } : {};
+    const entries = await AdminAudit.find(filter).sort({ createdAt: -1 }).limit(limit).lean();
+    return res.json({
+      success: true,
+      data: {
+        entries: entries.map((entry) => ({
+          _id: entry._id,
+          actorProfileId: entry.actorProfileId,
+          actorName: entry.actorName || "Administrator",
+          actorEmail: entry.actorEmail || "",
+          action: entry.action,
+          targetProfileId: entry.targetProfileId,
+          targetName: entry.targetName || "",
+          targetEmail: entry.targetEmail || "",
+          details: entry.details || {},
+          ipAddress: entry.ipAddress || "",
+          createdAt: entry.createdAt,
+        })),
+      },
+    });
+  } catch (error) {
+    console.error("admin audit error:", error);
+    return res.status(500).json({ success: false, error: "Failed to load admin audit trail" });
   }
 });
 
@@ -1568,6 +1834,7 @@ app.patch("/api/admin/users/:profileId/status", requireAdmin, async (req, res) =
       return res.status(403).json({ success: false, error: "Admin accounts cannot be suspended from this dashboard" });
     }
 
+    const previousStatus = target.accountStatus || "active";
     target.accountStatus = status;
     target.suspendedAt = status === "suspended" ? new Date() : null;
     target.suspendedReason = status === "suspended" ? String(req.body?.reason || "Suspended by administrator").slice(0, 200) : "";
@@ -1584,6 +1851,17 @@ app.patch("/api/admin/users/:profileId/status", requireAdmin, async (req, res) =
         });
       }
     }
+
+    await recordAdminAudit(req, {
+      action: status === "suspended" ? "account.suspended" : "account.reactivated",
+      target,
+      details: {
+        previousStatus,
+        nextStatus: status,
+        reason: target.suspendedReason || "",
+        sessionsRevoked: status === "suspended",
+      },
+    });
 
     io.emit("profiles_updated");
     return res.json({ success: true, data: adminUserShape(target, target.lastLoginAt) });
@@ -1631,6 +1909,12 @@ app.post("/api/admin/users/:profileId/send-password-reset", requireAdmin, async 
       payload.data.developmentResetUrl = resetUrl;
     }
 
+    await recordAdminAudit(req, {
+      action: "password_reset.requested",
+      target,
+      details: { delivered: Boolean(delivery?.delivered), expiresInMinutes: PASSWORD_RESET_EXPIRES_MINUTES },
+    });
+
     return res.json(payload);
   } catch (error) {
     console.error("admin password reset error:", error);
@@ -1660,6 +1944,12 @@ app.post("/api/admin/users/:profileId/revoke-sessions", requireAdmin, async (req
         io.sockets.sockets.get(socketId)?.disconnect(true);
       });
     }
+
+    await recordAdminAudit(req, {
+      action: "sessions.revoked",
+      target,
+      details: { revokedCount: result.modifiedCount || 0 },
+    });
 
     return res.json({ success: true, data: { revokedCount: result.modifiedCount || 0 } });
   } catch (error) {
@@ -1709,6 +1999,8 @@ app.post("/api/session/init", async (req, res) => {
         activeChat: profile.activeChat,
         role: profile.role || (isConfiguredAdminEmail(profile.email) ? "admin" : "user"),
         accountStatus: profile.accountStatus || "active",
+      lastSeenAt: profile.lastSeenAt || null,
+      online: Boolean(profileSockets[String(profile._id)]?.size),
       },
     });
   } catch (error) {
@@ -1791,6 +2083,8 @@ app.post("/api/session/set-name", async (req, res) => {
         activeChat: profile.activeChat,
         role: profile.role || (isConfiguredAdminEmail(profile.email) ? "admin" : "user"),
         accountStatus: profile.accountStatus || "active",
+      lastSeenAt: profile.lastSeenAt || null,
+      online: Boolean(profileSockets[String(profile._id)]?.size),
       },
     });
   } catch (error) {
@@ -1897,6 +2191,8 @@ app.post("/api/profile", (req, res) => {
           activeChat: profile.activeChat,
           role: profile.role || (isConfiguredAdminEmail(profile.email) ? "admin" : "user"),
           accountStatus: profile.accountStatus || "active",
+      lastSeenAt: profile.lastSeenAt || null,
+      online: Boolean(profileSockets[String(profile._id)]?.size),
         },
       });
     } catch (error) {
@@ -2103,6 +2399,64 @@ app.get("/api/unread-counts", async (req, res) => {
   }
 });
 
+app.get("/api/privacy", async (req, res) => {
+  try {
+    const profile = await getAuthenticatedProfile(req);
+    if (!profile) return res.status(401).json({ success: false, error: "Sign in required" });
+    return res.json({
+      success: true,
+      data: {
+        lastSeenPrivacy: profile.lastSeenPrivacy || "everyone",
+        onlinePrivacy: profile.onlinePrivacy || "everyone",
+        profilePhotoPrivacy: profile.profilePhotoPrivacy || "everyone",
+        readReceipts: profile.readReceipts !== false,
+      },
+    });
+  } catch (error) {
+    console.error("privacy get error:", error);
+    return res.status(500).json({ success: false, error: "Failed to load privacy settings" });
+  }
+});
+
+app.patch("/api/privacy", async (req, res) => {
+  try {
+    const profile = await getAuthenticatedProfile(req);
+    if (!profile) return res.status(401).json({ success: false, error: "Sign in required" });
+
+    const allowedVisibility = new Set(["everyone", "contacts", "nobody"]);
+    const allowedOnline = new Set(["everyone", "same_as_last_seen", "nobody"]);
+    const lastSeenPrivacy = String(req.body?.lastSeenPrivacy || profile.lastSeenPrivacy || "everyone");
+    const onlinePrivacy = String(req.body?.onlinePrivacy || profile.onlinePrivacy || "everyone");
+    const profilePhotoPrivacy = String(req.body?.profilePhotoPrivacy || profile.profilePhotoPrivacy || "everyone");
+
+    if (!allowedVisibility.has(lastSeenPrivacy) || !allowedVisibility.has(profilePhotoPrivacy) || !allowedOnline.has(onlinePrivacy)) {
+      return res.status(400).json({ success: false, error: "Invalid privacy setting" });
+    }
+
+    profile.lastSeenPrivacy = lastSeenPrivacy;
+    profile.onlinePrivacy = onlinePrivacy;
+    profile.profilePhotoPrivacy = profilePhotoPrivacy;
+    if (typeof req.body?.readReceipts === "boolean") profile.readReceipts = req.body.readReceipts;
+    await profile.save();
+
+    io.emit("profiles_updated");
+    await emitPresenceUpdate(profile._id, io);
+
+    return res.json({
+      success: true,
+      data: {
+        lastSeenPrivacy: profile.lastSeenPrivacy,
+        onlinePrivacy: profile.onlinePrivacy,
+        profilePhotoPrivacy: profile.profilePhotoPrivacy,
+        readReceipts: profile.readReceipts !== false,
+      },
+    });
+  } catch (error) {
+    console.error("privacy update error:", error);
+    return res.status(500).json({ success: false, error: "Failed to update privacy settings" });
+  }
+});
+
 app.get("/api/profiles", async (req, res) => {
   try {
     const installId = getInstallId(req);
@@ -2125,7 +2479,7 @@ app.get("/api/profiles", async (req, res) => {
       .sort({ displayName: 1 })
       .lean();
 
-    return res.json(profiles.map(publicProfileShape));
+    return res.json(profiles.map((item) => publicProfileShape(item, currentProfile._id)));
   } catch (error) {
     console.error("profiles error:", error);
     return res.status(500).json({
@@ -2175,6 +2529,18 @@ app.post("/api/direct-room", async (req, res) => {
       });
     }
 
+    const blockState = {
+      blockedByMe: profileHasBlocked(currentProfile, targetProfile._id),
+      blockedMe: profileHasBlocked(targetProfile, currentProfile._id),
+    };
+    if (blockState.blockedByMe || blockState.blockedMe) {
+      return res.status(403).json({
+        success: false,
+        error: blockState.blockedByMe ? "Unblock this contact before starting a chat" : "This contact is not available for direct messaging",
+        code: "DIRECT_CHAT_BLOCKED",
+      });
+    }
+
     const slug = normalizeDirectSlug(currentProfile._id, targetProfile._id);
     const roomName = `${currentProfile.displayName} & ${targetProfile.displayName}`;
 
@@ -2201,6 +2567,264 @@ app.post("/api/direct-room", async (req, res) => {
       success: false,
       error: "Failed to create direct room",
     });
+  }
+});
+
+
+/* =========================
+   CONTACTS & BLOCKING
+========================= */
+
+app.get("/api/contacts", async (req, res) => {
+  try {
+    const currentProfile = (await getAuthenticatedProfile(req)) || await getProfileByInstallId(getInstallId(req));
+    if (!currentProfile) return res.status(401).json({ success: false, error: "Please sign in again" });
+
+    const profiles = await Profile.find({
+      _id: { $ne: currentProfile._id },
+      activeChat: true,
+      nameLocked: true,
+      displayName: { $ne: "" },
+    }).sort({ displayName: 1 }).lean();
+
+    const saved = new Set((currentProfile.savedContacts || []).map(String));
+    const favorites = new Set((currentProfile.favoriteContacts || []).map(String));
+    const blocked = new Set((currentProfile.blockedProfiles || []).map(String));
+
+    return res.json({
+      success: true,
+      data: profiles.map((item) => ({
+        ...publicProfileShape(item, currentProfile._id),
+        isSaved: saved.has(String(item._id)),
+        isFavorite: favorites.has(String(item._id)),
+        isBlocked: blocked.has(String(item._id)),
+      })),
+    });
+  } catch (error) {
+    console.error("contacts error:", error);
+    return res.status(500).json({ success: false, error: "Failed to load contacts" });
+  }
+});
+
+app.patch("/api/contacts/:profileId", async (req, res) => {
+  try {
+    const currentProfile = (await getAuthenticatedProfile(req)) || await getProfileByInstallId(getInstallId(req));
+    if (!currentProfile) return res.status(401).json({ success: false, error: "Please sign in again" });
+    const targetId = String(req.params.profileId || "");
+    if (!mongoose.isValidObjectId(targetId) || idsEqual(targetId, currentProfile._id)) {
+      return res.status(400).json({ success: false, error: "Invalid contact" });
+    }
+    const target = await Profile.findById(targetId).select("_id displayName").lean();
+    if (!target) return res.status(404).json({ success: false, error: "Contact not found" });
+
+    const saved = new Set((currentProfile.savedContacts || []).map(String));
+    const favorites = new Set((currentProfile.favoriteContacts || []).map(String));
+    if (typeof req.body?.saved === "boolean") {
+      if (req.body.saved) saved.add(targetId); else { saved.delete(targetId); favorites.delete(targetId); }
+    }
+    if (typeof req.body?.favorite === "boolean") {
+      if (req.body.favorite) { saved.add(targetId); favorites.add(targetId); } else favorites.delete(targetId);
+    }
+    currentProfile.savedContacts = [...saved];
+    currentProfile.favoriteContacts = [...favorites];
+    await currentProfile.save();
+    return res.json({ success: true, data: { profileId: targetId, savedContacts: currentProfile.savedContacts, favoriteContacts: currentProfile.favoriteContacts } });
+  } catch (error) {
+    console.error("contact update error:", error);
+    return res.status(500).json({ success: false, error: "Failed to update contact" });
+  }
+});
+
+app.post("/api/contacts/:profileId/block", async (req, res) => {
+  try {
+    const currentProfile = (await getAuthenticatedProfile(req)) || await getProfileByInstallId(getInstallId(req));
+    if (!currentProfile) return res.status(401).json({ success: false, error: "Please sign in again" });
+    const targetId = String(req.params.profileId || "");
+    if (!mongoose.isValidObjectId(targetId) || idsEqual(targetId, currentProfile._id)) return res.status(400).json({ success: false, error: "Invalid contact" });
+    const target = await Profile.findById(targetId).select("_id displayName").lean();
+    if (!target) return res.status(404).json({ success: false, error: "Contact not found" });
+    const blocked = new Set((currentProfile.blockedProfiles || []).map(String));
+    blocked.add(targetId);
+    currentProfile.blockedProfiles = [...blocked];
+    currentProfile.favoriteContacts = (currentProfile.favoriteContacts || []).filter((id) => !idsEqual(id, targetId));
+    await currentProfile.save();
+    return res.json({ success: true, data: { profileId: targetId, blocked: true, blockedProfiles: currentProfile.blockedProfiles, favoriteContacts: currentProfile.favoriteContacts } });
+  } catch (error) {
+    console.error("block contact error:", error);
+    return res.status(500).json({ success: false, error: "Failed to block contact" });
+  }
+});
+
+app.delete("/api/contacts/:profileId/block", async (req, res) => {
+  try {
+    const currentProfile = (await getAuthenticatedProfile(req)) || await getProfileByInstallId(getInstallId(req));
+    if (!currentProfile) return res.status(401).json({ success: false, error: "Please sign in again" });
+    const targetId = String(req.params.profileId || "");
+    currentProfile.blockedProfiles = (currentProfile.blockedProfiles || []).filter((id) => !idsEqual(id, targetId));
+    await currentProfile.save();
+    return res.json({ success: true, data: { profileId: targetId, blocked: false, blockedProfiles: currentProfile.blockedProfiles } });
+  } catch (error) {
+    console.error("unblock contact error:", error);
+    return res.status(500).json({ success: false, error: "Failed to unblock contact" });
+  }
+});
+
+
+/* =========================
+   GROUP MANAGEMENT
+========================= */
+
+app.post("/api/groups", async (req, res) => {
+  try {
+    const currentProfile = (await getAuthenticatedProfile(req)) || await getProfileByInstallId(getInstallId(req));
+    if (!currentProfile) return res.status(401).json({ success: false, error: "Please sign in again" });
+
+    const name = String(req.body?.name || "").trim().slice(0, 60);
+    const requestedIds = Array.isArray(req.body?.participantIds) ? req.body.participantIds : [];
+    if (name.length < 2) return res.status(400).json({ success: false, error: "Group name must contain at least 2 characters" });
+
+    const validMembers = await Profile.find({
+      _id: { $in: requestedIds },
+      accountStatus: { $ne: "suspended" },
+      nameLocked: true,
+    }).select("_id").lean();
+
+    const participantIds = [...new Set([String(currentProfile._id), ...validMembers.map((item) => String(item._id))])];
+    if (participantIds.length < 2) return res.status(400).json({ success: false, error: "Select at least one other person for the group" });
+    if (participantIds.length > 256) return res.status(400).json({ success: false, error: "Groups are limited to 256 members" });
+
+    const slug = `group-${Date.now()}-${crypto.randomBytes(4).toString("hex")}`;
+    const room = await Room.create({
+      name,
+      slug,
+      isDirect: false,
+      isGroup: true,
+      ownerProfileId: currentProfile._id,
+      groupAdmins: [currentProfile._id],
+      participants: participantIds,
+    });
+
+    io.emit("rooms_updated");
+    return res.status(201).json({ success: true, data: roomResponseShape(room, currentProfile._id) });
+  } catch (error) {
+    console.error("create group error:", error);
+    return res.status(500).json({ success: false, error: "Failed to create group" });
+  }
+});
+
+app.patch("/api/groups/:roomSlug", (req, res) => {
+  upload.single("avatar")(req, res, async (uploadError) => {
+    try {
+      if (uploadError) return res.status(400).json({ success: false, error: uploadError.message || "Group photo upload failed" });
+      const currentProfile = (await getAuthenticatedProfile(req)) || await getProfileByInstallId(getInstallId(req));
+      if (!currentProfile) return res.status(401).json({ success: false, error: "Please sign in again" });
+      const room = await Room.findOne({ slug: req.params.roomSlug, isGroup: true });
+      if (!room || !profileCanAccessRoom(currentProfile, room)) return res.status(404).json({ success: false, error: "Group not found" });
+      if (!isGroupAdmin(room, currentProfile._id)) return res.status(403).json({ success: false, error: "Only group admins can edit group details" });
+      if (req.file && !String(req.file.mimetype || "").startsWith("image/")) return res.status(400).json({ success: false, error: "Please choose a valid image file" });
+
+      if (typeof req.body?.name === "string") {
+        const name = req.body.name.trim().slice(0, 60);
+        if (name.length < 2) return res.status(400).json({ success: false, error: "Group name must contain at least 2 characters" });
+        room.name = name;
+      }
+      if (req.file?.path) room.groupAvatarUrl = req.file.path;
+      await room.save();
+      io.emit("rooms_updated");
+      return res.json({ success: true, data: roomResponseShape(room, currentProfile._id) });
+    } catch (error) {
+      console.error("update group error:", error);
+      return res.status(500).json({ success: false, error: "Failed to update group" });
+    }
+  });
+});
+
+app.post("/api/groups/:roomSlug/members", async (req, res) => {
+  try {
+    const currentProfile = (await getAuthenticatedProfile(req)) || await getProfileByInstallId(getInstallId(req));
+    const room = await Room.findOne({ slug: req.params.roomSlug, isGroup: true });
+    if (!currentProfile || !room) return res.status(404).json({ success: false, error: "Group not found" });
+    if (!isGroupAdmin(room, currentProfile._id)) return res.status(403).json({ success: false, error: "Only group admins can add members" });
+    const profileId = String(req.body?.profileId || "");
+    const target = await Profile.findById(profileId).select("_id accountStatus nameLocked").lean();
+    if (!target || target.accountStatus === "suspended" || !target.nameLocked) return res.status(404).json({ success: false, error: "User is not available" });
+    if (!(room.participants || []).some((id) => idsEqual(id, target._id))) room.participants.push(target._id);
+    await room.save();
+    io.emit("rooms_updated");
+    return res.json({ success: true, data: roomResponseShape(room, currentProfile._id) });
+  } catch (error) {
+    console.error("add group member error:", error);
+    return res.status(500).json({ success: false, error: "Failed to add member" });
+  }
+});
+
+app.delete("/api/groups/:roomSlug/members/:profileId", async (req, res) => {
+  try {
+    const currentProfile = (await getAuthenticatedProfile(req)) || await getProfileByInstallId(getInstallId(req));
+    const room = await Room.findOne({ slug: req.params.roomSlug, isGroup: true });
+    if (!currentProfile || !room) return res.status(404).json({ success: false, error: "Group not found" });
+    if (!isGroupAdmin(room, currentProfile._id)) return res.status(403).json({ success: false, error: "Only group admins can remove members" });
+    const targetId = req.params.profileId;
+    if (idsEqual(room.ownerProfileId, targetId)) return res.status(400).json({ success: false, error: "The group owner cannot be removed" });
+    room.participants = (room.participants || []).filter((id) => !idsEqual(id, targetId));
+    room.groupAdmins = (room.groupAdmins || []).filter((id) => !idsEqual(id, targetId));
+    await room.save();
+    io.emit("rooms_updated");
+    return res.json({ success: true, data: roomResponseShape(room, currentProfile._id) });
+  } catch (error) {
+    console.error("remove group member error:", error);
+    return res.status(500).json({ success: false, error: "Failed to remove member" });
+  }
+});
+
+app.patch("/api/groups/:roomSlug/admins/:profileId", async (req, res) => {
+  try {
+    const currentProfile = (await getAuthenticatedProfile(req)) || await getProfileByInstallId(getInstallId(req));
+    const room = await Room.findOne({ slug: req.params.roomSlug, isGroup: true });
+    if (!currentProfile || !room) return res.status(404).json({ success: false, error: "Group not found" });
+    if (!idsEqual(room.ownerProfileId, currentProfile._id)) return res.status(403).json({ success: false, error: "Only the group owner can change admin roles" });
+    const targetId = req.params.profileId;
+    if (!(room.participants || []).some((id) => idsEqual(id, targetId))) return res.status(400).json({ success: false, error: "That user is not a group member" });
+    if (idsEqual(room.ownerProfileId, targetId)) return res.status(400).json({ success: false, error: "The group owner is always an admin" });
+    const makeAdmin = req.body?.admin !== false;
+    const admins = new Set((room.groupAdmins || []).map(String));
+    if (makeAdmin) admins.add(String(targetId)); else admins.delete(String(targetId));
+    admins.add(String(room.ownerProfileId));
+    room.groupAdmins = [...admins];
+    await room.save();
+    io.emit("rooms_updated");
+    return res.json({ success: true, data: roomResponseShape(room, currentProfile._id) });
+  } catch (error) {
+    console.error("group admin update error:", error);
+    return res.status(500).json({ success: false, error: "Failed to update admin role" });
+  }
+});
+
+app.post("/api/groups/:roomSlug/leave", async (req, res) => {
+  try {
+    const currentProfile = (await getAuthenticatedProfile(req)) || await getProfileByInstallId(getInstallId(req));
+    const room = await Room.findOne({ slug: req.params.roomSlug, isGroup: true });
+    if (!currentProfile || !room || !profileCanAccessRoom(currentProfile, room)) return res.status(404).json({ success: false, error: "Group not found" });
+    const remaining = (room.participants || []).filter((id) => !idsEqual(id, currentProfile._id));
+    if (!remaining.length) {
+      await Message.deleteMany({ roomSlug: room.slug });
+      await Room.deleteOne({ _id: room._id });
+      io.emit("rooms_updated");
+      return res.json({ success: true, data: { deleted: true } });
+    }
+    if (idsEqual(room.ownerProfileId, currentProfile._id)) {
+      const nextOwner = (room.groupAdmins || []).find((id) => !idsEqual(id, currentProfile._id) && remaining.some((pid) => idsEqual(pid, id))) || remaining[0];
+      room.ownerProfileId = nextOwner;
+    }
+    room.participants = remaining;
+    room.groupAdmins = (room.groupAdmins || []).filter((id) => !idsEqual(id, currentProfile._id));
+    if (!(room.groupAdmins || []).some((id) => idsEqual(id, room.ownerProfileId))) room.groupAdmins.push(room.ownerProfileId);
+    await room.save();
+    io.emit("rooms_updated");
+    return res.json({ success: true, data: { left: true } });
+  } catch (error) {
+    console.error("leave group error:", error);
+    return res.status(500).json({ success: false, error: "Failed to leave group" });
   }
 });
 
@@ -2235,10 +2859,7 @@ app.get("/api/rooms", async (req, res) => {
 
     const rooms = await Room.find({
       slug: { $nin: hiddenSlugs },
-      $or: [
-        { isDirect: false },
-        { isDirect: true, participants: currentProfile._id },
-      ],
+      ...roomAccessQuery(currentProfile._id),
     })
       .sort({ lastMessageAt: -1, createdAt: -1 })
       .lean();
@@ -2258,6 +2879,10 @@ app.get("/api/messages/search", async (req, res) => {
   try {
     const installId = getInstallId(req);
     const q = (req.query.q || "").toString().trim();
+    const type = (req.query.type || "all").toString().trim().toLowerCase();
+    const senderProfileId = (req.query.senderProfileId || "").toString().trim();
+    const from = (req.query.from || "").toString().trim();
+    const to = (req.query.to || "").toString().trim();
     const currentProfile = await getProfileByInstallId(installId);
 
     if (!currentProfile) {
@@ -2268,15 +2893,15 @@ app.get("/api/messages/search", async (req, res) => {
       return res.json({ success: true, data: [] });
     }
 
+    const allowedTypes = new Set(["all", "messages", "media", "links", "docs"]);
+    const normalizedType = allowedTypes.has(type) ? type : "all";
+
     const hiddenRows = await HiddenChat.find({ profileId: currentProfile._id }).lean();
     const hiddenSlugs = hiddenRows.map((row) => row.roomSlug);
 
     const accessibleRooms = await Room.find({
       slug: { $nin: hiddenSlugs },
-      $or: [
-        { isDirect: false },
-        { isDirect: true, participants: currentProfile._id },
-      ],
+      ...roomAccessQuery(currentProfile._id),
     }).lean();
 
     const roomSlugs = accessibleRooms.map((room) => room.slug);
@@ -2288,25 +2913,77 @@ app.get("/api/messages/search", async (req, res) => {
 
     const escapedQuery = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const matcher = new RegExp(escapedQuery, "i");
+    const urlMatcher = /https?:\/\/[^\s]+/i;
 
-    const messages = await Message.find({
+    const messageQuery = {
       roomSlug: { $in: roomSlugs },
       isDeleted: { $ne: true },
       hiddenFor: { $ne: currentProfile._id },
-      $or: [
-        { content: matcher },
-        { fileName: matcher },
-        { sender: matcher },
-        { "replyTo.content": matcher },
-        { "replyTo.fileName": matcher },
+      $and: [
+        {
+          $or: [
+            { content: matcher },
+            { fileName: matcher },
+            { sender: matcher },
+            { "replyTo.content": matcher },
+            { "replyTo.fileName": matcher },
+          ],
+        },
       ],
-    })
+    };
+
+    if (senderProfileId && mongoose.Types.ObjectId.isValid(senderProfileId)) {
+      messageQuery.senderProfileId = senderProfileId;
+    }
+
+    if (from || to) {
+      messageQuery.createdAt = {};
+      if (from) {
+        const fromDate = new Date(`${from}T00:00:00.000Z`);
+        if (!Number.isNaN(fromDate.getTime())) messageQuery.createdAt.$gte = fromDate;
+      }
+      if (to) {
+        const toDate = new Date(`${to}T23:59:59.999Z`);
+        if (!Number.isNaN(toDate.getTime())) messageQuery.createdAt.$lte = toDate;
+      }
+      if (!Object.keys(messageQuery.createdAt).length) delete messageQuery.createdAt;
+    }
+
+    if (normalizedType === "messages") {
+      messageQuery.$and.push({ type: "text" });
+    } else if (normalizedType === "media") {
+      messageQuery.$and.push({
+        $or: [
+          { mimeType: /^image\//i },
+          { mimeType: /^video\//i },
+          { mimeType: /^audio\//i },
+          { type: "audio" },
+        ],
+      });
+    } else if (normalizedType === "links") {
+      messageQuery.$and.push({ type: "text", content: urlMatcher });
+    } else if (normalizedType === "docs") {
+      messageQuery.$and.push({
+        type: "file",
+        mimeType: { $not: /^(image|video|audio)\//i },
+      });
+    }
+
+    const messages = await Message.find(messageQuery)
       .sort({ createdAt: -1 })
-      .limit(50)
+      .limit(75)
       .lean();
 
     const results = messages.map((message) => {
       const room = roomsBySlug[message.roomSlug];
+      const mimeType = message.mimeType || "";
+      const isLink = message.type === "text" && urlMatcher.test(message.content || "");
+      const isMedia =
+        message.type === "audio" ||
+        /^(image|video|audio)\//i.test(mimeType);
+      const isDoc = message.type === "file" && !isMedia;
+      const category = isLink ? "links" : isMedia ? "media" : isDoc ? "docs" : "messages";
+      const categoryLabel = isLink ? "Link" : isMedia ? "Media" : isDoc ? "Document" : "Message";
       const preview =
         message.type === "audio"
           ? "🎤 Voice note"
@@ -2321,8 +2998,12 @@ app.get("/api/messages/search", async (req, res) => {
         sender: message.sender || "User",
         senderProfileId: message.senderProfileId || null,
         type: message.type || "text",
+        category,
+        categoryLabel,
         preview,
         fileName: message.fileName || "",
+        fileUrl: message.fileUrl || "",
+        mimeType,
         createdAt: message.createdAt,
       };
     });
@@ -2352,9 +3033,10 @@ app.get("/api/rooms/:roomSlug/export", async (req, res) => {
     }
 
     const clearRow = await ChatClear.findOne({ roomSlug, profileId: currentProfile._id }).lean();
+    const notExpired = { $or: [{ expiresAt: null }, { expiresAt: { $exists: false } }, { expiresAt: { $gt: new Date() } }] };
     const query = clearRow?.clearedAt
-      ? { roomSlug, createdAt: { $gt: clearRow.clearedAt }, hiddenFor: { $ne: currentProfile._id } }
-      : { roomSlug, hiddenFor: { $ne: currentProfile._id } };
+      ? { roomSlug, createdAt: { $gt: clearRow.clearedAt }, hiddenFor: { $ne: currentProfile._id }, ...notExpired }
+      : { roomSlug, hiddenFor: { $ne: currentProfile._id }, ...notExpired };
 
     const messages = await Message.find(query)
       .sort({ createdAt: 1 })
@@ -2426,9 +3108,10 @@ app.get("/api/messages/:roomSlug", async (req, res) => {
     }
 
     const clearRow = await ChatClear.findOne({ roomSlug, profileId: currentProfile._id }).lean();
+    const notExpired = { $or: [{ expiresAt: null }, { expiresAt: { $exists: false } }, { expiresAt: { $gt: new Date() } }] };
     const query = clearRow?.clearedAt
-      ? { roomSlug, createdAt: { $gt: clearRow.clearedAt }, hiddenFor: { $ne: currentProfile._id } }
-      : { roomSlug, hiddenFor: { $ne: currentProfile._id } };
+      ? { roomSlug, createdAt: { $gt: clearRow.clearedAt }, hiddenFor: { $ne: currentProfile._id }, ...notExpired }
+      : { roomSlug, hiddenFor: { $ne: currentProfile._id }, ...notExpired };
     const messages = await Message.find(query).sort({ createdAt: 1 }).lean();
     return res.json(messages);
   } catch (error) {
@@ -2437,6 +3120,44 @@ app.get("/api/messages/:roomSlug", async (req, res) => {
       success: false,
       error: "Failed to load messages",
     });
+  }
+});
+
+
+app.patch("/api/rooms/:roomSlug/disappearing", async (req, res) => {
+  try {
+    const installId = getInstallId(req);
+    const { roomSlug } = req.params;
+    const seconds = Number(req.body?.seconds ?? req.body?.disappearingSeconds ?? 0);
+    const allowed = new Set([0, 86400, 604800, 7776000]);
+    if (!allowed.has(seconds)) {
+      return res.status(400).json({ success: false, error: "Choose Off, 24 hours, 7 days, or 90 days" });
+    }
+
+    const currentProfile = (await getAuthenticatedProfile(req)) || await getProfileByInstallId(installId);
+    if (!currentProfile) return res.status(401).json({ success: false, error: "Please sign in again" });
+
+    const room = await Room.findOne({ slug: roomSlug });
+    if (!room || !profileCanAccessRoom(currentProfile, room)) {
+      return res.status(403).json({ success: false, error: "You do not have access to this room" });
+    }
+
+    const canChange = room.isSaved
+      || room.isDirect
+      || (room.isGroup && isGroupAdmin(room, currentProfile._id))
+      || (roomSlug === "general" && currentProfile.role === "admin");
+    if (!canChange) {
+      return res.status(403).json({ success: false, error: "Only a group admin can change disappearing messages" });
+    }
+
+    room.disappearingSeconds = seconds;
+    await room.save();
+    io.emit("rooms_updated");
+    io.to(roomSlug).emit("room_disappearing_updated", { roomSlug, disappearingSeconds: seconds });
+    return res.json({ success: true, data: roomResponseShape(room, currentProfile._id) });
+  } catch (error) {
+    console.error("disappearing messages setting error:", error);
+    return res.status(500).json({ success: false, error: "Failed to update disappearing messages" });
   }
 });
 
@@ -2813,6 +3534,7 @@ app.post("/api/messages/:messageId/forward", async (req, res) => {
         roomSlug: sourceMessage.roomSlug,
       },
       replyTo: null,
+      expiresAt: disappearingExpiryForRoom(targetRoom),
     });
 
     await Room.updateOne(
@@ -3006,6 +3728,14 @@ app.post("/upload", (req, res) => {
           error: "You do not have access to this room",
         });
       }
+      const directBlock = await directRoomBlockState(room, profile._id);
+      if (directBlock.blocked) {
+        return res.status(403).json({
+          success: false,
+          error: directBlock.blockedByMe ? "Unblock this contact before sending attachments" : "This contact is not available for direct messaging",
+          code: "DIRECT_CHAT_BLOCKED",
+        });
+      }
 
       const encryptedFile = false;
       const originalFileName = (req.body.originalFileName || req.file.originalname || "").toString();
@@ -3042,6 +3772,7 @@ app.post("/upload", (req, res) => {
         status: "sent",
         replyTo: null,
         forwardedFrom: null,
+        expiresAt: disappearingExpiryForRoom(room),
       });
 
       await Room.updateOne(
@@ -3055,6 +3786,17 @@ app.post("/upload", (req, res) => {
       );
 
       await restoreArchivedRoomForNewMessage(roomSlug, profile._id);
+
+      // "Delivered" means at least one intended recipient currently has an active socket.
+      const recipientProfileIds = room.isDirect
+        ? (room.participants || []).filter((id) => String(id) !== String(profile._id))
+        : Object.keys(profileSockets).filter((id) => String(id) !== String(profile._id));
+      const hasConnectedRecipient = recipientProfileIds.some((id) => profileSockets[String(id)]?.size);
+      if (hasConnectedRecipient && message.status === "sent") {
+        message.status = "delivered";
+        await message.save();
+      }
+
       const plainMessage = message.toObject({ flattenMaps: true });
       await emitMessageToRoomParticipants(roomSlug, plainMessage, io);
       await emitUnreadCountsForRoom(roomSlug, io);
@@ -3134,6 +3876,8 @@ app.get("/api/calls", async (req, res) => {
           roomName: log.roomSlug === "general" ? "General" : (room?.name || log.title || log.roomSlug),
           otherUserId: otherUser?._id || null,
           otherUserName: log.roomSlug === "general" ? "General" : (otherUser?.displayName || log.callerName || log.title || log.roomSlug),
+          otherUserAvatar: log.roomSlug === "general" ? "" : (otherUser?.avatarUrl || ""),
+          direction: idsEqual(log.callerProfileId, currentProfile._id) ? "outgoing" : "incoming",
           callerName: caller?.displayName || log.callerName || "User",
         };
       })
@@ -3164,6 +3908,7 @@ io.on("connection", (socket) => {
 
       rememberSocketProfile(socket, resolvedProfileId);
       await emitUnreadCountsForProfile(resolvedProfileId, io);
+      await emitPresenceUpdate(resolvedProfileId, io);
     } catch (error) {
       console.error("profile:register error:", error);
     }
@@ -3175,6 +3920,15 @@ socket.on("call:start", async ({ roomSlug, profileId, name, callType = "audio" }
   try {
     if (!roomSlug) return;
     rememberSocketProfile(socket, profileId);
+
+    const persistedRoom = await Room.findOne({ slug: roomSlug });
+    if (persistedRoom?.isDirect && !persistedRoom.isSaved) {
+      const directBlock = await directRoomBlockState(persistedRoom, profileId);
+      if (directBlock.blocked) {
+        socket.emit("call:error", { roomSlug, code: "DIRECT_CHAT_BLOCKED", error: directBlock.blockedByMe ? "Unblock this contact before calling" : "This contact is not available for calls" });
+        return;
+      }
+    }
 
     const room = ensureCallRoom(roomSlug);
     room.callType = callType === "video" ? "video" : "audio";
@@ -3227,6 +3981,15 @@ socket.on("call:start", async ({ roomSlug, profileId, name, callType = "audio" }
     try {
       if (!roomSlug) return;
       rememberSocketProfile(socket, profileId);
+
+      const persistedRoom = await Room.findOne({ slug: roomSlug });
+      if (persistedRoom?.isDirect && !persistedRoom.isSaved) {
+        const directBlock = await directRoomBlockState(persistedRoom, profileId);
+        if (directBlock.blocked) {
+          socket.emit("call:error", { roomSlug, code: "DIRECT_CHAT_BLOCKED", error: directBlock.blockedByMe ? "Unblock this contact before calling" : "This contact is not available for calls" });
+          return;
+        }
+      }
 
       const room = ensureCallRoom(roomSlug);
       if (!room) return;
@@ -3428,6 +4191,15 @@ socket.on("call:start", async ({ roomSlug, profileId, name, callType = "audio" }
       }
 
       if (!room || !profileCanAccessRoom(profile, room)) return;
+      const directBlock = await directRoomBlockState(room, profile._id);
+      if (directBlock.blocked) {
+        socket.emit("message:error", {
+          roomSlug,
+          code: "DIRECT_CHAT_BLOCKED",
+          error: directBlock.blockedByMe ? "Unblock this contact before sending messages" : "This contact is not available for direct messaging",
+        });
+        return;
+      }
 
       let replyTo = null;
       if (replyToMessageId) {
@@ -3447,6 +4219,7 @@ socket.on("call:start", async ({ roomSlug, profileId, name, callType = "audio" }
         status: "sent",
         replyTo,
         forwardedFrom,
+        expiresAt: disappearingExpiryForRoom(room),
       });
 
       await Room.updateOne(
@@ -3479,6 +4252,12 @@ socket.on("call:start", async ({ roomSlug, profileId, name, callType = "audio" }
 
       const room = await Room.findOne({ slug: roomSlug });
       if (!room || !profileCanAccessRoom(profile, room)) return;
+
+      // Read-receipt privacy applies to direct chats. Group read state remains enabled.
+      if (room.isDirect && profile.readReceipts === false) {
+        await emitUnreadCountsForProfile(profile._id, io);
+        return;
+      }
 
       const seenMessages = await updateMessageStatuses(
         roomSlug,
@@ -3584,11 +4363,23 @@ socket.on("call:start", async ({ roomSlug, profileId, name, callType = "audio" }
 
   socket.on("disconnect", async () => {
     try {
+      const disconnectedProfileId = socket.data?.profileId ? String(socket.data.profileId) : "";
+
       for (const roomSlug of Object.keys(callRooms)) {
         await removeCallParticipant(socket, roomSlug, io);
       }
 
       forgetSocketProfile(socket);
+
+      // Only set last-seen when the user's final active socket goes offline.
+      if (disconnectedProfileId && !profileSockets[disconnectedProfileId]?.size) {
+        await Profile.updateOne(
+          { _id: disconnectedProfileId },
+          { $set: { lastSeenAt: new Date() } }
+        );
+        await emitPresenceUpdate(disconnectedProfileId, io);
+      }
+
       io.emit("online_count", io.engine.clientsCount);
     } catch (error) {
       console.error("disconnect error:", error);
@@ -3623,6 +4414,10 @@ app.get(
 (async () => {
   try {
     await connectDB();
+    await purgeExpiredMessages(io).catch((error) => console.error("initial disappearing message cleanup error:", error));
+    setInterval(() => {
+      purgeExpiredMessages(io).catch((error) => console.error("disappearing message cleanup error:", error));
+    }, 60 * 1000).unref?.();
 
     const general = await Room.findOne({ slug: "general" });
     if (!general) {

@@ -395,3 +395,220 @@ body[data-appearance="dark"] .admin-detail-profile,
     width: 100%;
   }
 }
+
+/* Int-Messager v4.10.6 — Admin activity & audit trail */
+.admin-view-tabs {
+  width: 100%;
+  max-width: 1600px;
+  margin: 0 auto 12px;
+  display: flex;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.admin-view-tabs button {
+  border: 1px solid #d8e1ea;
+  background: #fff;
+  color: #334155;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.admin-view-tabs button.active {
+  background: #0f172a;
+  color: #fff;
+  border-color: #0f172a;
+}
+
+.admin-activity-grid,
+.admin-audit-panel {
+  width: 100%;
+  max-width: 1600px;
+  margin: 0 auto;
+  min-height: 0;
+}
+
+.admin-activity-grid {
+  display: grid;
+  grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr);
+  gap: 14px;
+  flex: 1 1 auto;
+}
+
+.admin-insight-card,
+.admin-audit-panel {
+  background: #fff;
+  border: 1px solid #dfe7ef;
+  border-radius: 18px;
+  padding: 18px;
+  box-shadow: 0 8px 28px rgba(15, 23, 42, .05);
+}
+
+.admin-insight-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.admin-insight-head h2 { margin: 0; font-size: 17px; }
+.admin-insight-head p { margin: 4px 0 0; color: #64748b; font-size: 12px; }
+.admin-insight-head > strong { font-size: 28px; }
+
+.admin-trend-bars {
+  height: 230px;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  align-items: end;
+  gap: 10px;
+  padding-top: 6px;
+}
+
+.admin-trend-day {
+  height: 100%;
+  min-width: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto auto;
+  align-items: end;
+  justify-items: center;
+  gap: 4px;
+}
+
+.admin-trend-bar-wrap {
+  width: min(34px, 70%);
+  height: 100%;
+  background: #eef2f7;
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+}
+
+.admin-trend-bar-wrap i {
+  display: block;
+  width: 100%;
+  min-height: 6px;
+  background: #2563eb;
+  border-radius: 10px 10px 0 0;
+}
+
+.admin-trend-day strong { font-size: 12px; }
+.admin-trend-day small { color: #64748b; font-size: 11px; }
+
+.admin-session-feed,
+.admin-audit-list {
+  display: grid;
+  gap: 8px;
+  max-height: calc(100dvh - 335px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.admin-session-item {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid #edf1f5;
+}
+
+.admin-feed-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: inline-grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 900;
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.admin-session-item > div { min-width: 0; display: grid; gap: 3px; }
+.admin-session-item strong { font-size: 13px; }
+.admin-session-item small { color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.admin-session-item time { color: #64748b; font-size: 11px; white-space: nowrap; }
+
+.admin-audit-panel {
+  flex: 1 1 auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-audit-panel .admin-section-heading { flex: 0 0 auto; }
+.admin-audit-panel .admin-section-heading > span { color: #64748b; font-size: 12px; font-weight: 800; }
+.admin-audit-list { flex: 1 1 auto; min-height: 0; max-height: none; }
+
+.admin-audit-row {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #e5eaf0;
+  border-radius: 14px;
+  background: #fbfcfd;
+}
+
+.admin-audit-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.admin-audit-icon.danger { background: #fee2e2; color: #b91c1c; }
+.admin-audit-icon.success { background: #dcfce7; color: #166534; }
+.admin-audit-main { min-width: 0; }
+.admin-audit-main > strong { display: block; font-size: 13px; text-transform: capitalize; }
+.admin-audit-main p { margin: 3px 0; font-size: 12px; }
+.admin-audit-main small { color: #64748b; }
+.admin-audit-meta { display: grid; justify-items: end; gap: 4px; color: #64748b; font-size: 11px; }
+.admin-audit-meta time { white-space: nowrap; }
+.admin-audit-meta span { background: #eef2f7; color: #475569; border-radius: 999px; padding: 3px 7px; }
+
+.admin-shell[data-appearance="dark"] .admin-view-tabs button,
+.admin-shell[data-appearance="dark"] .admin-insight-card,
+.admin-shell[data-appearance="dark"] .admin-audit-panel,
+.admin-shell[data-appearance="dark"] .admin-audit-row {
+  background: #111923;
+  color: #f1f5f9;
+  border-color: #293746;
+}
+
+.admin-shell[data-appearance="dark"] .admin-view-tabs button.active { background: #e2e8f0; color: #0f172a; border-color: #e2e8f0; }
+.admin-shell[data-appearance="dark"] .admin-insight-head p,
+.admin-shell[data-appearance="dark"] .admin-session-item small,
+.admin-shell[data-appearance="dark"] .admin-session-item time,
+.admin-shell[data-appearance="dark"] .admin-trend-day small,
+.admin-shell[data-appearance="dark"] .admin-audit-main small,
+.admin-shell[data-appearance="dark"] .admin-audit-meta { color: #94a3b8; }
+.admin-shell[data-appearance="dark"] .admin-session-item { border-color: #293746; }
+.admin-shell[data-appearance="dark"] .admin-trend-bar-wrap { background: #1f2a37; }
+.admin-shell[data-appearance="dark"] .admin-audit-meta span { background: #1f2a37; color: #cbd5e1; }
+
+@media (max-width: 900px) {
+  .admin-view-tabs { position: sticky; top: 0; z-index: 4; padding: 4px 0 8px; background: #f4f6f8; overflow-x: auto; }
+  .admin-shell[data-appearance="dark"] .admin-view-tabs { background: #0b1118; }
+  .admin-activity-grid { grid-template-columns: 1fr; }
+  .admin-session-feed, .admin-audit-list { max-height: none; overflow: visible; }
+  .admin-audit-panel { overflow: visible; }
+  .admin-trend-bars { height: 190px; gap: 6px; }
+}
+
+@media (max-width: 560px) {
+  .admin-audit-row { grid-template-columns: 36px minmax(0, 1fr); }
+  .admin-audit-icon { width: 34px; height: 34px; }
+  .admin-audit-meta { grid-column: 2; justify-items: start; }
+  .admin-session-item { grid-template-columns: 34px minmax(0, 1fr); }
+  .admin-session-item time { grid-column: 2; }
+}

@@ -20,10 +20,20 @@ import "./styles/desktop-chat-info-pane-v4816.css";
 import "./styles/mobile-hamburger-remove-v4817.css";
 import "./styles/black-call-icon-v4818.css";
 import "./styles/admin-dashboard-v490.css";
+import "./styles/presence-receipts-v497.css";
+import "./styles/group-management-v499.css";
+import "./styles/contacts-blocking-v4100.css";
 import "./styles/dark-mode-v491.css";
 import "./styles/admin-access-v492.css";
 import "./styles/admin-dashboard-v493.css";
 import "./styles/composer-layout-v495.css";
+import "./styles/mobile-composer-overlap-v4101.css";
+import "./styles/shared-content-v4102.css";
+import "./styles/advanced-search-v4103.css";
+import "./styles/privacy-controls-v4104.css";
+import "./styles/call-experience-v4105.css";
+import "./styles/disappearing-messages-v4107.css";
+import "./styles/mobile-navigation-composer-v4108.css";
 import AuthScreen from "./components/auth/AuthScreen";
 import NavigationRail from "./components/layout/NavigationRail";
 import MessageActions, { DesktopMessageContextMenu, MobileMessageActionSheet } from "./components/chat/MessageActions";
@@ -132,6 +142,53 @@ function formatTime(dateString) {
   });
 }
 
+function disappearingLabel(seconds) {
+  const value = Number(seconds || 0);
+  if (value === 86400) return "24 hours";
+  if (value === 604800) return "7 days";
+  if (value === 7776000) return "90 days";
+  return "Off";
+}
+
+function expiryCountdownLabel(expiresAt) {
+  if (!expiresAt) return "";
+  const ms = new Date(expiresAt).getTime() - Date.now();
+  if (!Number.isFinite(ms) || ms <= 0) return "Expiring";
+  const minutes = Math.ceil(ms / 60000);
+  if (minutes < 60) return `Expires in ${minutes}m`;
+  const hours = Math.ceil(minutes / 60);
+  if (hours < 48) return `Expires in ${hours}h`;
+  const days = Math.ceil(hours / 24);
+  return `Expires in ${days}d`;
+}
+
+function formatPresenceLabel(profile) {
+  if (!profile) return "Private chat";
+  if (profile.online) return "Online";
+  if (!profile.lastSeenAt) return profile.profileStatus || "Private chat";
+
+  const seen = new Date(profile.lastSeenAt);
+  if (Number.isNaN(seen.getTime())) return profile.profileStatus || "Private chat";
+
+  const now = new Date();
+  const sameDay = seen.toDateString() === now.toDateString();
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const wasYesterday = seen.toDateString() === yesterday.toDateString();
+  const time = seen.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+  if (sameDay) return `Last seen today at ${time}`;
+  if (wasYesterday) return `Last seen yesterday at ${time}`;
+  return `Last seen ${seen.toLocaleDateString([], { day: "numeric", month: "short" })} at ${time}`;
+}
+
+function MessageReceipt({ status = "sent" }) {
+  const normalized = ["sent", "delivered", "seen"].includes(status) ? status : "sent";
+  const symbol = normalized === "sent" ? "✓" : "✓✓";
+  const label = normalized === "seen" ? "Seen" : normalized === "delivered" ? "Delivered" : "Sent";
+  return <span className={`wa-receipt wa-receipt-${normalized}`} title={label} aria-label={label}>{symbol}</span>;
+}
+
 function formatFileSize(bytes) {
   if (!Number.isFinite(bytes) || bytes <= 0) return "";
   const units = ["B", "KB", "MB", "GB"];
@@ -194,6 +251,27 @@ function isImageAttachment(item) {
 
 function isPdfAttachment(item) {
   return guessMimeType(item).includes("pdf");
+}
+
+function isVideoAttachment(item) {
+  return guessMimeType(item).startsWith("video/");
+}
+
+function isAudioAttachment(item) {
+  return item?.type === "audio" || guessMimeType(item).startsWith("audio/");
+}
+
+function extractMessageLinks(value) {
+  const text = String(value || "");
+  const matches = text.match(/https?:\/\/[^\s<>()]+/gi) || [];
+  return [...new Set(matches.map((url) => url.replace(/[),.!?;:]+$/, "")))];
+}
+
+function formatSharedItemDate(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString([], { day: "numeric", month: "short", year: date.getFullYear() === new Date().getFullYear() ? undefined : "numeric" });
 }
 
 function getFileKindLabel(item) {
@@ -3127,7 +3205,8 @@ function MessageBubble({
       <div className={`wa-meta ${useGroupTextTemplate ? "wa-group-text-meta" : ""}`}> 
         <span>{formatTime(message.createdAt)}</span>
         {message.isEdited ? <span className="wa-edited-label">Edited</span> : null}
-        {mine ? <span>{message.status || "sent"}</span> : null}
+        {message.expiresAt ? <span className="wa-expiry-meta" title={new Date(message.expiresAt).toLocaleString()}>⏱ {expiryCountdownLabel(message.expiresAt)}</span> : null}
+        {mine ? <MessageReceipt status={message.status || "sent"} /> : null}
         {!message.isDeleted ? (
           <MessageActions
             onOpen={(event) => {
@@ -3268,10 +3347,15 @@ export default function App() {
   const [globalMessageResults, setGlobalMessageResults] = useState([]);
   const [globalMessageSearchLoading, setGlobalMessageSearchLoading] = useState(false);
   const [globalMessageSearchError, setGlobalMessageSearchError] = useState("");
+  const [globalSearchType, setGlobalSearchType] = useState("all");
+  const [globalSearchSender, setGlobalSearchSender] = useState("");
+  const [globalSearchDateFrom, setGlobalSearchDateFrom] = useState("");
+  const [globalSearchDateTo, setGlobalSearchDateTo] = useState("");
   const [highlightedSearchMessageId, setHighlightedSearchMessageId] = useState("");
   const [messageSearch, setMessageSearch] = useState("");
   const [showMessageSearch, setShowMessageSearch] = useState(false);
   const [showChatDetails, setShowChatDetails] = useState(false);
+  const [sharedContentTab, setSharedContentTab] = useState("media");
   const [showMobileChatMenu, setShowMobileChatMenu] = useState(false);
   const [unreadCounts, setUnreadCounts] = useState({});
   const [sidebarMode, setSidebarMode] = useState("chats");
@@ -3293,6 +3377,29 @@ export default function App() {
     window.matchMedia?.("(prefers-color-scheme: dark)")?.matches || false
   );
   const [showAdminDashboard, setShowAdminDashboard] = useState(false);
+  const [showCreateGroup, setShowCreateGroup] = useState(false);
+  const [newGroupName, setNewGroupName] = useState("");
+  const [newGroupMemberIds, setNewGroupMemberIds] = useState([]);
+  const [groupManageBusy, setGroupManageBusy] = useState(false);
+  const [groupManageNotice, setGroupManageNotice] = useState("");
+  const [contactManageBusyId, setContactManageBusyId] = useState("");
+  const [contactManageNotice, setContactManageNotice] = useState("");
+  const [privacySettings, setPrivacySettings] = useState({
+    lastSeenPrivacy: "everyone",
+    onlinePrivacy: "everyone",
+    profilePhotoPrivacy: "everyone",
+    readReceipts: true,
+  });
+  const [privacyBusy, setPrivacyBusy] = useState(false);
+  const [privacyNotice, setPrivacyNotice] = useState("");
+  const [disappearingBusy, setDisappearingBusy] = useState(false);
+  const [disappearingNotice, setDisappearingNotice] = useState("");
+  const [expiryClock, setExpiryClock] = useState(() => Date.now());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setExpiryClock(Date.now()), 30000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (profile?.role !== "admin" && showAdminDashboard) {
@@ -3391,6 +3498,7 @@ export default function App() {
   const messageInputRef = useRef(null);
   const messageListRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+  const remoteTypingTimeoutRef = useRef(null);
   const recordingTimeoutRef = useRef(null);
   const longPressTimerRef = useRef(null);
   const roomLongPressTimerRef = useRef(null);
@@ -3413,6 +3521,7 @@ export default function App() {
   const isSwitchingCameraRef = useRef(false);
   const inCallRef = useRef(false);
   const activeRoomSlugRef = useRef(activeRoomSlug);
+  const mutedRoomsRef = useRef([]);
   const callRoomSlugRef = useRef("");
   const activeCallTypeRef = useRef("audio");
   const callControlsTimerRef = useRef(null);
@@ -3427,6 +3536,49 @@ export default function App() {
   const currentProfileId = profile?.profileId || profile?._id;
   const canChat = Boolean(profile?.nameLocked && profile?.displayName);
 
+  async function loadPrivacySettings() {
+    if (!canChat) return;
+    try {
+      const response = await authFetch(`${API_BASE}/api/privacy`, { headers: { "x-install-id": installId } });
+      const payload = await response.json();
+      if (!response.ok || payload?.success === false) throw new Error(payload?.error || "Failed to load privacy settings");
+      if (payload?.data) setPrivacySettings(payload.data);
+    } catch (err) {
+      console.warn("Privacy settings load failed:", err);
+    }
+  }
+
+  async function updatePrivacySetting(name, value) {
+    const next = { ...privacySettings, [name]: value };
+    setPrivacySettings(next);
+    setPrivacyBusy(true);
+    setPrivacyNotice("");
+    try {
+      const response = await authFetch(`${API_BASE}/api/privacy`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-install-id": installId },
+        body: JSON.stringify(next),
+      });
+      const payload = await response.json();
+      if (!response.ok || payload?.success === false) throw new Error(payload?.error || "Failed to update privacy settings");
+      setPrivacySettings(payload.data || next);
+      setPrivacyNotice("Privacy setting saved.");
+      window.setTimeout(() => setPrivacyNotice(""), 1800);
+    } catch (err) {
+      setPrivacyNotice(err?.message || "Failed to update privacy settings");
+      await loadPrivacySettings();
+    } finally {
+      setPrivacyBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    if (canChat) loadPrivacySettings();
+  }, [canChat, installId]);
+
+  useEffect(() => {
+    mutedRoomsRef.current = Array.isArray(chatOrgPrefs.mutedRooms) ? chatOrgPrefs.mutedRooms : [];
+  }, [chatOrgPrefs.mutedRooms]);
 
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
@@ -3652,6 +3804,7 @@ export default function App() {
         renotify: true,
         silent: false,
         icon: "/vite.svg",
+        badge: "/vite.svg",
       });
       notification.onclick = () => {
         window.focus();
@@ -3686,6 +3839,7 @@ export default function App() {
 
   function notifyNewMessage(message = {}) {
     if (!message.roomSlug) return;
+    if ((mutedRoomsRef.current || []).includes(message.roomSlug)) return;
     if (!shouldNotifyNow(message.roomSlug)) return;
     if (String(message.senderProfileId || "") === String(currentProfileId || "")) return;
     const room = roomsSorted.find((item) => item.slug === message.roomSlug);
@@ -3694,13 +3848,15 @@ export default function App() {
       : message.roomSlug === "general"
         ? "General"
         : "New message";
-    const body = message.type === "audio"
-      ? `${message.sender || "Someone"}: Voice note`
+    const isDirectRoom = Boolean(room?.isDirect);
+    const preview = message.type === "audio"
+      ? "Voice note"
       : message.type === "file"
-        ? `${message.sender || "Someone"}: ${message.fileName || "Attachment"}`
-        : `${message.sender || "Someone"}: ${message.content || "New message"}`;
+        ? message.fileName || "Attachment"
+        : String(message.content || "New message").slice(0, 180);
+    const body = isDirectRoom ? preview : `${message.sender || "Someone"}: ${preview}`;
     showLocalNotification({
-      title: chatName,
+      title: isDirectRoom ? (message.sender || chatName) : chatName,
       body,
       tag: `message-${message.roomSlug}`,
       onClick: () => {
@@ -3755,6 +3911,24 @@ export default function App() {
     [roomsSorted, activeRoomSlug]
   );
 
+  // Open the exact conversation selected from a push notification. Wait until
+  // rooms are loaded so a cold-started PWA can navigate reliably.
+  useEffect(() => {
+    if (!roomsSorted.length) return;
+    const params = new URLSearchParams(window.location.search);
+    const requestedRoom = params.get("room");
+    if (!requestedRoom) return;
+    if (!roomsSorted.some((room) => room.slug === requestedRoom)) return;
+    setSidebarMode("chats");
+    setActiveRoomSlug(requestedRoom);
+    setShowChatDetails(false);
+    setShowSidebar(false);
+    params.delete("room");
+    params.delete("call");
+    const nextQuery = params.toString();
+    window.history.replaceState({}, "", `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ""}${window.location.hash || ""}`);
+  }, [roomsSorted]);
+
   const totalUnreadCount = useMemo(
     () => Object.values(unreadCounts || {}).reduce((total, count) => total + Number(count || 0), 0),
     [unreadCounts]
@@ -3799,7 +3973,15 @@ export default function App() {
     [profiles, chatSearch]
   );
 
-  const rawMessages = messagesByRoom[activeRoomSlug] || [];
+  const savedContactIds = useMemo(() => new Set((profile?.savedContacts || []).map(String)), [profile?.savedContacts]);
+  const favoriteContactIds = useMemo(() => new Set((profile?.favoriteContacts || []).map(String)), [profile?.favoriteContacts]);
+  const blockedProfileIds = useMemo(() => new Set((profile?.blockedProfiles || []).map(String)), [profile?.blockedProfiles]);
+  const favoriteProfiles = useMemo(() => filteredProfiles.filter((user) => favoriteContactIds.has(String(user._id)) && !blockedProfileIds.has(String(user._id))), [filteredProfiles, favoriteContactIds, blockedProfileIds]);
+  const savedProfiles = useMemo(() => filteredProfiles.filter((user) => savedContactIds.has(String(user._id)) && !favoriteContactIds.has(String(user._id)) && !blockedProfileIds.has(String(user._id))), [filteredProfiles, savedContactIds, favoriteContactIds, blockedProfileIds]);
+  const otherProfiles = useMemo(() => filteredProfiles.filter((user) => !savedContactIds.has(String(user._id)) && !blockedProfileIds.has(String(user._id))), [filteredProfiles, savedContactIds, blockedProfileIds]);
+  const blockedProfiles = useMemo(() => profiles.filter((user) => blockedProfileIds.has(String(user._id))), [profiles, blockedProfileIds]);
+
+  const rawMessages = (messagesByRoom[activeRoomSlug] || []).filter((message) => !message.expiresAt || new Date(message.expiresAt).getTime() > expiryClock);
 
   const activePinnedMessages = useMemo(
     () => rawMessages.filter((message) => !message.isDeleted && message.pinned),
@@ -3811,10 +3993,44 @@ export default function App() {
     [rawMessages, currentProfileId]
   );
 
-  const activeRoomMedia = useMemo(
-    () => rawMessages.filter((message) => !message.isDeleted && (message.type === "file" || message.type === "audio" || message.fileUrl)),
-    [rawMessages]
-  );
+  const activeRoomSharedContent = useMemo(() => {
+    const media = [];
+    const docs = [];
+    const voice = [];
+    const links = [];
+
+    rawMessages.forEach((message) => {
+      if (!message || message.isDeleted) return;
+
+      if (isAudioAttachment(message)) {
+        voice.push(message);
+      } else if (message.type === "file" || message.fileUrl) {
+        if (isImageAttachment(message) || isVideoAttachment(message)) media.push(message);
+        else docs.push(message);
+      }
+
+      if (message.type === "text" && message.content) {
+        extractMessageLinks(message.content).forEach((url) => {
+          links.push({
+            id: `${message._id || message.createdAt}-${url}`,
+            url,
+            sender: message.sender || "User",
+            createdAt: message.createdAt,
+          });
+        });
+      }
+    });
+
+    const newestFirst = (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+    media.sort(newestFirst);
+    docs.sort(newestFirst);
+    voice.sort(newestFirst);
+    links.sort(newestFirst);
+
+    return { media, docs, links, voice };
+  }, [rawMessages]);
+
+  const activeSharedContentItems = activeRoomSharedContent[sharedContentTab] || [];
 
   const activeRoomOtherProfile = useMemo(() => {
     if (!activeRoom?.isDirect) return null;
@@ -3823,6 +4039,10 @@ export default function App() {
       .find((id) => id && id !== String(currentProfileId || ""));
     return profiles.find((user) => String(user._id) === String(otherProfileId)) || null;
   }, [activeRoom, profiles, currentProfileId]);
+  const activeDirectContactId = activeRoomOtherProfile?._id ? String(activeRoomOtherProfile._id) : "";
+  const activeDirectContactBlocked = Boolean(activeDirectContactId && blockedProfileIds.has(activeDirectContactId));
+  const activeDirectContactSaved = Boolean(activeDirectContactId && savedContactIds.has(activeDirectContactId));
+  const activeDirectContactFavorite = Boolean(activeDirectContactId && favoriteContactIds.has(activeDirectContactId));
 
   const filteredMessages = useMemo(() => {
     if (!messageSearch.trim()) return rawMessages;
@@ -3848,10 +4068,23 @@ export default function App() {
 
   const pendingUploadsForRoom = pendingUploads.filter((item) => item.roomSlug === activeRoomSlug);
   const isGroupChat = activeRoom ? !activeRoom.isDirect && activeRoom.type !== "saved" : false;
+  const isManagedGroup = Boolean(activeRoom?.isGroup);
+  const currentUserIsGroupOwner = Boolean(isManagedGroup && String(activeRoom?.ownerProfileId || "") === String(currentProfileId || ""));
+  const currentUserIsGroupAdmin = Boolean(isManagedGroup && (currentUserIsGroupOwner || (activeRoom?.groupAdmins || []).some((id) => String(id) === String(currentProfileId || ""))));
+  const activeGroupMembers = isManagedGroup
+    ? (activeRoom?.participants || []).map((id) => {
+        const memberId = String(id);
+        const found = profiles.find((user) => String(user._id) === memberId);
+        return found || (memberId === String(currentProfileId || "") ? { ...profile, _id: currentProfileId, displayName: profile?.displayName || "Me", avatarUrl: profile?.avatarUrl || "" } : { _id: memberId, displayName: "Member", avatarUrl: "" });
+      })
+    : [];
+  const availableGroupMembers = isManagedGroup
+    ? profiles.filter((user) => !(activeRoom?.participants || []).some((id) => String(id) === String(user._id)))
+    : [];
   const activeRoomHasCall = Boolean(activeRoom?.activeCall);
   const currentCallRoomSlug = callRoomSlug || activeRoomSlug;
   const currentCallRoom = roomsSorted.find((room) => room.slug === currentCallRoomSlug) || activeRoom;
-  const currentCallIsDirect = Boolean(currentCallRoom && currentCallRoom.slug !== "general");
+  const currentCallIsDirect = Boolean(currentCallRoom?.isDirect);
   const currentCallTitle = currentCallIsDirect
     ? getRoomDisplayName(currentCallRoom, profile?.displayName, currentProfileId, profiles)
     : getRoomDisplayName(currentCallRoom, profile?.displayName, currentProfileId, profiles);
@@ -3875,6 +4108,7 @@ export default function App() {
   function getRoomAvatarSrc(room) {
     if (!room || room.slug === "general") return "";
     if (room.isSaved || String(room.slug || "").startsWith("saved:")) return profile?.avatarUrl || "";
+    if (room.isGroup) return room.groupAvatarUrl || "";
     const otherProfileId = (room.participants || []).find((id) => String(id) !== String(currentProfileId || ""));
     return getProfileAvatarById(otherProfileId);
   }
@@ -3923,8 +4157,40 @@ export default function App() {
   }
 
   function getCallHistoryTypeLabel(call) {
-    return (call.callType || call.type) === "video" ? "📹 Video call" : "📞︎ Audio call";
+    return (call.callType || call.type) === "video" ? "Video call" : "Audio call";
   }
+
+  function getCallHistoryDirection(call) {
+    if (call?.direction === "outgoing" || call?.direction === "incoming") return call.direction;
+    return String(call?.callerProfileId || "") === String(currentProfileId || "") ? "outgoing" : "incoming";
+  }
+
+  function getCallHistoryDayLabel(dateValue) {
+    const date = new Date(dateValue || 0);
+    if (Number.isNaN(date.getTime())) return "Earlier";
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const target = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const diffDays = Math.round((today - target) / 86400000);
+    if (diffDays === 0) return "Today";
+    if (diffDays === 1) return "Yesterday";
+    if (diffDays < 7) return date.toLocaleDateString([], { weekday: "long" });
+    return date.toLocaleDateString([], { day: "numeric", month: "short", year: date.getFullYear() === now.getFullYear() ? undefined : "numeric" });
+  }
+
+  const groupedCallHistory = useMemo(() => {
+    const groups = [];
+    (callHistory || []).forEach((call) => {
+      const label = getCallHistoryDayLabel(call.startedAt);
+      let group = groups.find((item) => item.label === label);
+      if (!group) {
+        group = { label, calls: [] };
+        groups.push(group);
+      }
+      group.calls.push(call);
+    });
+    return groups;
+  }, [callHistory]);
 
   async function startCallFromHistory(call) {
     if (!call?.roomSlug) return;
@@ -4217,6 +4483,11 @@ export default function App() {
 
     const onRoomsUpdated = () => loadRoomsAndProfiles();
     const onProfilesUpdated = () => loadRoomsAndProfiles();
+    const onPresenceUpdated = ({ profileId } = {}) => {
+      if (!profileId) return;
+      // Presence is privacy-aware and must be re-shaped by the server for this viewer.
+      loadRoomsAndProfiles();
+    };
     const onUnreadCountsUpdated = (counts) => {
       const normalizedCounts = {};
       Object.entries(counts || {}).forEach(([roomSlug, count]) => {
@@ -4227,11 +4498,13 @@ export default function App() {
 
     socket.on("rooms_updated", onRoomsUpdated);
     socket.on("profiles_updated", onProfilesUpdated);
+    socket.on("presence_updated", onPresenceUpdated);
     socket.on("unread_counts_updated", onUnreadCountsUpdated);
 
     return () => {
       socket.off("rooms_updated", onRoomsUpdated);
       socket.off("profiles_updated", onProfilesUpdated);
+      socket.off("presence_updated", onPresenceUpdated);
       socket.off("unread_counts_updated", onUnreadCountsUpdated);
     };
   }, [canChat, installId]);
@@ -4258,8 +4531,12 @@ export default function App() {
       try {
         setGlobalMessageSearchLoading(true);
         setGlobalMessageSearchError("");
+        const searchParams = new URLSearchParams({ q, installId, type: globalSearchType });
+        if (globalSearchSender) searchParams.set("senderProfileId", globalSearchSender);
+        if (globalSearchDateFrom) searchParams.set("from", globalSearchDateFrom);
+        if (globalSearchDateTo) searchParams.set("to", globalSearchDateTo);
         const res = await authFetch(
-          `${API_BASE}/api/messages/search?q=${encodeURIComponent(q)}&installId=${encodeURIComponent(installId)}`,
+          `${API_BASE}/api/messages/search?${searchParams.toString()}`,
           { headers: { "x-install-id": installId }, signal: controller.signal }
         );
         const payload = await res.json();
@@ -4281,7 +4558,7 @@ export default function App() {
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [canChat, sidebarMode, chatSearch, installId]);
+  }, [canChat, sidebarMode, chatSearch, installId, globalSearchType, globalSearchSender, globalSearchDateFrom, globalSearchDateTo]);
 
   useEffect(() => {
     if (!highlightedSearchMessageId || !activeRoomSlug) return;
@@ -4475,6 +4752,8 @@ export default function App() {
       if (payloadProfileId && payloadProfileId === String(currentProfileId || "")) return;
 
       setTypingName(payloadName || "");
+      window.clearTimeout(remoteTypingTimeoutRef.current);
+      remoteTypingTimeoutRef.current = window.setTimeout(() => setTypingName(""), 4500);
     };
 
     const handleUserStopTyping = (payload) => {
@@ -4484,6 +4763,7 @@ export default function App() {
       if (payloadRoomSlug !== activeRoomSlug) return;
       if (payloadProfileId && payloadProfileId === String(currentProfileId || "")) return;
 
+      window.clearTimeout(remoteTypingTimeoutRef.current);
       setTypingName("");
     };
     const handleUserRecordingAudio = (payload) => {
@@ -4514,7 +4794,13 @@ export default function App() {
       setRecordingName("");
     };
 
+    const handleMessageError = (payload) => {
+      if (payload?.roomSlug && payload.roomSlug !== activeRoomSlug) return;
+      setError(payload?.error || "Message could not be sent");
+    };
+
     socket.on("load_messages", handleLoadMessages);
+    socket.on("message:error", handleMessageError);
     socket.on("receive_message", handleReceiveMessage);
     socket.on("message_deleted", handleDeletedMessage);
     socket.on("message_edited", handleEditedMessage);
@@ -4533,6 +4819,7 @@ export default function App() {
     return () => {
       socket.emit("leave_room", { roomSlug: activeRoomSlug });
       socket.off("load_messages", handleLoadMessages);
+      socket.off("message:error", handleMessageError);
       socket.off("receive_message", handleReceiveMessage);
       socket.off("message_deleted", handleDeletedMessage);
       socket.off("message_edited", handleEditedMessage);
@@ -4548,6 +4835,7 @@ export default function App() {
       socket.off("user_recording_audio", handleUserRecordingAudio);
       socket.off("user_stop_recording_audio", handleUserStopRecordingAudio);
       window.clearTimeout(recordingTimeoutRef.current);
+      window.clearTimeout(remoteTypingTimeoutRef.current);
     };
   }, [activeRoomSlug, canChat, installId, currentProfileId]);
 
@@ -4599,6 +4887,17 @@ export default function App() {
       window.removeEventListener("focus", refreshActiveRoomMessagesForMobile);
     };
   }, [activeRoomSlug, canChat, installId]);
+
+  useEffect(() => {
+    const handleCallError = (payload) => {
+      setCallError(payload?.error || "Call could not be started");
+      setInCall(false);
+      setCallRoomSlug("");
+      cleanupCallMedia();
+    };
+    socket.on("call:error", handleCallError);
+    return () => socket.off("call:error", handleCallError);
+  }, []);
 
   useEffect(() => {
     const handleParticipants = ({ participants, roomSlug }) => {
@@ -5014,6 +5313,58 @@ export default function App() {
     }
   }
 
+  async function updateContactPreference(targetProfileId, changes) {
+    if (!targetProfileId) return;
+    setContactManageBusyId(String(targetProfileId));
+    setContactManageNotice("");
+    try {
+      const response = await authFetch(`${API_BASE}/api/contacts/${encodeURIComponent(targetProfileId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-install-id": installId },
+        body: JSON.stringify(changes),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload?.success) throw new Error(payload?.error || "Failed to update contact");
+      setProfile((current) => current ? {
+        ...current,
+        savedContacts: payload.data?.savedContacts || current.savedContacts || [],
+        favoriteContacts: payload.data?.favoriteContacts || current.favoriteContacts || [],
+      } : current);
+      setContactManageNotice("Contact updated.");
+    } catch (err) {
+      setError(err?.message || "Failed to update contact");
+    } finally {
+      setContactManageBusyId("");
+    }
+  }
+
+  async function setContactBlocked(targetProfileId, shouldBlock) {
+    if (!targetProfileId) return;
+    const target = profiles.find((user) => String(user._id) === String(targetProfileId));
+    if (shouldBlock && !window.confirm(`Block ${target?.displayName || "this contact"}? They will not be able to message or call you directly.`)) return;
+    setContactManageBusyId(String(targetProfileId));
+    setContactManageNotice("");
+    try {
+      const response = await authFetch(`${API_BASE}/api/contacts/${encodeURIComponent(targetProfileId)}/block`, {
+        method: shouldBlock ? "POST" : "DELETE",
+        headers: { "Content-Type": "application/json", "x-install-id": installId },
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload?.success) throw new Error(payload?.error || `Failed to ${shouldBlock ? "block" : "unblock"} contact`);
+      setProfile((current) => current ? {
+        ...current,
+        blockedProfiles: payload.data?.blockedProfiles || current.blockedProfiles || [],
+        favoriteContacts: payload.data?.favoriteContacts || current.favoriteContacts || [],
+      } : current);
+      setContactManageNotice(shouldBlock ? `${target?.displayName || "Contact"} blocked.` : `${target?.displayName || "Contact"} unblocked.`);
+      if (shouldBlock && activeDirectContactId === String(targetProfileId)) setMessageInput("");
+    } catch (err) {
+      setError(err?.message || `Failed to ${shouldBlock ? "block" : "unblock"} contact`);
+    } finally {
+      setContactManageBusyId("");
+    }
+  }
+
   async function startDirectRoom(targetProfileId) {
     try {
       setError("");
@@ -5045,6 +5396,135 @@ export default function App() {
     } catch (err) {
       setError(err.message || "Failed to create direct room");
     }
+  }
+
+  async function createGroup() {
+    const name = newGroupName.trim();
+    if (name.length < 2) {
+      setError("Enter a group name with at least 2 characters.");
+      return;
+    }
+    if (!newGroupMemberIds.length) {
+      setError("Select at least one person for the group.");
+      return;
+    }
+    setGroupManageBusy(true);
+    setGroupManageNotice("");
+    setError("");
+    try {
+      const res = await authFetch(`${API_BASE}/api/groups`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-install-id": installId },
+        body: JSON.stringify({ name, participantIds: newGroupMemberIds }),
+      });
+      const payload = await res.json();
+      if (!res.ok || !payload?.success) throw new Error(payload?.error || "Failed to create group");
+      const room = payload.data;
+      setRooms((current) => [room, ...current.filter((item) => item.slug !== room.slug)]);
+      setActiveRoomSlug(room.slug);
+      setShowCreateGroup(false);
+      setNewGroupName("");
+      setNewGroupMemberIds([]);
+      setSidebarMode("chats");
+      setShowSidebar(false);
+    } catch (err) {
+      setError(err.message || "Failed to create group");
+    } finally {
+      setGroupManageBusy(false);
+    }
+  }
+
+  function mergeUpdatedRoom(room) {
+    if (!room?.slug) return;
+    setRooms((current) => current.map((item) => item.slug === room.slug ? { ...item, ...room } : item));
+  }
+
+  async function updateGroupDetails({ name, avatarFile } = {}) {
+    if (!activeRoom?.isGroup) return;
+    setGroupManageBusy(true);
+    setGroupManageNotice("");
+    setError("");
+    try {
+      const form = new FormData();
+      if (typeof name === "string") form.append("name", name.trim());
+      if (avatarFile) form.append("avatar", avatarFile);
+      const res = await authFetch(`${API_BASE}/api/groups/${encodeURIComponent(activeRoom.slug)}`, {
+        method: "PATCH",
+        headers: { "x-install-id": installId },
+        body: form,
+      });
+      const payload = await res.json();
+      if (!res.ok || !payload?.success) throw new Error(payload?.error || "Failed to update group");
+      mergeUpdatedRoom(payload.data);
+      setGroupManageNotice("Group details updated.");
+    } catch (err) {
+      setError(err.message || "Failed to update group");
+    } finally {
+      setGroupManageBusy(false);
+    }
+  }
+
+  async function addGroupMember(profileId) {
+    if (!activeRoom?.isGroup || !profileId) return;
+    setGroupManageBusy(true); setGroupManageNotice(""); setError("");
+    try {
+      const res = await authFetch(`${API_BASE}/api/groups/${encodeURIComponent(activeRoom.slug)}/members`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-install-id": installId },
+        body: JSON.stringify({ profileId }),
+      });
+      const payload = await res.json();
+      if (!res.ok || !payload?.success) throw new Error(payload?.error || "Failed to add member");
+      mergeUpdatedRoom(payload.data); setGroupManageNotice("Member added.");
+    } catch (err) { setError(err.message || "Failed to add member"); }
+    finally { setGroupManageBusy(false); }
+  }
+
+  async function removeGroupMember(profileId) {
+    if (!activeRoom?.isGroup || !profileId) return;
+    if (!window.confirm("Remove this person from the group?")) return;
+    setGroupManageBusy(true); setGroupManageNotice(""); setError("");
+    try {
+      const res = await authFetch(`${API_BASE}/api/groups/${encodeURIComponent(activeRoom.slug)}/members/${encodeURIComponent(profileId)}`, {
+        method: "DELETE", headers: { "x-install-id": installId },
+      });
+      const payload = await res.json();
+      if (!res.ok || !payload?.success) throw new Error(payload?.error || "Failed to remove member");
+      mergeUpdatedRoom(payload.data); setGroupManageNotice("Member removed.");
+    } catch (err) { setError(err.message || "Failed to remove member"); }
+    finally { setGroupManageBusy(false); }
+  }
+
+  async function setGroupAdmin(profileId, makeAdmin) {
+    if (!activeRoom?.isGroup || !profileId) return;
+    setGroupManageBusy(true); setGroupManageNotice(""); setError("");
+    try {
+      const res = await authFetch(`${API_BASE}/api/groups/${encodeURIComponent(activeRoom.slug)}/admins/${encodeURIComponent(profileId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-install-id": installId },
+        body: JSON.stringify({ admin: makeAdmin }),
+      });
+      const payload = await res.json();
+      if (!res.ok || !payload?.success) throw new Error(payload?.error || "Failed to update admin role");
+      mergeUpdatedRoom(payload.data); setGroupManageNotice(makeAdmin ? "Group admin added." : "Admin role removed.");
+    } catch (err) { setError(err.message || "Failed to update admin role"); }
+    finally { setGroupManageBusy(false); }
+  }
+
+  async function leaveActiveGroup() {
+    if (!activeRoom?.isGroup) return;
+    if (!window.confirm(`Leave ${activeRoom.name || "this group"}?`)) return;
+    setGroupManageBusy(true); setError("");
+    try {
+      const res = await authFetch(`${API_BASE}/api/groups/${encodeURIComponent(activeRoom.slug)}/leave`, {
+        method: "POST", headers: { "x-install-id": installId },
+      });
+      const payload = await res.json();
+      if (!res.ok || !payload?.success) throw new Error(payload?.error || "Failed to leave group");
+      setRooms((current) => current.filter((item) => item.slug !== activeRoom.slug));
+      setActiveRoomSlug(""); setShowChatDetails(false); setSidebarMode("chats");
+    } catch (err) { setError(err.message || "Failed to leave group"); }
+    finally { setGroupManageBusy(false); }
   }
 
   async function editMessage(message) {
@@ -5100,6 +5580,28 @@ export default function App() {
     if (roomLongPressTimerRef.current) {
       window.clearTimeout(roomLongPressTimerRef.current);
       roomLongPressTimerRef.current = null;
+    }
+  }
+
+  async function updateDisappearingMessages(seconds) {
+    if (!activeRoomSlug) return;
+    setDisappearingBusy(true);
+    setDisappearingNotice("");
+    try {
+      const res = await authFetch(`${API_BASE}/api/rooms/${encodeURIComponent(activeRoomSlug)}/disappearing`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-install-id": installId },
+        body: JSON.stringify({ seconds, installId }),
+      });
+      const payload = await res.json();
+      if (!res.ok || !payload?.success) throw new Error(payload?.error || "Failed to update disappearing messages");
+      const updated = payload.data;
+      setRooms((current) => current.map((room) => room.slug === updated.slug ? { ...room, ...updated } : room));
+      setDisappearingNotice(seconds ? `New messages will disappear after ${disappearingLabel(seconds)}.` : "Disappearing messages are off.");
+    } catch (error) {
+      setDisappearingNotice(error.message || "Failed to update disappearing messages");
+    } finally {
+      setDisappearingBusy(false);
     }
   }
 
@@ -5587,6 +6089,10 @@ export default function App() {
 
   async function handleSendMessage() {
     if (!messageInput.trim() || !canChat) return;
+    if (activeDirectContactBlocked) {
+      setError("Unblock this contact before sending messages.");
+      return;
+    }
     socket.emit("send_message", {
       roomSlug: activeRoomSlug,
       installId,
@@ -6093,10 +6599,12 @@ export default function App() {
   }
 
   function startCall() {
+    if (activeDirectContactBlocked) { setCallError("Unblock this contact before calling."); return; }
     enterCall(activeRoomHasCall ? "call:join" : "call:start", activeRoomSlugRef.current, "audio");
   }
 
   async function startVideoCall() {
+    if (activeDirectContactBlocked) { setCallError("Unblock this contact before calling."); return; }
     if (!inCallRef.current) {
       await enterCall(activeRoomHasCall ? "call:join" : "call:start", activeRoomSlugRef.current, "video");
     }
@@ -6474,6 +6982,39 @@ export default function App() {
         }}
       />
 
+      {showCreateGroup ? (
+        <div className="wa-group-modal-backdrop" data-appearance={resolvedAppearance} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowCreateGroup(false); }}>
+          <section className="wa-group-modal" role="dialog" aria-modal="true" aria-label="Create group">
+            <div className="wa-group-modal-head">
+              <div><strong>New group</strong><small>Choose a name and at least one member</small></div>
+              <button type="button" onClick={() => setShowCreateGroup(false)} aria-label="Close">×</button>
+            </div>
+            <label className="wa-group-field">Group name
+              <input value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} maxLength={60} placeholder="e.g. Family & Friends" autoFocus />
+            </label>
+            <div className="wa-group-member-picker">
+              <div className="wa-group-picker-title">Members <span>{newGroupMemberIds.length} selected</span></div>
+              <div className="wa-group-picker-list">
+                {profiles.filter((user) => String(user._id) !== String(currentProfileId || "")).map((user) => {
+                  const selected = newGroupMemberIds.includes(String(user._id));
+                  return (
+                    <label key={user._id} className={`wa-group-picker-row ${selected ? "selected" : ""}`}>
+                      <input type="checkbox" checked={selected} onChange={() => setNewGroupMemberIds((current) => selected ? current.filter((id) => id !== String(user._id)) : [...current, String(user._id)])} />
+                      <Avatar label={user.displayName} src={user.avatarUrl} />
+                      <span><strong>{user.displayName}</strong><small>{user.profileStatus || (user.online ? "Online" : "Available")}</small></span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="wa-group-modal-actions">
+              <button type="button" className="secondary" onClick={() => setShowCreateGroup(false)}>Cancel</button>
+              <button type="button" className="primary" disabled={groupManageBusy || newGroupName.trim().length < 2 || !newGroupMemberIds.length} onClick={createGroup}>{groupManageBusy ? "Creating…" : "Create group"}</button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
       {showSidebar && !showAdminDashboard ? <div className="wa-mobile-overlay" onClick={() => setShowSidebar(false)} /> : null}
 
       <div data-theme={chatPrefs.theme || "light-grey"} data-appearance={resolvedAppearance} className={`wa-app ${activeRoom ? "has-active-chat" : "no-active-chat"} bubble-${chatPrefs.bubbleShape} font-${chatPrefs.fontSize}`} style={{ "--app-color": chatPrefs.appColor, "--accent-color": chatPrefs.accentColor, "--chat-wallpaper": chatPrefs.wallpaper, "--chat-color": chatPrefs.chatColor, "--desktop-sidebar-width": `${desktopSidebarWidth}px` }}>
@@ -6554,8 +7095,68 @@ export default function App() {
           />
 
           {sidebarMode === "chats" && chatSearch.trim().length >= 2 ? (
-            <div className="wa-global-search-results">
-              <div className="wa-section-label">Message results</div>
+            <div className="wa-global-search-results wa-advanced-search">
+              <div className="wa-section-label">Search messages</div>
+              <div className="wa-search-filter-tabs" role="tablist" aria-label="Search result type">
+                {[
+                  ["all", "All"],
+                  ["messages", "Messages"],
+                  ["media", "Media"],
+                  ["links", "Links"],
+                  ["docs", "Docs"],
+                ].map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    className={globalSearchType === value ? "active" : ""}
+                    onClick={() => setGlobalSearchType(value)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div className="wa-search-filter-grid">
+                <label>
+                  <span>From</span>
+                  <select value={globalSearchSender} onChange={(e) => setGlobalSearchSender(e.target.value)}>
+                    <option value="">Anyone</option>
+                    {profiles
+                      .filter((user) => String(user._id || user.profileId || "") !== String(currentProfileId || ""))
+                      .slice()
+                      .sort((a, b) => String(a.displayName || "").localeCompare(String(b.displayName || "")))
+                      .map((user) => (
+                        <option key={user._id || user.profileId} value={user._id || user.profileId}>
+                          {user.displayName || "User"}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+                <label>
+                  <span>After</span>
+                  <input type="date" value={globalSearchDateFrom} onChange={(e) => setGlobalSearchDateFrom(e.target.value)} />
+                </label>
+                <label>
+                  <span>Before</span>
+                  <input type="date" value={globalSearchDateTo} onChange={(e) => setGlobalSearchDateTo(e.target.value)} />
+                </label>
+                {(globalSearchType !== "all" || globalSearchSender || globalSearchDateFrom || globalSearchDateTo) ? (
+                  <button
+                    type="button"
+                    className="wa-search-clear-filters"
+                    onClick={() => {
+                      setGlobalSearchType("all");
+                      setGlobalSearchSender("");
+                      setGlobalSearchDateFrom("");
+                      setGlobalSearchDateTo("");
+                    }}
+                  >
+                    Clear filters
+                  </button>
+                ) : null}
+              </div>
+              <div className="wa-search-result-summary">
+                {globalMessageSearchLoading ? "Searching…" : `${globalMessageResults.length} result${globalMessageResults.length === 1 ? "" : "s"}`}
+              </div>
               {globalMessageSearchLoading ? <div className="wa-empty dark">Searching messages…</div> : null}
               {globalMessageSearchError ? <div className="wa-error">{globalMessageSearchError}</div> : null}
               {!globalMessageSearchLoading && !globalMessageSearchError && globalMessageResults.length ? (
@@ -6568,7 +7169,10 @@ export default function App() {
                   >
                     <div className="wa-room-row-top">
                       <div className="wa-room-title">{result.roomName}</div>
-                      <span className="wa-room-sub">{new Date(result.createdAt).toLocaleDateString()}</span>
+                      <div className="wa-search-result-meta">
+                        <span className={`wa-search-type-chip ${result.category || result.type || "message"}`}>{result.categoryLabel || result.type || "Message"}</span>
+                        <span className="wa-room-sub">{new Date(result.createdAt).toLocaleDateString()}</span>
+                      </div>
                     </div>
                     <div className="wa-room-sub">
                       {result.sender}: {result.preview}
@@ -6724,24 +7328,51 @@ export default function App() {
           ) : sidebarMode === "calls" ? (
             <>
               <div className="wa-section-label">Calls</div>
-              {callHistory.length ? callHistory.map((call) => (
-                <button
-                  key={call._id || `${call.roomSlug}-${call.startedAt}`}
-                  type="button"
-                  className="wa-call-log-card wa-call-log-action"
-                  onClick={() => startCallFromHistory(call)}
-                  title={`Call ${getCallHistoryDisplayName(call)} again`}
-                >
-                  <div className="wa-room-row-top">
-                    <div className="wa-room-title">{getCallHistoryDisplayName(call)}</div>
-                    <span className={`wa-call-log-status ${call.status === "missed" ? "missed" : call.status === "rejected" ? "rejected" : ""}`}>
-                      {call.status === "missed" ? "Missed" : call.status === "rejected" ? "Rejected" : "Answered"}
-                    </span>
-                  </div>
-                  <div className="wa-room-sub">
-                    {getCallHistoryTypeLabel(call)} · {new Date(call.startedAt).toLocaleString()} · {formatCallDuration(call.durationSeconds || 0)}
-                  </div>
-                </button>
+              {groupedCallHistory.length ? groupedCallHistory.map((group) => (
+                <section className="wa-call-history-group" key={group.label}>
+                  <div className="wa-call-history-date">{group.label}</div>
+                  {group.calls.map((call) => {
+                    const direction = getCallHistoryDirection(call);
+                    const isMissed = call.status === "missed";
+                    const isRejected = call.status === "rejected";
+                    const isVideo = (call.callType || call.type) === "video";
+                    const displayName = getCallHistoryDisplayName(call);
+                    return (
+                      <button
+                        key={call._id || `${call.roomSlug}-${call.startedAt}`}
+                        type="button"
+                        className={`wa-call-log-card wa-call-log-action ${isMissed ? "is-missed" : ""}`}
+                        onClick={() => startCallFromHistory(call)}
+                        title={`Call ${displayName} again`}
+                      >
+                        <Avatar label={displayName} src={call.otherUserAvatar || ""} />
+                        <div className="wa-call-history-copy">
+                          <div className="wa-room-row-top">
+                            <div className="wa-room-title">{displayName}</div>
+                            <span className={`wa-call-log-status ${isMissed ? "missed" : isRejected ? "rejected" : ""}`}>
+                              {isMissed ? "Missed" : isRejected ? "Declined" : "Answered"}
+                            </span>
+                          </div>
+                          <div className="wa-call-history-meta">
+                            <span className={`wa-call-direction ${direction}`}>{direction === "outgoing" ? "↗" : "↙"}</span>
+                            <span>{direction === "outgoing" ? "Outgoing" : "Incoming"}</span>
+                            <span>·</span>
+                            <span>{isVideo ? "Video" : "Audio"}</span>
+                            <span>·</span>
+                            <span>{new Date(call.startedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                            {!isMissed && !isRejected && Number(call.durationSeconds || 0) > 0 ? (
+                              <>
+                                <span>·</span>
+                                <span>{formatCallDuration(call.durationSeconds || 0)}</span>
+                              </>
+                            ) : null}
+                          </div>
+                        </div>
+                        <span className="wa-call-history-redial" aria-hidden="true">{isVideo ? "📹" : "📞︎"}</span>
+                      </button>
+                    );
+                  })}
+                </section>
               )) : <div className="wa-empty dark">No call history yet.</div>}
             </>
           ) : sidebarMode === "settings" ? (
@@ -6789,6 +7420,61 @@ export default function App() {
               ) : null}
               <div className="wa-section-label">Security</div>
               <DeviceSessions />
+              <div className="wa-section-label">Privacy</div>
+              <div className="wa-settings-card wa-privacy-card">
+                <div className="wa-settings-title">Privacy</div>
+                <div className="wa-settings-note">Choose what other people can see. “My contacts” means people you have saved in Int-Messager.</div>
+
+                <label className="wa-privacy-row">
+                  <span><strong>Last seen</strong><small>Who can see when you were last active.</small></span>
+                  <select value={privacySettings.lastSeenPrivacy} disabled={privacyBusy} onChange={(e) => updatePrivacySetting("lastSeenPrivacy", e.target.value)}>
+                    <option value="everyone">Everyone</option>
+                    <option value="contacts">My contacts</option>
+                    <option value="nobody">Nobody</option>
+                  </select>
+                </label>
+
+                <label className="wa-privacy-row">
+                  <span><strong>Online status</strong><small>Control who can see when you are online.</small></span>
+                  <select value={privacySettings.onlinePrivacy} disabled={privacyBusy} onChange={(e) => updatePrivacySetting("onlinePrivacy", e.target.value)}>
+                    <option value="everyone">Everyone</option>
+                    <option value="same_as_last_seen">Same as last seen</option>
+                    <option value="nobody">Nobody</option>
+                  </select>
+                </label>
+
+                <label className="wa-privacy-row">
+                  <span><strong>Profile photo</strong><small>Who can see your current profile picture.</small></span>
+                  <select value={privacySettings.profilePhotoPrivacy} disabled={privacyBusy} onChange={(e) => updatePrivacySetting("profilePhotoPrivacy", e.target.value)}>
+                    <option value="everyone">Everyone</option>
+                    <option value="contacts">My contacts</option>
+                    <option value="nobody">Nobody</option>
+                  </select>
+                </label>
+
+                <label className="wa-privacy-toggle">
+                  <span><strong>Read receipts</strong><small>Allow blue seen receipts in direct chats. Group read state remains enabled.</small></span>
+                  <input type="checkbox" checked={privacySettings.readReceipts !== false} disabled={privacyBusy} onChange={(e) => updatePrivacySetting("readReceipts", e.target.checked)} />
+                </label>
+
+                {privacyNotice ? <div className="wa-privacy-notice">{privacyNotice}</div> : null}
+              </div>
+              <div className="wa-section-label">Blocked contacts</div>
+              <div className="wa-settings-card wa-blocked-contacts-card">
+                <div className="wa-settings-title">Blocked contacts</div>
+                <div className="wa-settings-note">Blocked people cannot message or call you directly. Group membership is unchanged.</div>
+                {blockedProfiles.length ? (
+                  <div className="wa-blocked-list">
+                    {blockedProfiles.map((user) => (
+                      <div key={user._id} className="wa-blocked-row">
+                        <Avatar label={user.displayName} src={user.avatarUrl} />
+                        <div><strong>{user.displayName}</strong><small>{user.profileStatus || "Blocked contact"}</small></div>
+                        <button type="button" disabled={contactManageBusyId === String(user._id)} onClick={() => setContactBlocked(user._id, false)}>Unblock</button>
+                      </div>
+                    ))}
+                  </div>
+                ) : <div className="wa-empty">No blocked contacts.</div>}
+              </div>
               <div className="wa-section-label">Chat view</div>
               <div className="wa-settings-card">
                 <div className="wa-settings-title">Personalize this device</div>
@@ -6853,21 +7539,37 @@ export default function App() {
             </>
           ) : (
             <>
-              <div className="wa-section-label">Contacts</div>
-              {filteredProfiles.map((user) => (
-                <button
-                  key={user._id}
-                  type="button"
-                  className="wa-user-card"
-                  onClick={() => startDirectRoom(user._id)}
-                >
-                  <Avatar label={user.displayName} src={user.avatarUrl} />
-                  <div className="wa-user-content">
-                    <div className="wa-user-name">{user.displayName}</div>
-                    <div className="wa-user-sub">{user.profileStatus || "Available now"}</div>
-                  </div>
-                </button>
-              ))}
+              <div className="wa-contacts-heading">
+                <div><div className="wa-section-label">Contacts</div><small>{savedContactIds.size} saved · {favoriteContactIds.size} favourites</small></div>
+              </div>
+              {contactManageNotice ? <div className="wa-contact-notice">{contactManageNotice}</div> : null}
+              {[
+                ["Favourites", favoriteProfiles],
+                ["Saved contacts", savedProfiles],
+                ["People on Int-Messager", otherProfiles],
+              ].map(([label, list]) => list.length ? (
+                <section className="wa-contact-section" key={label}>
+                  <div className="wa-contact-section-title">{label}</div>
+                  {list.map((user) => {
+                    const userId = String(user._id);
+                    const saved = savedContactIds.has(userId);
+                    const favorite = favoriteContactIds.has(userId);
+                    return (
+                      <div key={userId} className="wa-contact-card">
+                        <button type="button" className="wa-contact-main" onClick={() => startDirectRoom(user._id)}>
+                          <Avatar label={user.displayName} src={user.avatarUrl} />
+                          <span className="wa-user-content"><span className="wa-user-name">{user.displayName}</span><span className="wa-user-sub">{user.online ? "Online" : user.profileStatus || "Available now"}</span></span>
+                        </button>
+                        <div className="wa-contact-actions">
+                          <button type="button" title={saved ? "Remove from saved contacts" : "Save contact"} disabled={contactManageBusyId === userId} onClick={() => updateContactPreference(userId, { saved: !saved })}>{saved ? "✓ Saved" : "+ Save"}</button>
+                          <button type="button" title={favorite ? "Remove favourite" : "Add favourite"} disabled={contactManageBusyId === userId} onClick={() => updateContactPreference(userId, { favorite: !favorite })}>{favorite ? "★" : "☆"}</button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </section>
+              ) : null)}
+              {!favoriteProfiles.length && !savedProfiles.length && !otherProfiles.length ? <div className="wa-empty dark">No contacts match your search.</div> : null}
             </>
           )}
           </div>
@@ -6937,7 +7639,7 @@ export default function App() {
                           : activeRoomHasCall
                             ? `${callParticipants.length || activeRoom?.activeCallParticipants?.length || 1} in call`
                             : activeRoom.isDirect
-                              ? "Private chat"
+                              ? formatPresenceLabel(activeRoomOtherProfile)
                               : "Group chat"}
                     </div>
                   </button>
@@ -7321,7 +8023,7 @@ export default function App() {
               <section className="wa-details-hero">
                 <Avatar label={getRoomDisplayName(activeRoom, profile?.displayName, currentProfileId, profiles)} src={getRoomAvatarSrc(activeRoom)} className="details" />
                 <h2>{getRoomDisplayName(activeRoom, profile?.displayName, currentProfileId, profiles)}</h2>
-                <p>{activeRoom?.isDirect ? (activeRoomOtherProfile?.profileStatus || "No status") : "General group chat"}</p>
+                <p>{activeRoom?.isDirect ? formatPresenceLabel(activeRoomOtherProfile) : activeRoom?.isGroup ? `${activeRoom.participants?.length || 0} members` : "General group chat"}</p>
               </section>
 
               <section className="wa-details-actions">
@@ -7332,6 +8034,73 @@ export default function App() {
                 <button type="button" onClick={() => exportChat("json")}>⬇ Export JSON</button>
                 <button type="button" onClick={() => clearChatHistory()}>Clear history</button>
               </section>
+
+              {activeRoom?.isDirect && !activeRoom?.isSaved && activeRoomOtherProfile ? (
+                <section className="wa-details-card wa-contact-management-card">
+                  <div className="wa-details-card-title">Contact</div>
+                  <div className="wa-contact-detail-actions">
+                    <button type="button" disabled={contactManageBusyId === activeDirectContactId} onClick={() => updateContactPreference(activeDirectContactId, { saved: !activeDirectContactSaved })}>{activeDirectContactSaved ? "✓ Saved contact" : "+ Save contact"}</button>
+                    <button type="button" disabled={contactManageBusyId === activeDirectContactId} onClick={() => updateContactPreference(activeDirectContactId, { favorite: !activeDirectContactFavorite })}>{activeDirectContactFavorite ? "★ Favourite" : "☆ Add favourite"}</button>
+                    <button type="button" className={activeDirectContactBlocked ? "" : "danger"} disabled={contactManageBusyId === activeDirectContactId} onClick={() => setContactBlocked(activeDirectContactId, !activeDirectContactBlocked)}>{activeDirectContactBlocked ? "Unblock contact" : "Block contact"}</button>
+                  </div>
+                  {activeDirectContactBlocked ? <div className="wa-contact-blocked-banner">This contact is blocked. Direct messages, files and calls are disabled until you unblock them.</div> : null}
+                </section>
+              ) : null}
+
+              {activeRoom?.isGroup ? (
+                <section className="wa-details-card wa-group-management-card">
+                  <div className="wa-group-section-heading">
+                    <div><div className="wa-details-card-title">Group management</div><small>{activeRoom.participants?.length || 0} members · {currentUserIsGroupOwner ? "You are the owner" : currentUserIsGroupAdmin ? "You are an admin" : "Member"}</small></div>
+                  </div>
+
+                  {currentUserIsGroupAdmin ? (
+                    <div className="wa-group-edit-grid">
+                      <label className="wa-group-field">Group name
+                        <div className="wa-group-inline-edit">
+                          <input defaultValue={activeRoom.name || ""} key={`group-name-${activeRoom.slug}-${activeRoom.name}`} id="wa-group-name-input" maxLength={60} />
+                          <button type="button" disabled={groupManageBusy} onClick={() => updateGroupDetails({ name: document.getElementById("wa-group-name-input")?.value || activeRoom.name })}>Save</button>
+                        </div>
+                      </label>
+                      <label className="wa-group-photo-control">Change group photo
+                        <input type="file" accept="image/*" disabled={groupManageBusy} onChange={(e) => { const file = e.target.files?.[0]; if (file) updateGroupDetails({ avatarFile: file }); e.target.value = ""; }} />
+                      </label>
+                    </div>
+                  ) : null}
+
+                  {currentUserIsGroupAdmin && availableGroupMembers.length ? (
+                    <div className="wa-group-add-row">
+                      <select id="wa-group-add-select" defaultValue="">
+                        <option value="" disabled>Add someone…</option>
+                        {availableGroupMembers.map((user) => <option key={user._id} value={user._id}>{user.displayName}</option>)}
+                      </select>
+                      <button type="button" disabled={groupManageBusy} onClick={() => { const el = document.getElementById("wa-group-add-select"); if (el?.value) addGroupMember(el.value); }}>Add member</button>
+                    </div>
+                  ) : null}
+
+                  {groupManageNotice ? <div className="wa-group-notice">{groupManageNotice}</div> : null}
+
+                  <div className="wa-group-member-list">
+                    {activeGroupMembers.map((member) => {
+                      const memberId = String(member._id || "");
+                      const isOwner = String(activeRoom.ownerProfileId || "") === memberId;
+                      const isAdmin = isOwner || (activeRoom.groupAdmins || []).some((id) => String(id) === memberId);
+                      const isMe = memberId === String(currentProfileId || "");
+                      return (
+                        <div key={memberId} className="wa-group-member-row">
+                          <Avatar label={member.displayName || "Member"} src={member.avatarUrl || ""} />
+                          <div className="wa-group-member-copy"><strong>{isMe ? `${member.displayName || "Me"} (You)` : member.displayName || "Member"}</strong><small>{isOwner ? "Group owner" : isAdmin ? "Group admin" : member.profileStatus || "Member"}</small></div>
+                          <div className="wa-group-member-actions">
+                            {currentUserIsGroupOwner && !isOwner && !isMe ? <button type="button" onClick={() => setGroupAdmin(memberId, !isAdmin)} disabled={groupManageBusy}>{isAdmin ? "Remove admin" : "Make admin"}</button> : null}
+                            {currentUserIsGroupAdmin && !isOwner && !isMe ? <button type="button" className="danger" onClick={() => removeGroupMember(memberId)} disabled={groupManageBusy}>Remove</button> : null}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <button type="button" className="wa-group-leave-btn" disabled={groupManageBusy} onClick={leaveActiveGroup}>Leave group</button>
+                </section>
+              ) : null}
 
               <section className="wa-settings-card wa-details-card">
                 <div className="wa-settings-title">Chat theme</div>
@@ -7345,18 +8114,104 @@ export default function App() {
                 <div className="wa-empty">⭐ {activeStarredCount} starred message{activeStarredCount === 1 ? "" : "s"}</div>
               </section>
 
-              <section className="wa-details-card">
-                <div className="wa-details-card-title">Media in this chat</div>
-                {activeRoomMedia.length ? (
-                  <div className="wa-media-grid">
-                    {activeRoomMedia.map((message) => (
-                      <a key={message._id} href={resolveMediaUrl(message.fileUrl)} target="_blank" rel="noreferrer" className="wa-media-item">
-                        <span>{message.type === "audio" ? "🎤" : "📎"}</span>
-                        <small>{message.fileName || message.content || "Media"}</small>
+              <section className="wa-details-card wa-shared-content-card">
+                <div className="wa-shared-content-heading">
+                  <div>
+                    <div className="wa-details-card-title">Media, links & docs</div>
+                    <small>Everything shared in this conversation, organised by type.</small>
+                  </div>
+                  <span className="wa-shared-total">{activeRoomSharedContent.media.length + activeRoomSharedContent.docs.length + activeRoomSharedContent.links.length + activeRoomSharedContent.voice.length}</span>
+                </div>
+
+                <div className="wa-shared-tabs" role="tablist" aria-label="Shared content types">
+                  {[
+                    ["media", "Media", activeRoomSharedContent.media.length],
+                    ["links", "Links", activeRoomSharedContent.links.length],
+                    ["docs", "Docs", activeRoomSharedContent.docs.length],
+                    ["voice", "Voice", activeRoomSharedContent.voice.length],
+                  ].map(([key, label, count]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      role="tab"
+                      aria-selected={sharedContentTab === key}
+                      className={sharedContentTab === key ? "active" : ""}
+                      onClick={() => setSharedContentTab(key)}
+                    >
+                      {label}<span>{count}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {!activeSharedContentItems.length ? (
+                  <div className="wa-shared-empty">No {sharedContentTab === "voice" ? "voice notes" : sharedContentTab} shared yet.</div>
+                ) : sharedContentTab === "media" ? (
+                  <div className="wa-shared-media-grid">
+                    {activeSharedContentItems.map((message) => {
+                      const href = resolveMediaUrl(message.fileUrl);
+                      return (
+                        <a key={message._id} href={href} target="_blank" rel="noreferrer" className="wa-shared-media-tile">
+                          {isImageAttachment(message) ? (
+                            <img src={href} alt={message.fileName || "Shared image"} loading="lazy" />
+                          ) : (
+                            <div className="wa-shared-video-placeholder"><span>▶</span><small>{message.fileName || "Video"}</small></div>
+                          )}
+                          <div className="wa-shared-media-meta">{formatSharedItemDate(message.createdAt)}</div>
+                        </a>
+                      );
+                    })}
+                  </div>
+                ) : sharedContentTab === "links" ? (
+                  <div className="wa-shared-list">
+                    {activeSharedContentItems.map((item) => {
+                      let host = item.url;
+                      try { host = new URL(item.url).hostname.replace(/^www\./, ""); } catch {}
+                      return (
+                        <a key={item.id} href={item.url} target="_blank" rel="noreferrer" className="wa-shared-row wa-shared-link-row">
+                          <span className="wa-shared-icon">🔗</span>
+                          <span className="wa-shared-copy"><strong>{host}</strong><small>{item.url}</small><em>{item.sender} · {formatSharedItemDate(item.createdAt)}</em></span>
+                          <span className="wa-shared-open">↗</span>
+                        </a>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="wa-shared-list">
+                    {activeSharedContentItems.map((message) => (
+                      <a key={message._id} href={resolveMediaUrl(message.fileUrl)} target="_blank" rel="noreferrer" className="wa-shared-row">
+                        <span className="wa-shared-icon">{sharedContentTab === "voice" ? "🎤" : isPdfAttachment(message) ? "PDF" : "📄"}</span>
+                        <span className="wa-shared-copy">
+                          <strong>{message.fileName || (sharedContentTab === "voice" ? "Voice note" : "Document")}</strong>
+                          <small>{sharedContentTab === "voice" ? "Voice note" : getFileKindLabel(message)}</small>
+                          <em>{message.sender || "User"} · {formatSharedItemDate(message.createdAt)}</em>
+                        </span>
+                        <span className="wa-shared-open">↗</span>
                       </a>
                     ))}
                   </div>
-                ) : <div className="wa-empty">No media shared yet.</div>}
+                )}
+              </section>
+
+              <section className="wa-details-card wa-disappearing-card">
+                <div className="wa-details-card-title">Disappearing messages</div>
+                <div className="wa-disappearing-copy">New messages sent after this setting is changed will automatically disappear for everyone after the selected period.</div>
+                <label className="wa-disappearing-select-row">
+                  <span>Message timer</span>
+                  <select
+                    value={Number(activeRoom?.disappearingSeconds || 0)}
+                    disabled={disappearingBusy || (activeRoom?.isGroup && !currentUserIsGroupAdmin) || (activeRoomSlug === "general" && profile?.role !== "admin")}
+                    onChange={(event) => updateDisappearingMessages(Number(event.target.value))}
+                  >
+                    <option value={0}>Off</option>
+                    <option value={86400}>24 hours</option>
+                    <option value={604800}>7 days</option>
+                    <option value={7776000}>90 days</option>
+                  </select>
+                </label>
+                <div className="wa-disappearing-status">Current setting: <strong>{disappearingLabel(activeRoom?.disappearingSeconds)}</strong></div>
+                {activeRoom?.isGroup && !currentUserIsGroupAdmin ? <small>Only group admins can change this setting.</small> : null}
+                {activeRoomSlug === "general" && profile?.role !== "admin" ? <small>Only an Int-Messager administrator can change this setting for General.</small> : null}
+                {disappearingNotice ? <div className="wa-disappearing-notice">{disappearingNotice}</div> : null}
               </section>
 
               <section className="wa-details-card danger-zone">
@@ -7388,6 +8243,10 @@ export default function App() {
                   <button type="button" className="wa-home-action" onClick={() => { setSidebarMode("people"); setShowSidebar(true); }}>
                     <span className="wa-home-action-icon">✚</span>
                     New chat
+                  </button>
+                  <button type="button" className="wa-home-action" onClick={() => { setNewGroupName(""); setNewGroupMemberIds([]); setShowCreateGroup(true); }}>
+                    <span className="wa-home-action-icon">👥</span>
+                    New group
                   </button>
                   <button type="button" className="wa-home-action" onClick={() => {
                     const savedRoom = roomsSorted.find((room) => room.isSaved);
@@ -7614,24 +8473,34 @@ export default function App() {
       ) : null}
 
       {incomingCall ? (
-        <div className="wa-incoming-call">
-          <div className="wa-incoming-title">
-            {incomingCall.roomSlug === "general"
-              ? "Incoming General call"
-              : `${incomingCall.name || "Someone"} is calling`}
-          </div>
-          {incomingCall.roomSlug === "general" ? (
-            <div className="wa-incoming-sub">
-              {incomingCall.name || "Someone"} is calling in General
+        <div className="wa-incoming-call-backdrop" role="presentation">
+          <div className="wa-incoming-call" role="dialog" aria-modal="true" aria-label="Incoming call">
+            <div className="wa-incoming-call-kind">
+              {(incomingCall.callType || incomingCall.type) === "video" ? "Incoming video call" : "Incoming audio call"}
             </div>
-          ) : null}
-          <div className="wa-incoming-actions">
-            <button type="button" className="wa-call-btn secondary" onClick={declineIncomingCall}>
-              Decline
-            </button>
-            <button type="button" className="wa-call-btn" onClick={() => joinCall(incomingCall.roomSlug)}>
-              Join
-            </button>
+            <Avatar
+              label={incomingCall.name || "Caller"}
+              src={getProfileAvatarById(incomingCall.profileId) || ""}
+              className="incoming-call-avatar"
+            />
+            <div className="wa-incoming-title">
+              {incomingCall.roomSlug === "general" ? "General" : (incomingCall.name || "Someone")}
+            </div>
+            <div className="wa-incoming-sub">
+              {incomingCall.roomSlug === "general"
+                ? `${incomingCall.name || "Someone"} started a call in General`
+                : "Int-Messager call"}
+            </div>
+            <div className="wa-incoming-actions">
+              <button type="button" className="wa-incoming-action decline" onClick={declineIncomingCall}>
+                <span aria-hidden="true">✕</span>
+                <small>Decline</small>
+              </button>
+              <button type="button" className="wa-incoming-action accept" onClick={() => joinCall(incomingCall.roomSlug)}>
+                <span aria-hidden="true">📞︎</span>
+                <small>Answer</small>
+              </button>
+            </div>
           </div>
         </div>
       ) : null}

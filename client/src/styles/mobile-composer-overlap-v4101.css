@@ -1,0 +1,102 @@
+/* Int-Messager v4.10.1
+   Phone-only message/composer overlap hardening.
+   Uses the live composer height and the browser visual viewport. */
+
+:root {
+  --wa-visible-viewport-height: 100dvh;
+}
+
+@media (max-width: 900px) {
+  html,
+  body,
+  #root {
+    height: var(--wa-visible-viewport-height, 100dvh) !important;
+    max-height: var(--wa-visible-viewport-height, 100dvh) !important;
+    overflow: hidden !important;
+  }
+
+  .wa-app,
+  .wa-main {
+    height: var(--wa-visible-viewport-height, 100dvh) !important;
+    max-height: var(--wa-visible-viewport-height, 100dvh) !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .wa-conversation-stack.wa-mobile-overlap-safe {
+    --wa-live-composer-height: 64px;
+    min-height: 0 !important;
+    height: auto !important;
+    max-height: 100% !important;
+    overflow: hidden !important;
+    grid-template-rows: minmax(0, 1fr) auto !important;
+  }
+
+  .wa-mobile-overlap-safe .wa-conversation-message-area {
+    min-height: 0 !important;
+    overflow: hidden !important;
+    position: relative !important;
+    z-index: 1 !important;
+  }
+
+  .wa-mobile-overlap-safe .wa-conversation-message-area > .wa-chat {
+    min-height: 0 !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    box-sizing: border-box !important;
+    /* A real safety reserve equal to the composer prevents the last bubble/media
+       from ever being hidden, even if another legacy rule makes the composer overlay. */
+    padding-bottom: calc(var(--wa-live-composer-height, 64px) + 18px + env(safe-area-inset-bottom, 0px)) !important;
+    scroll-padding-bottom: calc(var(--wa-live-composer-height, 64px) + 18px + env(safe-area-inset-bottom, 0px)) !important;
+    overscroll-behavior-y: contain !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .wa-mobile-overlap-safe .wa-conversation-composer-area {
+    position: relative !important;
+    inset: auto !important;
+    bottom: auto !important;
+    transform: none !important;
+    z-index: 20 !important;
+    flex: 0 0 auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+    overflow: visible !important;
+    isolation: isolate;
+  }
+
+  .wa-mobile-overlap-safe .wa-conversation-composer-area .wa-composer,
+  .wa-mobile-overlap-safe .wa-conversation-composer-area .wa-composer-wrap {
+    position: relative !important;
+    inset: auto !important;
+    bottom: auto !important;
+    transform: none !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Prevent tall media from escaping underneath the composer row. */
+  .wa-mobile-overlap-safe .wa-message-row,
+  .wa-mobile-overlap-safe .wa-bubble,
+  .wa-mobile-overlap-safe .wa-image-preview,
+  .wa-mobile-overlap-safe .wa-attachment-card,
+  .wa-mobile-overlap-safe .wa-pdf-card,
+  .wa-mobile-overlap-safe video,
+  .wa-mobile-overlap-safe img {
+    position: relative;
+    z-index: auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .wa-mobile-overlap-safe .wa-conversation-message-area > .wa-chat {
+    padding-bottom: calc(var(--wa-live-composer-height, 64px) + 22px + env(safe-area-inset-bottom, 0px)) !important;
+    scroll-padding-bottom: calc(var(--wa-live-composer-height, 64px) + 22px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}

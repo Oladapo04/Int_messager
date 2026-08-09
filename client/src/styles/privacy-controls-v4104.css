@@ -1,0 +1,41 @@
+/* Int-Messager v4.10.4 — Privacy & Profile Controls */
+.wa-privacy-card { display: grid; gap: 10px; }
+.wa-privacy-row,
+.wa-privacy-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-top: 1px solid rgba(148, 163, 184, .18);
+}
+.wa-privacy-row > span,
+.wa-privacy-toggle > span { display: grid; gap: 3px; min-width: 0; }
+.wa-privacy-row strong,
+.wa-privacy-toggle strong { font-size: 14px; }
+.wa-privacy-row small,
+.wa-privacy-toggle small { color: #64748b; line-height: 1.35; }
+.wa-privacy-row select {
+  min-width: 150px;
+  max-width: 190px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #fff;
+  color: #0f172a;
+  padding: 9px 10px;
+}
+.wa-privacy-toggle input { width: 20px; height: 20px; accent-color: var(--accent-color, #22c55e); }
+.wa-privacy-notice { font-size: 12px; color: #166534; font-weight: 700; }
+.wa-app[data-appearance="dark"] .wa-privacy-row small,
+.wa-app[data-appearance="dark"] .wa-privacy-toggle small { color: #94a3b8; }
+.wa-app[data-appearance="dark"] .wa-privacy-row select {
+  background: #111827;
+  border-color: #334155;
+  color: #f8fafc;
+}
+.wa-app[data-appearance="dark"] .wa-privacy-notice { color: #86efac; }
+@media (max-width: 600px) {
+  .wa-privacy-row { align-items: stretch; flex-direction: column; gap: 8px; }
+  .wa-privacy-row select { width: 100%; max-width: none; }
+  .wa-privacy-toggle { align-items: center; }
+}

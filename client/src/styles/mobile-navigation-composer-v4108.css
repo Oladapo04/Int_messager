@@ -1,0 +1,139 @@
+/* Int-Messager v4.10.8 — navigation profile + mobile composer fit */
+
+/* Keep the app inside the visual viewport. Some older structural rules gave
+   .wa-app 100dvh and then added padding on top, which can clip the rail foot. */
+.wa-app,
+.wa-sidebar,
+.wa-nav-rail,
+.wa-main,
+.wa-conversation-stack,
+.wa-conversation-composer-area,
+.wa-composer {
+  box-sizing: border-box !important;
+}
+
+.wa-app {
+  max-height: 100dvh !important;
+}
+
+/* The profile control always owns a visible final row in the desktop rail. */
+.wa-nav-rail {
+  min-height: 0 !important;
+  max-height: 100% !important;
+  overflow: hidden !important;
+}
+
+.wa-rail-nav {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+}
+
+.wa-rail-profile {
+  flex: 0 0 auto !important;
+  margin-top: auto !important;
+  margin-bottom: max(2px, env(safe-area-inset-bottom, 0px)) !important;
+  position: relative !important;
+  z-index: 2 !important;
+}
+
+/* Composer children are allowed to shrink instead of forcing the Send button
+   outside the rounded composer boundary on narrow screens. */
+.wa-conversation-composer-area .wa-composer {
+  min-width: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+}
+
+.wa-composer > *,
+.wa-composer .wa-input-wrap {
+  min-width: 0 !important;
+}
+
+.wa-composer .wa-input-wrap {
+  flex: 1 1 0 !important;
+}
+
+.wa-composer .wa-input {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.wa-composer > .wa-send-btn,
+.wa-conversation-composer-area .wa-send-btn {
+  flex: 0 0 auto !important;
+  min-width: 60px !important;
+  max-width: 76px !important;
+  width: auto !important;
+  box-sizing: border-box !important;
+  white-space: nowrap !important;
+}
+
+@media (max-width: 900px) {
+  html,
+  body,
+  #root,
+  .wa-app {
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+  }
+
+  /* When the rail is vertical (tablet/narrow desktop variants), retain a
+     protected footer area for the user avatar. */
+  .wa-nav-rail {
+    padding-bottom: max(12px, env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  /* Existing bottom-navigation mode intentionally hides the rail profile;
+     the rule below only affects variants where it remains visible. */
+  .wa-rail-profile:not([hidden]) {
+    bottom: auto !important;
+  }
+
+  .wa-conversation-composer-area,
+  .wa-composer {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .wa-composer {
+    gap: 5px !important;
+    padding-left: 6px !important;
+    padding-right: 6px !important;
+  }
+
+  .wa-composer > .wa-send-btn,
+  .wa-conversation-composer-area .wa-send-btn {
+    min-width: 56px !important;
+    max-width: 66px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    padding: 0 9px !important;
+    font-size: 12px !important;
+    border-radius: 12px !important;
+  }
+}
+
+@media (max-width: 390px) {
+  .wa-composer {
+    gap: 4px !important;
+    padding-left: 5px !important;
+    padding-right: 5px !important;
+  }
+
+  .wa-composer .wa-icon-btn {
+    width: 32px !important;
+    height: 32px !important;
+    flex-basis: 32px !important;
+  }
+
+  .wa-composer > .wa-send-btn,
+  .wa-conversation-composer-area .wa-send-btn {
+    min-width: 52px !important;
+    max-width: 60px !important;
+    padding: 0 7px !important;
+    font-size: 11px !important;
+  }
+}

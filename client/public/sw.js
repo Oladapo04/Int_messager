@@ -1,66 +1,43 @@
-const CACHE_NAME = "int-messager-pwa-v2";
-const APP_SHELL = ["/", "/manifest.webmanifest"];
-
-self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)).then(() => self.skipWaiting()));
-});
-
-self.addEventListener("activate", (event) => {
-  event.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)))).then(() => self.clients.claim()));
-});
-
-self.addEventListener("fetch", (event) => {
-  const request = event.request;
-  const url = new URL(request.url);
-  if (request.method !== "GET") return;
-  if (url.pathname.startsWith("/api") || url.pathname.startsWith("/socket.io") || url.pathname.startsWith("/uploads")) return;
-
-  if (request.mode === "navigate") {
-    event.respondWith(fetch(request).catch(() => caches.match("/")));
-    return;
-  }
-
-  event.respondWith(caches.match(request).then((cached) => {
-    if (cached) return cached;
-    return fetch(request).then((response) => {
-      const clone = response.clone();
-      caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-      return response;
-    });
-  }));
-});
-
 self.addEventListener("push", (event) => {
-  let data = {};
+  let payload = {};
   try {
-    data = event.data ? event.data.json() : {};
-  } catch {
-    data = { title: "Int Messager", body: event.data ? event.data.text() : "New notification" };
+    payload = event.data ? event.data.json() : {};
+  } catch (_) {
+    payload = { title: "Int-Messager", body: event.data ? event.data.text() : "New activity" };
   }
 
-  const type = data.type || "message";
-  event.waitUntil(self.registration.showNotification(data.title || "Int Messager", {
-    body: data.body || "New notification",
-    icon: data.icon || "/icons/icon-192.png",
-    badge: data.badge || "/icons/icon-192.png",
-    tag: data.tag || `${type}-${data.roomSlug || "general"}`,
-    data: { url: data.url || "/", roomSlug: data.roomSlug || "", type },
-    requireInteraction: type === "call",
-    vibrate: type === "call" ? [300, 120, 300, 120, 300] : [180, 80, 180],
-    silent: false,
-  }));
+  const title = payload.title || "Int-Messager";
+  const options = {
+    body: payload.body || "New activity",
+    icon: payload.senderAvatarUrl || "/vite.svg",
+    badge: "/vite.svg",
+    tag: payload.tag || `int-messager-${Date.now()}`,
+    renotify: true,
+    data: {
+      url: payload.url || "/",
+      roomSlug: payload.roomSlug || "",
+      type: payload.type || "message",
+    },
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
 });
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = event.notification?.data?.url || "/";
-  event.waitUntil(clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
-    for (const client of clientList) {
+  const targetUrl = new URL(event.notification.data?.url || "/", self.location.origin).href;
+
+  event.waitUntil((async () => {
+    const windows = await clients.matchAll({ type: "window", includeUncontrolled: true });
+    for (const client of windows) {
+      if ("navigate" in client) {
+        await client.navigate(targetUrl);
+      }
       if ("focus" in client) {
-        client.navigate(url);
-        return client.focus();
+        await client.focus();
+        return;
       }
     }
-    if (clients.openWindow) return clients.openWindow(url);
-  }));
+    if (clients.openWindow) await clients.openWindow(targetUrl);
+  })());
 });

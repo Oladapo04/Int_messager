@@ -1,0 +1,41 @@
+/* Int-Messager v4.10.5 — call experience */
+.wa-call-history-group { display: grid; gap: 7px; margin: 0 0 14px; }
+.wa-call-history-date { padding: 4px 6px; font-size: 11px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: .06em; }
+.wa-call-log-card.wa-call-log-action { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; width: 100%; text-align: left; }
+.wa-call-history-copy { min-width: 0; }
+.wa-call-history-meta { display: flex; gap: 5px; align-items: center; flex-wrap: wrap; margin-top: 4px; color: #64748b; font-size: 12px; }
+.wa-call-direction { font-size: 15px; font-weight: 900; }
+.wa-call-direction.outgoing { color: #16a34a; }
+.wa-call-direction.incoming { color: #2563eb; }
+.wa-call-log-card.is-missed .wa-call-direction.incoming, .wa-call-log-card.is-missed .wa-room-title { color: #dc2626; }
+.wa-call-history-redial { width: 34px; height: 34px; border-radius: 999px; display: grid; place-items: center; background: rgba(37,99,235,.08); font-size: 15px; }
+
+.wa-incoming-call-backdrop { position: fixed; inset: 0; z-index: 120; display: grid; place-items: center; padding: 20px; background: rgba(2,6,23,.42); backdrop-filter: blur(8px); }
+.wa-incoming-call { position: relative !important; inset: auto !important; width: min(390px, calc(100vw - 32px)) !important; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 30px 24px 24px !important; border-radius: 28px !important; background: rgba(255,255,255,.98) !important; box-shadow: 0 28px 80px rgba(2,6,23,.30) !important; text-align: center; }
+.wa-incoming-call-kind { font-size: 12px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: .08em; }
+.wa-incoming-call .wa-avatar.incoming-call-avatar { width: 92px; height: 92px; font-size: 30px; margin: 4px 0 2px; box-shadow: 0 12px 30px rgba(15,23,42,.16); }
+.wa-incoming-title { font-size: 24px !important; line-height: 1.2; font-weight: 900; }
+.wa-incoming-sub { color: #64748b; font-size: 13px; }
+.wa-incoming-actions { width: 100%; display: flex; justify-content: space-around; gap: 30px; margin-top: 18px; }
+.wa-incoming-action { border: 0; background: transparent; display: grid; justify-items: center; gap: 7px; cursor: pointer; color: #334155; }
+.wa-incoming-action > span { width: 58px; height: 58px; border-radius: 999px; display: grid; place-items: center; color: white; font-size: 22px; box-shadow: 0 9px 24px rgba(15,23,42,.16); }
+.wa-incoming-action small { font-size: 12px; font-weight: 800; }
+.wa-incoming-action.decline > span { background: #dc2626; }
+.wa-incoming-action.accept > span { background: #16a34a; }
+
+.wa-app[data-appearance="dark"] .wa-incoming-call { background: rgba(15,23,42,.98) !important; color: #f8fafc; }
+.wa-app[data-appearance="dark"] .wa-incoming-call-kind,
+.wa-app[data-appearance="dark"] .wa-incoming-sub,
+.wa-app[data-appearance="dark"] .wa-call-history-meta,
+.wa-app[data-appearance="dark"] .wa-call-history-date { color: #94a3b8; }
+.wa-app[data-appearance="dark"] .wa-call-history-redial { background: rgba(96,165,250,.13); }
+
+@media (max-width: 760px) {
+  .wa-incoming-call-backdrop { padding: 0; align-items: stretch; }
+  .wa-incoming-call { width: 100% !important; min-height: 100dvh; border-radius: 0 !important; justify-content: center; padding: max(34px, env(safe-area-inset-top)) 24px max(30px, env(safe-area-inset-bottom)) !important; }
+  .wa-incoming-call .wa-avatar.incoming-call-avatar { width: 116px; height: 116px; font-size: 38px; margin-bottom: 8px; }
+  .wa-incoming-title { font-size: 28px !important; }
+  .wa-incoming-actions { margin-top: 52px; max-width: 320px; }
+  .wa-incoming-action > span { width: 68px; height: 68px; font-size: 25px; }
+  .wa-call-log-card.wa-call-log-action { grid-template-columns: auto minmax(0, 1fr) auto; padding: 10px 8px; }
+}

@@ -1,8 +1,7 @@
-# v4.9.5
+# v4.10.8
 
-- Fixed message composer overlapping the last chat message/attachment.
-- Added a dedicated conversation layout stack.
-- Message history now owns the scrollable area above the composer.
-- Composer now reserves real layout height instead of relying on bottom padding.
-- Added mobile safe-area handling.
-- Existing message bubble, image, PDF, admin dashboard, and dark-mode designs are unchanged.
+- Fixed clipped user/profile icon at the bottom of the navigation rail.
+- Added viewport-safe sizing to prevent rail footer clipping.
+- Fixed Send button overflow on narrow composer widths.
+- Improved mobile composer child shrinking at <=900px and <=390px.
+- Preserved all prior messaging, privacy, call, admin and disappearing-message features.

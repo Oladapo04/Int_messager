@@ -1,0 +1,17 @@
+/* Int-Messager v4.10.7 — disappearing messages */
+.wa-disappearing-card { display: grid; gap: 12px; }
+.wa-disappearing-copy { font-size: 13px; line-height: 1.5; color: #64748b; }
+.wa-disappearing-select-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; font-size: 13px; font-weight: 700; }
+.wa-disappearing-select-row select { min-width: 132px; border: 1px solid rgba(148,163,184,.35); border-radius: 12px; padding: 9px 10px; background: #fff; color: #0f172a; }
+.wa-disappearing-status { font-size: 12px; color: #64748b; }
+.wa-disappearing-notice { font-size: 12px; border-radius: 10px; padding: 9px 10px; background: rgba(14,165,233,.09); color: #0369a1; }
+.wa-expiry-meta { font-size: 10px; opacity: .78; white-space: nowrap; }
+.wa-app[data-appearance="dark"] .wa-disappearing-copy,
+.wa-app[data-appearance="dark"] .wa-disappearing-status { color: #94a3b8; }
+.wa-app[data-appearance="dark"] .wa-disappearing-select-row select { background: #0f172a; color: #e2e8f0; border-color: rgba(148,163,184,.25); }
+.wa-app[data-appearance="dark"] .wa-disappearing-notice { background: rgba(14,165,233,.14); color: #7dd3fc; }
+@media (max-width: 760px) {
+  .wa-disappearing-select-row { align-items: stretch; flex-direction: column; gap: 7px; }
+  .wa-disappearing-select-row select { width: 100%; min-width: 0; font-size: 16px; }
+  .wa-expiry-meta { max-width: 92px; overflow: hidden; text-overflow: ellipsis; }
+}

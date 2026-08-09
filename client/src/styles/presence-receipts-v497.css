@@ -1,0 +1,51 @@
+/* Int-Messager v4.9.7 — Presence, typing and read receipts */
+
+.wa-receipt {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 14px;
+  margin-left: 1px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -2px;
+  color: #667781;
+  user-select: none;
+}
+
+.wa-receipt-seen {
+  color: #53bdeb;
+}
+
+.wa-header-sub {
+  min-height: 16px;
+  transition: color 140ms ease, opacity 140ms ease;
+}
+
+/* Typing/recording states are deliberately more prominent than passive presence. */
+.wa-header-title-wrap .wa-header-sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[data-appearance="dark"] .wa-receipt,
+html[data-appearance="dark"] .wa-receipt {
+  color: #94a3b8;
+}
+
+[data-appearance="dark"] .wa-receipt-seen,
+html[data-appearance="dark"] .wa-receipt-seen {
+  color: #53bdeb;
+}
+
+@media (max-width: 900px) {
+  .wa-receipt {
+    font-size: 12px;
+  }
+
+  .wa-header-sub {
+    max-width: min(58vw, 270px);
+  }
+}
