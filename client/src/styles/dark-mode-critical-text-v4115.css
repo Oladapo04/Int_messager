@@ -1,0 +1,115 @@
+/* Int-Messager v4.10.15 — dark-mode critical text hotfix.
+   Loaded after v4.10.14 to repair stubborn low-contrast areas:
+   app brand, sidebar profile card, contact save buttons, and related labels. */
+
+.wa-app[data-appearance="dark"] {
+  --dm15-text-strong: #f8fbff;
+  --dm15-text-secondary: #d9e6f2;
+  --dm15-text-accent: #eaf4ff;
+  --dm15-border: #4a6278;
+  --dm15-btn-bg: #162433;
+  --dm15-btn-bg-hover: #1c2d3f;
+}
+
+/* App name / brand in sidebar and mobile header */
+.wa-app[data-appearance="dark"] .wa-brand,
+.wa-app[data-appearance="dark"] .wa-brand span,
+.wa-app[data-appearance="dark"] .wa-header-title,
+.wa-app[data-appearance="dark"] .wa-launch-name,
+.wa-app[data-appearance="dark"] .wa-welcome-shell h1,
+.wa-app[data-appearance="dark"] .wa-welcome-shell .wa-header-title {
+  color: var(--dm15-text-strong) !important;
+  -webkit-text-fill-color: var(--dm15-text-strong) !important;
+  opacity: 1 !important;
+  text-shadow: 0 1px 0 rgba(0,0,0,.18);
+}
+
+.wa-app[data-appearance="dark"] .wa-brand em,
+.wa-app[data-appearance="dark"] .wa-header-sub {
+  color: var(--dm15-text-secondary) !important;
+  -webkit-text-fill-color: var(--dm15-text-secondary) !important;
+  opacity: 1 !important;
+}
+
+/* Sidebar profile block */
+.wa-app[data-appearance="dark"] .wa-profile-card {
+  color: var(--dm15-text-strong) !important;
+}
+.wa-app[data-appearance="dark"] .wa-profile-card .wa-room-title,
+.wa-app[data-appearance="dark"] .wa-profile-card .wa-profile-text,
+.wa-app[data-appearance="dark"] .wa-profile-card .wa-profile-text * {
+  color: var(--dm15-text-strong) !important;
+  -webkit-text-fill-color: var(--dm15-text-strong) !important;
+  opacity: 1 !important;
+}
+.wa-app[data-appearance="dark"] .wa-profile-card .wa-profile-sub {
+  color: var(--dm15-text-secondary) !important;
+  -webkit-text-fill-color: var(--dm15-text-secondary) !important;
+}
+.wa-app[data-appearance="dark"] .wa-profile-card .wa-profile-edit {
+  color: #cfe2f5 !important;
+  -webkit-text-fill-color: #cfe2f5 !important;
+  opacity: .92 !important;
+}
+
+/* Contact cards and save buttons */
+.wa-app[data-appearance="dark"] .wa-contact-card,
+.wa-app[data-appearance="dark"] .wa-contact-main,
+.wa-app[data-appearance="dark"] .wa-user-content,
+.wa-app[data-appearance="dark"] .wa-user-name {
+  color: var(--dm15-text-strong) !important;
+  -webkit-text-fill-color: var(--dm15-text-strong) !important;
+  opacity: 1 !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-contact-card .wa-user-sub,
+.wa-app[data-appearance="dark"] .wa-contact-card .wa-user-content small {
+  color: var(--dm15-text-secondary) !important;
+  -webkit-text-fill-color: var(--dm15-text-secondary) !important;
+  opacity: 1 !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-contact-actions button,
+.wa-app[data-appearance="dark"] .wa-contact-detail-actions button,
+.wa-app[data-appearance="dark"] .wa-details-actions button,
+.wa-app[data-appearance="dark"] .wa-group-member-actions button {
+  background: var(--dm15-btn-bg) !important;
+  border: 1px solid var(--dm15-border) !important;
+  color: var(--dm15-text-accent) !important;
+  -webkit-text-fill-color: var(--dm15-text-accent) !important;
+  opacity: 1 !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
+}
+
+.wa-app[data-appearance="dark"] .wa-contact-actions button:hover,
+.wa-app[data-appearance="dark"] .wa-contact-detail-actions button:hover,
+.wa-app[data-appearance="dark"] .wa-details-actions button:hover,
+.wa-app[data-appearance="dark"] .wa-group-member-actions button:hover {
+  background: var(--dm15-btn-bg-hover) !important;
+  border-color: #5d7a95 !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-contact-actions button:disabled,
+.wa-app[data-appearance="dark"] .wa-contact-detail-actions button:disabled {
+  color: #c0d2e4 !important;
+  -webkit-text-fill-color: #c0d2e4 !important;
+  opacity: .8 !important;
+}
+
+/* Contact page labels / notes */
+.wa-app[data-appearance="dark"] .wa-contact-section-title,
+.wa-app[data-appearance="dark"] .wa-details-card-title,
+.wa-app[data-appearance="dark"] .wa-settings-title,
+.wa-app[data-appearance="dark"] .wa-section-label {
+  color: var(--dm15-text-strong) !important;
+  -webkit-text-fill-color: var(--dm15-text-strong) !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-settings-note,
+.wa-app[data-appearance="dark"] .wa-contact-blocked-banner,
+.wa-app[data-appearance="dark"] .wa-empty,
+.wa-app[data-appearance="dark"] .wa-empty.dark {
+  color: var(--dm15-text-secondary) !important;
+  -webkit-text-fill-color: var(--dm15-text-secondary) !important;
+  opacity: 1 !important;
+}

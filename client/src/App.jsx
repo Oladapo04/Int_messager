@@ -48,6 +48,8 @@ import Composer from "./components/composer/Composer";
 import { editMessageRequest, deleteMessageRequest } from "./services/messageService";
 import "./styles/dark-mode-visibility-v4113.css";
 import "./styles/dark-mode-contrast-v4114.css";
+import "./styles/dark-mode-critical-text-v4115.css";
+import "./styles/dark-mode-settings-chat-v4116.css";
 
 const API_BASE = "";
 const socket = io(API_BASE, { autoConnect: true });

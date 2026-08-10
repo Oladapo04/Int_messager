@@ -1,9 +1,9 @@
-# v4.10.14 — Dark Mode Contrast Pass
+# Changelog — v4.10.16
 
-- Increased secondary text contrast throughout dark mode.
-- Removed low-opacity text treatments that caused labels to fade into dark surfaces.
-- Strengthened placeholders, timestamps, metadata and helper text.
-- Improved dark-mode text visibility in Chats, Contacts, Calls, Settings, Search, Chat Info, Status/Updates, scheduled messages, disappearing messages and modals.
-- Improved disabled control legibility.
-- Preserved semantic accent, success, danger and unread colours.
-- Client-only update; no server/database migration.
+## Fixed
+- Repaired unreadable **Appearance** mode selector in dark mode.
+- Brightened settings headings and helper text inside dark mode.
+- Reworked incoming/outgoing message bubble contrast for dark mode.
+- Repaired message text readability in both **private chat** and **group chat**.
+- Repaired sender-name, reply-sender and message-meta visibility in dark mode.
+- Added a stronger late-loaded CSS override so old weak dark rules stop winning.

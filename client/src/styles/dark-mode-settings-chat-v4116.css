@@ -1,0 +1,148 @@
+/* Int-Messager v4.10.16
+   Dark mode emergency patch for settings appearance controls
+   and unreadable conversation text in private/group chat. */
+
+.wa-app[data-appearance="dark"] {
+  --dm16-text: #f8fbff;
+  --dm16-subtext: #d4e0eb;
+  --dm16-muted: #b6c7d7;
+  --dm16-line: #37506a;
+  --dm16-surface: #101c28;
+  --dm16-surface-2: #132334;
+  --dm16-surface-3: #182b3f;
+  --dm16-chip-active: #24456d;
+  --dm16-accent: #7fd4ff;
+}
+
+/* SETTINGS: appearance card and mode switch */
+.wa-app[data-appearance="dark"] .wa-settings-card,
+.wa-app[data-appearance="dark"] .wa-settings-card * {
+  opacity: 1 !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-settings-title,
+.wa-app[data-appearance="dark"] .wa-settings-card .wa-settings-title,
+.wa-app[data-appearance="dark"] .wa-settings-card h3,
+.wa-app[data-appearance="dark"] .wa-settings-card strong {
+  color: var(--dm16-text) !important;
+  -webkit-text-fill-color: var(--dm16-text) !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-settings-note,
+.wa-app[data-appearance="dark"] .wa-settings-label,
+.wa-app[data-appearance="dark"] .wa-settings-card p,
+.wa-app[data-appearance="dark"] .wa-settings-card small,
+.wa-app[data-appearance="dark"] .wa-settings-card label {
+  color: var(--dm16-subtext) !important;
+  -webkit-text-fill-color: var(--dm16-subtext) !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-appearance-segmented {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  padding: 4px;
+  border-radius: 14px;
+  background: rgba(6, 14, 22, 0.95) !important;
+  border: 1px solid var(--dm16-line) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+}
+
+.wa-app[data-appearance="dark"] .wa-appearance-segmented button {
+  min-height: 36px;
+  border-radius: 10px;
+  border: 1px solid transparent !important;
+  background: transparent !important;
+  color: var(--dm16-subtext) !important;
+  -webkit-text-fill-color: var(--dm16-subtext) !important;
+  font-weight: 800;
+}
+
+.wa-app[data-appearance="dark"] .wa-appearance-segmented button:hover {
+  background: rgba(255,255,255,0.06) !important;
+  color: var(--dm16-text) !important;
+  -webkit-text-fill-color: var(--dm16-text) !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-appearance-segmented button.active,
+.wa-app[data-appearance="dark"] .wa-appearance-segmented button[aria-pressed="true"] {
+  background: linear-gradient(180deg, rgba(42,83,129,.95), rgba(28,58,92,.95)) !important;
+  border-color: #5b7ea2 !important;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  box-shadow: 0 4px 14px rgba(0,0,0,.28);
+}
+
+/* CHAT: make actual message content readable */
+.wa-app[data-appearance="dark"] .wa-chat,
+.wa-app[data-appearance="dark"] .wa-conversation-view {
+  color: var(--dm16-text) !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-bubble,
+.wa-app[data-appearance="dark"] .wa-bubble * {
+  opacity: 1 !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-message-row:not(.own) .wa-bubble,
+.wa-app[data-appearance="dark"] .wa-bubble:not(.mine) {
+  background: linear-gradient(180deg, rgba(20,34,49,.98), rgba(16,28,40,.98)) !important;
+  border: 1px solid var(--dm16-line) !important;
+  color: var(--dm16-text) !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-message-row.own .wa-bubble,
+.wa-app[data-appearance="dark"] .wa-bubble.mine {
+  background: linear-gradient(180deg, rgba(26,68,52,.98), rgba(20,56,43,.98)) !important;
+  border: 1px solid #39705b !important;
+  color: #f7fffb !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-message-text,
+.wa-app[data-appearance="dark"] .wa-group-text-body,
+.wa-app[data-appearance="dark"] .wa-bubble .wa-message-text,
+.wa-app[data-appearance="dark"] .wa-bubble .wa-group-text-body,
+.wa-app[data-appearance="dark"] .wa-reply-card,
+.wa-app[data-appearance="dark"] .wa-reply-card div,
+.wa-app[data-appearance="dark"] .wa-forward-label,
+.wa-app[data-appearance="dark"] .wa-message-flag,
+.wa-app[data-appearance="dark"] .wa-attachment-name {
+  color: var(--dm16-text) !important;
+  -webkit-text-fill-color: var(--dm16-text) !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-sender-name,
+.wa-app[data-appearance="dark"] .wa-sender-name-inside,
+.wa-app[data-appearance="dark"] .wa-group-text-sender,
+.wa-app[data-appearance="dark"] .wa-reply-sender {
+  color: var(--dm16-accent) !important;
+  -webkit-text-fill-color: var(--dm16-accent) !important;
+  font-weight: 800 !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-meta,
+.wa-app[data-appearance="dark"] .wa-meta span,
+.wa-app[data-appearance="dark"] .wa-message-time,
+.wa-app[data-appearance="dark"] .wa-edited-label,
+.wa-app[data-appearance="dark"] .wa-expiry-meta,
+.wa-app[data-appearance="dark"] .wa-voice-time {
+  color: var(--dm16-muted) !important;
+  -webkit-text-fill-color: var(--dm16-muted) !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-receipt.seen,
+.wa-app[data-appearance="dark"] .wa-receipt.blue {
+  color: #72d8ff !important;
+  -webkit-text-fill-color: #72d8ff !important;
+}
+
+/* Group template specifically */
+.wa-app[data-appearance="dark"] .wa-group-text-template {
+  background: linear-gradient(180deg, rgba(20,34,49,.98), rgba(16,28,40,.98)) !important;
+  border: 1px solid var(--dm16-line) !important;
+}
+
+/* Any stubborn dark text inside conversation items */
+.wa-app[data-appearance="dark"] .wa-message-row :where(p, div, span, strong, small):not(.wa-avatar):not(.wa-unread-badge) {
+  text-shadow: none;
+}
