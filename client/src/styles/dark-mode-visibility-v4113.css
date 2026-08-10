@@ -1,0 +1,547 @@
+/* Int-Messager v4.10.13 — comprehensive dark-mode visibility repair.
+   Loaded last and intentionally uses strong specificity/!important to defeat
+   legacy inline StyleTag rules and later light-only component styles. */
+
+.wa-app[data-appearance="dark"] {
+  --dm-bg: #081018;
+  --dm-surface: #101923;
+  --dm-surface-2: #16212d;
+  --dm-surface-3: #1c2937;
+  --dm-hover: #223243;
+  --dm-border: #314153;
+  --dm-border-soft: #253445;
+  --dm-text: #f8fafc;
+  --dm-text-2: #d6e0ea;
+  --dm-muted: #9fb0c1;
+  --dm-faint: #8193a6;
+  --dm-accent: #38bdf8;
+  --dm-accent-soft: rgba(56, 189, 248, .16);
+  --dm-danger: #fda4af;
+  color: var(--dm-text) !important;
+  background: var(--dm-bg) !important;
+}
+
+/* App / navigation / primary surfaces */
+.wa-app[data-appearance="dark"] .wa-main,
+.wa-app[data-appearance="dark"] .wa-sidebar,
+.wa-app[data-appearance="dark"] .wa-sidebar-panel,
+.wa-app[data-appearance="dark"] .wa-welcome-screen,
+.wa-app[data-appearance="dark"] .wa-details-page,
+.wa-app[data-appearance="dark"] .wa-chat,
+.wa-app[data-appearance="dark"] .wa-conversation-stack,
+.wa-app[data-appearance="dark"] .wa-conversation-message-area {
+  color: var(--dm-text) !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-main,
+.wa-app[data-appearance="dark"] .wa-welcome-screen,
+.wa-app[data-appearance="dark"] .wa-chat,
+.wa-app[data-appearance="dark"] .wa-conversation-message-area {
+  background-color: var(--dm-bg) !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-sidebar,
+.wa-app[data-appearance="dark"] .wa-sidebar-panel,
+.wa-app[data-appearance="dark"] .wa-header,
+.wa-app[data-appearance="dark"] .wa-details-topbar,
+.wa-app[data-appearance="dark"] .wa-conversation-composer-area,
+.wa-app[data-appearance="dark"] .wa-composer {
+  background-color: var(--dm-surface) !important;
+  border-color: var(--dm-border-soft) !important;
+  color: var(--dm-text) !important;
+}
+
+/* Global text that was frequently low contrast */
+.wa-app[data-appearance="dark"] :is(
+  .wa-brand,
+  .wa-section-label,
+  .wa-room-title,
+  .wa-user-name,
+  .wa-header-title,
+  .wa-details-card-title,
+  .wa-settings-title,
+  .wa-settings-label,
+  .wa-home-profile-name,
+  .wa-home-room-name,
+  .wa-home-section-title,
+  .wa-contact-section-title,
+  .wa-contact-name,
+  .wa-call-title,
+  .wa-call-history-copy,
+  .wa-shared-content-heading,
+  .wa-scheduled-card-head,
+  .wa-group-section-heading,
+  .wa-modal-title,
+  .wa-status-section-title
+) {
+  color: var(--dm-text) !important;
+}
+
+.wa-app[data-appearance="dark"] :is(
+  .wa-room-sub,
+  .wa-user-sub,
+  .wa-header-sub,
+  .wa-profile-sub,
+  .wa-settings-note,
+  .wa-home-profile-status,
+  .wa-home-room-preview,
+  .wa-welcome-intro,
+  .wa-welcome-tagline,
+  .wa-call-subtitle,
+  .wa-call-history-date,
+  .wa-call-history-meta,
+  .wa-search-result-meta,
+  .wa-search-result-summary,
+  .wa-shared-copy,
+  .wa-shared-media-meta,
+  .wa-scheduled-empty,
+  .wa-scheduled-item-copy,
+  .wa-disappearing-copy,
+  .wa-disappearing-status,
+  .wa-expiry-meta,
+  .wa-empty,
+  .wa-empty.dark
+) {
+  color: var(--dm-muted) !important;
+}
+
+/* Cards / lists / panels */
+.wa-app[data-appearance="dark"] :is(
+  .wa-profile-card,
+  .wa-room-card,
+  .wa-contact-card,
+  .wa-call-log-card,
+  .wa-settings-card,
+  .wa-details-card,
+  .wa-privacy-card,
+  .wa-blocked-contacts-card,
+  .wa-shared-content-card,
+  .wa-search-result-card,
+  .wa-scheduled-card,
+  .wa-scheduled-item,
+  .wa-disappearing-card,
+  .wa-pinned-item,
+  .wa-home-profile,
+  .wa-home-room,
+  .wa-home-action,
+  .wa-group-member-row,
+  .wa-group-picker-row,
+  .wa-contact-management-card
+) {
+  background: var(--dm-surface-2) !important;
+  border-color: var(--dm-border) !important;
+  color: var(--dm-text) !important;
+  box-shadow: none !important;
+}
+
+.wa-app[data-appearance="dark"] :is(
+  .wa-room-card,
+  .wa-contact-card,
+  .wa-call-log-card,
+  .wa-home-room,
+  .wa-home-action,
+  .wa-search-result-card,
+  .wa-group-member-row,
+  .wa-group-picker-row
+):hover {
+  background: var(--dm-hover) !important;
+}
+
+/* Search / filters / settings controls */
+.wa-app[data-appearance="dark"] :is(
+  input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
+  textarea,
+  select,
+  .wa-input,
+  .wa-search-input,
+  .wa-select,
+  .wa-group-field,
+  .wa-schedule-field
+) {
+  background: #0c151f !important;
+  color: var(--dm-text) !important;
+  border-color: var(--dm-border) !important;
+  caret-color: var(--dm-text) !important;
+}
+
+.wa-app[data-appearance="dark"] :is(input, textarea)::placeholder {
+  color: #8798aa !important;
+  opacity: 1 !important;
+}
+
+.wa-app[data-appearance="dark"] select option {
+  background: #101923 !important;
+  color: #f8fafc !important;
+}
+
+.wa-app[data-appearance="dark"] :is(
+  .wa-search-filter-tabs,
+  .wa-search-filter-grid,
+  .wa-shared-tabs,
+  .wa-appearance-segmented,
+  .wa-side-switcher
+) {
+  background: rgba(7, 15, 24, .72) !important;
+  border-color: var(--dm-border-soft) !important;
+}
+
+.wa-app[data-appearance="dark"] :is(
+  .wa-search-type-chip,
+  .wa-search-clear-filters,
+  .wa-archive-toggle,
+  .wa-settings-btn,
+  .wa-details-actions button,
+  .wa-contact-detail-actions button,
+  .wa-group-member-actions button,
+  .wa-group-leave-btn,
+  .wa-shared-open,
+  .wa-scheduled-add-btn,
+  .wa-call-history-redial,
+  .wa-mini-btn,
+  .wa-icon-btn
+) {
+  background: var(--dm-surface-3) !important;
+  color: var(--dm-text-2) !important;
+  border-color: var(--dm-border) !important;
+}
+
+.wa-app[data-appearance="dark"] :is(
+  .wa-search-type-chip,
+  .wa-search-clear-filters,
+  .wa-archive-toggle,
+  .wa-settings-btn,
+  .wa-details-actions button,
+  .wa-contact-detail-actions button,
+  .wa-group-member-actions button,
+  .wa-shared-open,
+  .wa-call-history-redial,
+  .wa-icon-btn
+):hover {
+  background: var(--dm-hover) !important;
+  color: #fff !important;
+}
+
+/* Glass navigation — preserve glass, increase legibility */
+.wa-app[data-appearance="dark"] .wa-side-switcher {
+  background: rgba(8, 16, 24, .64) !important;
+  border: 1px solid rgba(148, 163, 184, .22) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 8px 24px rgba(0,0,0,.24) !important;
+}
+.wa-app[data-appearance="dark"] .wa-side-tab {
+  background: rgba(255,255,255,.075) !important;
+  color: #dce6f0 !important;
+  border-color: rgba(148,163,184,.24) !important;
+  text-shadow: 0 1px 1px rgba(0,0,0,.45);
+}
+.wa-app[data-appearance="dark"] .wa-side-tab:hover {
+  background: rgba(255,255,255,.13) !important;
+  color: #fff !important;
+}
+.wa-app[data-appearance="dark"] .wa-side-tab.active {
+  background: rgba(56,189,248,.18) !important;
+  color: #fff !important;
+  border-color: rgba(125,211,252,.42) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 7px 20px rgba(14,165,233,.16) !important;
+}
+
+/* Left navigation rail */
+.wa-app[data-appearance="dark"] .wa-nav-rail {
+  background: #09121b !important;
+  border-color: var(--dm-border-soft) !important;
+}
+.wa-app[data-appearance="dark"] .wa-rail-btn,
+.wa-app[data-appearance="dark"] .wa-rail-profile {
+  color: #cdd8e4 !important;
+}
+.wa-app[data-appearance="dark"] .wa-rail-btn:hover,
+.wa-app[data-appearance="dark"] .wa-rail-btn.active,
+.wa-app[data-appearance="dark"] .wa-rail-profile:hover {
+  background: var(--dm-hover) !important;
+  color: #fff !important;
+}
+.wa-app[data-appearance="dark"] .wa-rail-btn small { color: inherit !important; opacity: .92 !important; }
+
+/* Conversation bubbles */
+.wa-app[data-appearance="dark"] .wa-bubble:not(.mine),
+.wa-app[data-appearance="dark"] .wa-message-row:not(.mine) .wa-bubble {
+  background: #1b2937 !important;
+  color: #f8fafc !important;
+}
+.wa-app[data-appearance="dark"] .wa-bubble.mine,
+.wa-app[data-appearance="dark"] .wa-message-row.mine .wa-bubble {
+  background: #123b34 !important;
+  color: #f8fafc !important;
+}
+.wa-app[data-appearance="dark"] :is(.wa-message-text, .wa-reply-card, .wa-forward-label, .wa-message-flag) {
+  color: #f8fafc !important;
+}
+.wa-app[data-appearance="dark"] :is(.wa-meta, .wa-edited-label, .wa-receipt, .wa-expiry-meta) {
+  color: #a9bacb !important;
+}
+.wa-app[data-appearance="dark"] .wa-sender-name-inside,
+.wa-app[data-appearance="dark"] .wa-group-text-sender { color: #7dd3fc !important; }
+.wa-app[data-appearance="dark"] .wa-reply-card {
+  background: rgba(2,6,23,.28) !important;
+  border-color: rgba(148,163,184,.24) !important;
+}
+.wa-app[data-appearance="dark"] .wa-reply-sender { color: #7dd3fc !important; }
+
+/* Composer */
+.wa-app[data-appearance="dark"] .wa-input-wrap {
+  background: #172330 !important;
+  border-color: var(--dm-border) !important;
+}
+.wa-app[data-appearance="dark"] .wa-composer .wa-input {
+  background: transparent !important;
+  color: #fff !important;
+}
+.wa-app[data-appearance="dark"] .wa-send-btn {
+  background: #0ea5e9 !important;
+  color: #fff !important;
+  border-color: #0ea5e9 !important;
+}
+.wa-app[data-appearance="dark"] .wa-icon-btn { color: #e2e8f0 !important; }
+
+/* Attachments / voice */
+.wa-app[data-appearance="dark"] :is(
+  .wa-attachment-card,
+  .wa-attachment-chip,
+  .wa-attachment-footer,
+  .wa-attachment-info,
+  .wa-voice-note,
+  .wa-uploading-audio
+) {
+  background: #172330 !important;
+  color: #f8fafc !important;
+  border-color: var(--dm-border) !important;
+}
+.wa-app[data-appearance="dark"] .wa-attachment-name { color: #fff !important; }
+.wa-app[data-appearance="dark"] :is(.wa-attachment-subtext, .wa-voice-time) { color: var(--dm-muted) !important; }
+.wa-app[data-appearance="dark"] .wa-voice-speed-btn { color: #e2e8f0 !important; }
+.wa-app[data-appearance="dark"] .wa-voice-wave-bar { background: #526477 !important; }
+.wa-app[data-appearance="dark"] .wa-voice-wave-bar.played { background: #38bdf8 !important; }
+
+/* Context menus / modals / sheets */
+.wa-app[data-appearance="dark"] :is(
+  .wa-room-context-menu,
+  .wa-mobile-chat-menu,
+  .wa-message-context-menu,
+  .wa-action-sheet,
+  .wa-reaction-picker,
+  .wa-chat-emoji-picker,
+  .wa-profile-modal,
+  .wa-group-modal,
+  .wa-schedule-modal,
+  .wa-forward-picker,
+  .wa-modal,
+  .wa-dialog
+) {
+  background: #121d28 !important;
+  color: #f8fafc !important;
+  border-color: var(--dm-border) !important;
+  box-shadow: 0 18px 55px rgba(0,0,0,.48) !important;
+}
+.wa-app[data-appearance="dark"] :is(
+  .wa-room-context-menu button,
+  .wa-mobile-chat-menu button,
+  .wa-message-context-menu button,
+  .wa-reaction-option,
+  .wa-chat-emoji-option
+) {
+  color: #eef2f7 !important;
+}
+.wa-app[data-appearance="dark"] :is(
+  .wa-room-context-menu button,
+  .wa-mobile-chat-menu button,
+  .wa-message-context-menu button
+):hover { background: var(--dm-hover) !important; }
+
+/* Chat info / details */
+.wa-app[data-appearance="dark"] .wa-details-page {
+  background: #0d1620 !important;
+  color: #f8fafc !important;
+}
+.wa-app[data-appearance="dark"] .wa-details-hero {
+  background: #101923 !important;
+  color: #f8fafc !important;
+  border-color: var(--dm-border-soft) !important;
+}
+.wa-app[data-appearance="dark"] .wa-details-hero p { color: var(--dm-muted) !important; }
+.wa-app[data-appearance="dark"] .wa-danger-text-btn,
+.wa-app[data-appearance="dark"] .danger { color: var(--dm-danger) !important; }
+
+/* Contacts / privacy / group management notices */
+.wa-app[data-appearance="dark"] :is(
+  .wa-contact-notice,
+  .wa-group-notice,
+  .wa-privacy-notice,
+  .wa-disappearing-notice,
+  .wa-schedule-notice,
+  .wa-contact-blocked-banner
+) {
+  background: #172330 !important;
+  color: #dbeafe !important;
+  border-color: #334b63 !important;
+}
+.wa-app[data-appearance="dark"] :is(.wa-privacy-row, .wa-blocked-row) {
+  border-color: var(--dm-border-soft) !important;
+  color: #f8fafc !important;
+}
+
+/* Calls */
+.wa-app[data-appearance="dark"] :is(.wa-call-history-group, .wa-call-person) {
+  color: #f8fafc !important;
+}
+.wa-app[data-appearance="dark"] .wa-call-history-group > :is(h3, strong) { color: #f8fafc !important; }
+.wa-app[data-appearance="dark"] .wa-call-log-status { color: var(--dm-text-2) !important; }
+
+/* Status / Updates */
+.wa-app[data-appearance="dark"] :is(
+  .wa-status-my-card,
+  .wa-status-contact-card
+) {
+  background: #14202b !important;
+  color: #f8fafc !important;
+  border-color: var(--dm-border) !important;
+}
+.wa-app[data-appearance="dark"] :is(
+  .wa-status-my-main,
+  .wa-status-contact-copy,
+  .wa-status-heading,
+  .wa-status-modal-head,
+  .wa-status-viewer-head
+) { color: #f8fafc !important; }
+.wa-app[data-appearance="dark"] :is(
+  .wa-status-heading small,
+  .wa-status-my-main small,
+  .wa-status-contact-copy small,
+  .wa-status-modal-head small,
+  .wa-status-char-count,
+  .wa-status-view-count
+) { color: var(--dm-muted) !important; }
+
+.wa-app[data-appearance="dark"] .wa-status-add-btn,
+.wa-app[data-appearance="dark"] .wa-status-plus {
+  background: rgba(56,189,248,.14) !important;
+  color: #bae6fd !important;
+  border-color: rgba(125,211,252,.34) !important;
+}
+.wa-app[data-appearance="dark"] .wa-status-quick-btn {
+  background: rgba(255,255,255,.08) !important;
+  color: #f1f5f9 !important;
+  border-color: rgba(148,163,184,.30) !important;
+}
+.wa-app[data-appearance="dark"] .wa-status-quick-btn:hover {
+  background: rgba(56,189,248,.13) !important;
+  color: #fff !important;
+  border-color: rgba(125,211,252,.38) !important;
+}
+.wa-app[data-appearance="dark"] .wa-status-quick-btn.text .wa-status-quick-icon { color: #7dd3fc !important; }
+
+.wa-app[data-appearance="dark"] .wa-status-modal-backdrop { background: rgba(0,0,0,.72) !important; }
+.wa-app[data-appearance="dark"] .wa-status-composer {
+  background: #111c27 !important;
+  color: #f8fafc !important;
+  border: 1px solid var(--dm-border) !important;
+  box-shadow: 0 22px 70px rgba(0,0,0,.56) !important;
+}
+.wa-app[data-appearance="dark"] .wa-status-composer textarea {
+  background: #0b141e !important;
+  color: #f8fafc !important;
+  border-color: var(--dm-border) !important;
+}
+.wa-app[data-appearance="dark"] .wa-status-composer.mode-text .wa-status-text-editor {
+  color: #fff !important;
+  background:
+    radial-gradient(circle at 20% 15%, rgba(56,189,248,.10), transparent 34%),
+    linear-gradient(145deg, #12344a, #252951) !important;
+  border-color: rgba(125,211,252,.30) !important;
+}
+.wa-app[data-appearance="dark"] .wa-status-photo-empty {
+  background: #0e1c28 !important;
+  color: #e2e8f0 !important;
+  border-color: rgba(125,211,252,.38) !important;
+}
+.wa-app[data-appearance="dark"] .wa-status-photo-empty small { color: #9fb0c1 !important; }
+.wa-app[data-appearance="dark"] .wa-status-photo-preview {
+  background: #09121b !important;
+  border-color: var(--dm-border) !important;
+}
+.wa-app[data-appearance="dark"] .wa-status-photo-preview button,
+.wa-app[data-appearance="dark"] .wa-status-composer-actions .secondary {
+  background: var(--dm-surface-3) !important;
+  color: #f8fafc !important;
+  border-color: var(--dm-border) !important;
+}
+.wa-app[data-appearance="dark"] .wa-status-composer-actions .primary {
+  background: #0ea5e9 !important;
+  color: #fff !important;
+  border-color: #0ea5e9 !important;
+}
+.wa-app[data-appearance="dark"] .wa-status-viewer {
+  background: #03070c !important;
+  color: #fff !important;
+}
+.wa-app[data-appearance="dark"] .wa-status-viewer-head {
+  background: linear-gradient(180deg, rgba(0,0,0,.62), transparent) !important;
+}
+.wa-app[data-appearance="dark"] .wa-status-viewer-text { color: #fff !important; text-shadow: 0 1px 3px rgba(0,0,0,.7); }
+.wa-app[data-appearance="dark"] .wa-status-close,
+.wa-app[data-appearance="dark"] .wa-status-delete,
+.wa-app[data-appearance="dark"] .wa-status-nav {
+  color: #fff !important;
+  border-color: rgba(255,255,255,.22) !important;
+}
+
+/* PWA / miscellaneous overlays */
+.wa-app[data-appearance="dark"] .wa-pwa-install-card {
+  background: #172330 !important;
+  color: #f8fafc !important;
+  border-color: var(--dm-border) !important;
+}
+
+/* Admin — ensure later admin styles cannot erase contrast */
+.wa-app[data-appearance="dark"] :is(
+  .admin-shell,
+  .admin-topbar,
+  .admin-stat-card,
+  .admin-users-panel,
+  .admin-user-detail,
+  .admin-user-row,
+  .admin-activity-card,
+  .admin-audit-row
+) {
+  background: #111b26 !important;
+  color: #f8fafc !important;
+  border-color: var(--dm-border) !important;
+}
+.wa-app[data-appearance="dark"] :is(
+  .admin-topbar p,
+  .admin-stat-card span,
+  .admin-stat-card small,
+  .admin-section-heading p,
+  .admin-user-main small,
+  .admin-user-date,
+  .admin-detail-profile p,
+  .admin-detail-grid span,
+  .admin-device-row small,
+  .admin-device-row > span,
+  .admin-protection-note,
+  .admin-empty
+) { color: var(--dm-muted) !important; }
+
+/* Accessibility: focus must remain visible in dark mode */
+.wa-app[data-appearance="dark"] :is(button, input, textarea, select, [tabindex]):focus-visible {
+  outline: 2px solid #38bdf8 !important;
+  outline-offset: 2px !important;
+}
+
+/* Disabled controls should remain readable rather than disappear */
+.wa-app[data-appearance="dark"] :is(button, input, textarea, select):disabled {
+  opacity: .58 !important;
+}
+
+@media (max-width: 900px) {
+  .wa-app[data-appearance="dark"] .wa-side-tab { color: #eaf2f8 !important; }
+  .wa-app[data-appearance="dark"] .wa-status-quick-btn { color: #f8fafc !important; }
+}

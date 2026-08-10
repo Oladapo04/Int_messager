@@ -39,12 +39,15 @@ import "./styles/drafts-scheduled-v4109.css";
 import "./styles/glass-navigation-v4110.css";
 import AuthScreen from "./components/auth/AuthScreen";
 import NavigationRail from "./components/layout/NavigationRail";
+import StatusUpdates from "./components/status/StatusUpdates";
 import MessageActions, { DesktopMessageContextMenu, MobileMessageActionSheet } from "./components/chat/MessageActions";
 import AttachmentRenderer from "./components/chat/AttachmentRenderer";
 import ConversationView from "./components/chat/ConversationView";
 import MessageList from "./components/chat/MessageList";
 import Composer from "./components/composer/Composer";
 import { editMessageRequest, deleteMessageRequest } from "./services/messageService";
+import "./styles/dark-mode-visibility-v4113.css";
+import "./styles/dark-mode-contrast-v4114.css";
 
 const API_BASE = "";
 const socket = io(API_BASE, { autoConnect: true });
@@ -7286,6 +7289,13 @@ export default function App() {
             </button>
             <button
               type="button"
+              className={`wa-side-tab ${sidebarMode === "updates" ? "active" : ""}`}
+              onClick={() => setSidebarMode("updates")}
+            >
+              Updates
+            </button>
+            <button
+              type="button"
               className={`wa-side-tab ${sidebarMode === "calls" ? "active" : ""}`}
               onClick={() => setSidebarMode("calls")}
             >
@@ -7300,12 +7310,14 @@ export default function App() {
             </button>
           </div>
 
-          <input
-            className="wa-search-input"
-            value={chatSearch}
-            onChange={(e) => setChatSearch(e.target.value)}
-            placeholder={sidebarMode === "chats" ? "Search chats" : sidebarMode === "people" ? "Search contacts" : sidebarMode === "settings" ? "Personalize chat" : "Search calls"}
-          />
+          {sidebarMode !== "updates" ? (
+            <input
+              className="wa-search-input"
+              value={chatSearch}
+              onChange={(e) => setChatSearch(e.target.value)}
+              placeholder={sidebarMode === "chats" ? "Search chats" : sidebarMode === "people" ? "Search contacts" : sidebarMode === "settings" ? "Personalize chat" : "Search calls"}
+            />
+          ) : null}
 
           {sidebarMode === "chats" && chatSearch.trim().length >= 2 ? (
             <div className="wa-global-search-results wa-advanced-search">
@@ -7545,6 +7557,8 @@ export default function App() {
                 );
               })}
             </>
+          ) : sidebarMode === "updates" ? (
+            <StatusUpdates currentProfile={profile} />
           ) : sidebarMode === "calls" ? (
             <>
               <div className="wa-section-label">Calls</div>

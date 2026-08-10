@@ -1,0 +1,198 @@
+/* Int-Messager v4.10.12 — Quick Status Composer */
+
+.wa-status-my-card {
+  align-items: center;
+}
+
+.wa-status-quick-actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.wa-status-quick-btn {
+  min-width: 58px;
+  min-height: 52px;
+  border: 1px solid rgba(148, 163, 184, 0.20);
+  border-radius: 14px;
+  background: rgba(255,255,255,0.56);
+  color: #334155;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 6px 9px;
+  font-size: 10.5px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.62);
+  backdrop-filter: blur(10px) saturate(140%);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  transition: transform .16s ease, border-color .16s ease, background .16s ease, box-shadow .16s ease;
+}
+
+.wa-status-quick-btn:hover {
+  transform: translateY(-1px);
+  border-color: rgba(14, 165, 233, 0.30);
+  background: rgba(255,255,255,0.76);
+  box-shadow: 0 8px 18px rgba(15,23,42,0.08), inset 0 1px 0 rgba(255,255,255,0.78);
+}
+
+.wa-status-quick-btn.text .wa-status-quick-icon {
+  color: #0ea5e9;
+}
+
+.wa-status-quick-btn.photo .wa-status-quick-icon {
+  filter: saturate(.8);
+}
+
+.wa-status-quick-icon {
+  min-height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 19px;
+  font-weight: 900;
+}
+
+.wa-status-composer.mode-text .wa-status-text-editor {
+  min-height: 210px;
+  font-size: 20px;
+  line-height: 1.45;
+  text-align: center;
+  padding: 28px 22px;
+  background:
+    radial-gradient(circle at 18% 14%, rgba(255,255,255,.34), transparent 31%),
+    linear-gradient(135deg, rgba(14,165,233,.14), rgba(99,102,241,.12));
+}
+
+.wa-status-composer.mode-photo .wa-status-caption-editor {
+  min-height: 88px;
+  resize: none;
+}
+
+.wa-status-photo-empty {
+  width: 100%;
+  min-height: 230px;
+  margin-bottom: 12px;
+  border: 1.5px dashed rgba(14,165,233,.34);
+  border-radius: 18px;
+  background: rgba(14,165,233,.055);
+  color: #334155;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.wa-status-photo-empty > span {
+  font-size: 34px;
+  margin-bottom: 4px;
+}
+
+.wa-status-photo-empty strong {
+  font-size: 15px;
+}
+
+.wa-status-photo-empty small {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.wa-status-photo-preview button:disabled,
+.wa-status-photo-empty:disabled {
+  opacity: .55;
+  cursor: default;
+}
+
+.wa-status-composer-actions.quick-mode {
+  align-items: center;
+}
+
+.wa-status-composer-actions.quick-mode .secondary {
+  background: transparent;
+  border: 1px solid rgba(148,163,184,.28);
+}
+
+.wa-app[data-appearance="dark"] .wa-status-quick-btn {
+  border-color: rgba(148, 163, 184, 0.16);
+  background: rgba(255,255,255,0.055);
+  color: #e2e8f0;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.055);
+}
+
+.wa-app[data-appearance="dark"] .wa-status-quick-btn:hover {
+  border-color: rgba(56,189,248,.28);
+  background: rgba(255,255,255,0.09);
+}
+
+.wa-app[data-appearance="dark"] .wa-status-composer.mode-text .wa-status-text-editor {
+  background:
+    radial-gradient(circle at 18% 14%, rgba(255,255,255,.06), transparent 31%),
+    linear-gradient(135deg, rgba(14,165,233,.13), rgba(99,102,241,.12));
+}
+
+.wa-app[data-appearance="dark"] .wa-status-photo-empty {
+  border-color: rgba(56,189,248,.26);
+  background: rgba(14,165,233,.06);
+  color: #e2e8f0;
+}
+
+.wa-app[data-appearance="dark"] .wa-status-photo-empty small {
+  color: #94a3b8;
+}
+
+.wa-app[data-appearance="dark"] .wa-status-composer-actions.quick-mode .secondary {
+  background: transparent;
+  border-color: rgba(148,163,184,.22);
+}
+
+@media (max-width: 620px) {
+  .wa-status-my-card {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+
+  .wa-status-my-main {
+    flex-basis: calc(100% - 2px);
+  }
+
+  .wa-status-quick-actions {
+    width: 100%;
+    justify-content: flex-end;
+    padding-top: 2px;
+  }
+
+  .wa-status-quick-btn {
+    min-width: 74px;
+    min-height: 44px;
+    flex-direction: row;
+    gap: 6px;
+    border-radius: 999px;
+    padding-inline: 12px;
+  }
+
+  .wa-status-quick-icon {
+    min-height: 0;
+    font-size: 16px;
+  }
+
+  .wa-status-composer.mode-text .wa-status-text-editor {
+    min-height: 260px;
+    font-size: 18px;
+    padding: 24px 16px;
+  }
+
+  .wa-status-composer-actions.quick-mode {
+    flex-direction: column-reverse;
+  }
+
+  .wa-status-composer-actions.quick-mode button {
+    width: 100%;
+  }
+}

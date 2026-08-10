@@ -10,6 +10,7 @@ export default function NavigationRail({
   const navigation = [
     { key: "chats", icon: "✉", label: "Chats" },
     { key: "people", icon: "◉", label: "Contacts" },
+    { key: "updates", icon: "◌", label: "Updates" },
     { key: "calls", icon: "☎", label: "Calls" },
     { key: "settings", icon: "⚙", label: "Settings" },
   ];

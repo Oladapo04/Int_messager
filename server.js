@@ -441,6 +441,22 @@ const Room = mongoose.model("Room", roomSchema);
 const Message = mongoose.model("Message", messageSchema);
 const Profile = mongoose.model("Profile", profileSchema);
 
+const statusUpdateSchema = new mongoose.Schema(
+  {
+    ownerProfileId: { type: mongoose.Schema.Types.ObjectId, ref: "Profile", required: true, index: true },
+    type: { type: String, enum: ["text", "image"], default: "text", index: true },
+    text: { type: String, default: "", trim: true },
+    mediaUrl: { type: String, default: "" },
+    mimeType: { type: String, default: "" },
+    viewers: [{ type: mongoose.Schema.Types.ObjectId, ref: "Profile" }],
+    expiresAt: { type: Date, required: true },
+  },
+  { timestamps: true }
+);
+statusUpdateSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+statusUpdateSchema.index({ ownerProfileId: 1, createdAt: -1 });
+const StatusUpdate = mongoose.model("StatusUpdate", statusUpdateSchema);
+
 const scheduledMessageSchema = new mongoose.Schema(
   {
     roomSlug: { type: String, required: true, index: true, trim: true },
@@ -797,6 +813,37 @@ function idsEqual(a, b) {
 
 function profileHasBlocked(profile, targetProfileId) {
   return Boolean(profile && (profile.blockedProfiles || []).some((id) => idsEqual(id, targetProfileId)));
+}
+
+function profileHasSavedContact(profile, targetProfileId) {
+  return Boolean(profile && (profile.savedContacts || []).some((id) => idsEqual(id, targetProfileId)));
+}
+
+function canViewStatusOwner(viewerProfile, ownerProfile) {
+  if (!viewerProfile || !ownerProfile) return false;
+  if (idsEqual(viewerProfile._id, ownerProfile._id)) return true;
+  if (profileHasBlocked(viewerProfile, ownerProfile._id) || profileHasBlocked(ownerProfile, viewerProfile._id)) return false;
+  // Privacy baseline: status updates are shared only between mutual saved contacts.
+  return profileHasSavedContact(viewerProfile, ownerProfile._id) &&
+    profileHasSavedContact(ownerProfile, viewerProfile._id);
+}
+
+function statusResponseShape(status, ownerProfile, currentProfile) {
+  const mine = idsEqual(status.ownerProfileId, currentProfile?._id);
+  return {
+    _id: status._id,
+    ownerProfileId: status.ownerProfileId,
+    owner: ownerProfile ? publicProfileShape(ownerProfile, currentProfile?._id) : null,
+    type: status.type || "text",
+    text: status.text || "",
+    mediaUrl: status.mediaUrl || "",
+    mimeType: status.mimeType || "",
+    createdAt: status.createdAt,
+    expiresAt: status.expiresAt,
+    isMine: mine,
+    viewedByMe: mine || (status.viewers || []).some((id) => idsEqual(id, currentProfile?._id)),
+    viewCount: mine ? (status.viewers || []).length : undefined,
+  };
 }
 
 async function directBlockState(profileIdA, profileIdB) {
@@ -2660,6 +2707,149 @@ app.get("/api/profiles", async (req, res) => {
       success: false,
       error: "Failed to load users",
     });
+  }
+});
+
+/* =========================
+   STATUS / UPDATES (24 HOURS)
+========================= */
+
+app.get("/api/statuses", async (req, res) => {
+  try {
+    const currentProfile = (await getAuthenticatedProfile(req)) || await getProfileByInstallId(getInstallId(req));
+    if (!currentProfile) return res.status(401).json({ success: false, error: "Please sign in again" });
+    if ((currentProfile.accountStatus || "active") === "suspended") {
+      return res.status(403).json({ success: false, error: "This account is suspended" });
+    }
+
+    const contactIds = (currentProfile.savedContacts || []).map(String);
+    const otherOwners = contactIds.length
+      ? await Profile.find({
+          _id: { $in: contactIds },
+          accountStatus: { $ne: "suspended" },
+          activeChat: true,
+          nameLocked: true,
+        }).lean()
+      : [];
+
+    const ownerProfiles = [currentProfile, ...otherOwners].filter((owner) => canViewStatusOwner(currentProfile, owner));
+    const ownerIds = ownerProfiles.map((owner) => owner._id);
+    const ownersById = new Map(ownerProfiles.map((owner) => [String(owner._id), owner]));
+
+    if (!ownerIds.length) return res.json({ success: true, data: [] });
+
+    const statuses = await StatusUpdate.find({
+      ownerProfileId: { $in: ownerIds },
+      expiresAt: { $gt: new Date() },
+    })
+      .sort({ createdAt: -1 })
+      .limit(250)
+      .lean();
+
+    return res.json({
+      success: true,
+      data: statuses.map((status) =>
+        statusResponseShape(status, ownersById.get(String(status.ownerProfileId)), currentProfile)
+      ),
+    });
+  } catch (error) {
+    console.error("statuses list error:", error);
+    return res.status(500).json({ success: false, error: "Failed to load status updates" });
+  }
+});
+
+app.post("/api/statuses", (req, res) => {
+  upload.single("media")(req, res, async (uploadError) => {
+    try {
+      if (uploadError) {
+        return res.status(400).json({ success: false, error: uploadError.message || "Status photo upload failed" });
+      }
+
+      const currentProfile = (await getAuthenticatedProfile(req)) || await getProfileByInstallId(getInstallId(req));
+      if (!currentProfile) return res.status(401).json({ success: false, error: "Please sign in again" });
+      if ((currentProfile.accountStatus || "active") === "suspended") {
+        return res.status(403).json({ success: false, error: "This account is suspended" });
+      }
+
+      const text = String(req.body?.text || "").trim().slice(0, 700);
+      const hasMedia = Boolean(req.file);
+      if (!text && !hasMedia) {
+        return res.status(400).json({ success: false, error: "Add some text or choose a photo" });
+      }
+      if (hasMedia && !String(req.file.mimetype || "").startsWith("image/")) {
+        return res.status(400).json({ success: false, error: "Status media must be an image" });
+      }
+
+      const createdAt = new Date();
+      const expiresAt = new Date(createdAt.getTime() + 24 * 60 * 60 * 1000);
+      const status = await StatusUpdate.create({
+        ownerProfileId: currentProfile._id,
+        type: hasMedia ? "image" : "text",
+        text,
+        mediaUrl: hasMedia ? (req.file.secure_url || req.file.path || "") : "",
+        mimeType: hasMedia ? (req.file.mimetype || "") : "",
+        viewers: [],
+        expiresAt,
+      });
+
+      io.emit("statuses_updated", { ownerProfileId: String(currentProfile._id) });
+      return res.status(201).json({
+        success: true,
+        data: statusResponseShape(status.toObject({ flattenMaps: true }), currentProfile, currentProfile),
+      });
+    } catch (error) {
+      console.error("create status error:", error);
+      return res.status(500).json({ success: false, error: "Failed to post status" });
+    }
+  });
+});
+
+app.post("/api/statuses/:statusId/view", async (req, res) => {
+  try {
+    const currentProfile = (await getAuthenticatedProfile(req)) || await getProfileByInstallId(getInstallId(req));
+    if (!currentProfile) return res.status(401).json({ success: false, error: "Please sign in again" });
+
+    const status = await StatusUpdate.findById(req.params.statusId);
+    if (!status || new Date(status.expiresAt).getTime() <= Date.now()) {
+      return res.status(404).json({ success: false, error: "Status is no longer available" });
+    }
+
+    const owner = await Profile.findById(status.ownerProfileId);
+    if (!owner || !canViewStatusOwner(currentProfile, owner)) {
+      return res.status(403).json({ success: false, error: "You cannot view this status" });
+    }
+
+    if (!idsEqual(status.ownerProfileId, currentProfile._id)) {
+      await StatusUpdate.updateOne(
+        { _id: status._id },
+        { $addToSet: { viewers: currentProfile._id } }
+      );
+    }
+
+    return res.json({ success: true });
+  } catch (error) {
+    console.error("status view error:", error);
+    return res.status(500).json({ success: false, error: "Failed to update status view" });
+  }
+});
+
+app.delete("/api/statuses/:statusId", async (req, res) => {
+  try {
+    const currentProfile = (await getAuthenticatedProfile(req)) || await getProfileByInstallId(getInstallId(req));
+    if (!currentProfile) return res.status(401).json({ success: false, error: "Please sign in again" });
+
+    const status = await StatusUpdate.findById(req.params.statusId);
+    if (!status) return res.status(404).json({ success: false, error: "Status not found" });
+    if (!idsEqual(status.ownerProfileId, currentProfile._id)) {
+      return res.status(403).json({ success: false, error: "You can only delete your own status" });
+    }
+
+    await StatusUpdate.deleteOne({ _id: status._id });
+    io.emit("statuses_updated", { ownerProfileId: String(currentProfile._id) });
+    return res.json({ success: true });
+  } catch (error) {
+    console.error("delete status error:", error);
+    return res.status(500).json({ success: false, error: "Failed to delete status" });
   }
 });
 

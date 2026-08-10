@@ -1,0 +1,294 @@
+/* Int-Messager v4.10.14 — dark-mode contrast pass.
+   This file MUST stay after all feature CSS. It intentionally favours
+   readable contrast over faint/low-opacity decorative text. */
+
+.wa-app[data-appearance="dark"] {
+  --dm14-text: #ffffff;
+  --dm14-text-primary: #f8fafc;
+  --dm14-text-secondary: #dbe5ef;
+  --dm14-text-muted: #b9c8d8;
+  --dm14-text-soft: #a8bacb;
+  --dm14-link: #7dd3fc;
+  --dm14-border: #3b4d60;
+  --dm14-field: #0d1823;
+  --dm14-surface: #111d28;
+  --dm14-surface-raised: #182633;
+  color-scheme: dark;
+}
+
+/* Remove legacy fading from textual UI. */
+.wa-app[data-appearance="dark"] :where(
+  p, small, label, legend, figcaption, dt, dd,
+  h1, h2, h3, h4, h5, h6,
+  .wa-section-label, .wa-room-sub, .wa-user-sub, .wa-profile-sub,
+  .wa-header-sub, .wa-settings-note, .wa-settings-label,
+  .wa-home-profile-status, .wa-home-room-preview, .wa-welcome-tagline,
+  .wa-welcome-intro, .wa-call-subtitle, .wa-call-history-date,
+  .wa-call-history-meta, .wa-search-result-meta, .wa-search-result-summary,
+  .wa-shared-copy, .wa-shared-media-meta, .wa-scheduled-empty,
+  .wa-scheduled-item-copy, .wa-disappearing-copy, .wa-disappearing-status,
+  .wa-expiry-meta, .wa-status-heading small, .wa-status-my-main small,
+  .wa-status-contact-copy small, .wa-status-modal-head small,
+  .wa-status-char-count, .wa-status-view-count, .wa-empty, .wa-empty.dark
+) {
+  opacity: 1 !important;
+}
+
+/* Primary readable text */
+.wa-app[data-appearance="dark"] :where(
+  h1, h2, h3, h4, h5, h6, strong,
+  .wa-brand, .wa-room-title, .wa-user-name, .wa-header-title,
+  .wa-details-card-title, .wa-settings-title, .wa-home-profile-name,
+  .wa-home-room-name, .wa-home-section-title, .wa-contact-section-title,
+  .wa-contact-name, .wa-call-title, .wa-modal-title,
+  .wa-status-section-title, .wa-status-modal-head strong,
+  .wa-status-viewer-head strong
+) {
+  color: var(--dm14-text-primary) !important;
+  opacity: 1 !important;
+}
+
+/* Secondary copy: deliberately brighter than previous dark mode. */
+.wa-app[data-appearance="dark"] :where(
+  p, small, label, legend, figcaption, dt, dd,
+  .wa-room-sub, .wa-user-sub, .wa-profile-sub, .wa-header-sub,
+  .wa-settings-note, .wa-settings-label, .wa-home-profile-status,
+  .wa-home-room-preview, .wa-welcome-tagline, .wa-welcome-intro,
+  .wa-call-subtitle, .wa-call-history-date, .wa-call-history-meta,
+  .wa-search-result-meta, .wa-search-result-summary, .wa-shared-copy,
+  .wa-shared-media-meta, .wa-scheduled-empty, .wa-scheduled-item-copy,
+  .wa-disappearing-copy, .wa-disappearing-status, .wa-expiry-meta,
+  .wa-status-heading small, .wa-status-my-main small,
+  .wa-status-contact-copy small, .wa-status-modal-head small,
+  .wa-status-char-count, .wa-status-view-count, .wa-empty, .wa-empty.dark
+) {
+  color: var(--dm14-text-muted) !important;
+}
+
+/* Section labels must not fade into the background. */
+.wa-app[data-appearance="dark"] .wa-section-label {
+  color: #d6e3ef !important;
+  opacity: 1 !important;
+  font-weight: 800 !important;
+}
+
+/* Broad safety net for newer feature cards whose child spans/divs had
+   hard-coded light-theme colors or inherited opacity. */
+.wa-app[data-appearance="dark"] :where(
+  .wa-sidebar-panel,
+  .wa-settings-card,
+  .wa-details-page,
+  .wa-details-card,
+  .wa-contact-card,
+  .wa-call-log-card,
+  .wa-search-result-card,
+  .wa-shared-content-card,
+  .wa-scheduled-card,
+  .wa-scheduled-item,
+  .wa-disappearing-card,
+  .wa-group-management-card,
+  .wa-contact-management-card,
+  .wa-status-my-card,
+  .wa-status-contact-card,
+  .wa-status-composer,
+  .wa-profile-modal,
+  .wa-group-modal,
+  .wa-schedule-modal,
+  .wa-forward-picker,
+  .wa-room-context-menu,
+  .wa-message-context-menu,
+  .wa-mobile-chat-menu
+) :where(span, div):not(.wa-avatar):not(.wa-unread-badge):not(.wa-status-ring):not(.wa-status-progress):not(.wa-status-progress span) {
+  opacity: 1 !important;
+}
+
+/* Inputs/selects: readable value, placeholder and helper text. */
+.wa-app[data-appearance="dark"] :where(
+  input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
+  textarea, select, .wa-input, .wa-search-input, .wa-select,
+  .wa-group-field, .wa-schedule-field
+) {
+  background-color: var(--dm14-field) !important;
+  color: var(--dm14-text-primary) !important;
+  border-color: var(--dm14-border) !important;
+  -webkit-text-fill-color: var(--dm14-text-primary) !important;
+  opacity: 1 !important;
+}
+.wa-app[data-appearance="dark"] :where(input, textarea)::placeholder {
+  color: #aebdcb !important;
+  -webkit-text-fill-color: #aebdcb !important;
+  opacity: 1 !important;
+}
+.wa-app[data-appearance="dark"] select option {
+  background: #111d28 !important;
+  color: #ffffff !important;
+}
+
+/* Buttons: prevent black/dim labels on dark surfaces. */
+.wa-app[data-appearance="dark"] :where(
+  button,
+  .wa-icon-btn,
+  .wa-mini-btn,
+  .wa-settings-btn,
+  .wa-archive-toggle,
+  .wa-search-type-chip,
+  .wa-search-clear-filters,
+  .wa-shared-open,
+  .wa-scheduled-add-btn,
+  .wa-call-history-redial,
+  .wa-details-actions button,
+  .wa-contact-detail-actions button,
+  .wa-group-member-actions button
+) {
+  opacity: 1;
+}
+.wa-app[data-appearance="dark"] :where(
+  .wa-icon-btn,
+  .wa-mini-btn,
+  .wa-settings-btn,
+  .wa-archive-toggle,
+  .wa-search-type-chip,
+  .wa-search-clear-filters,
+  .wa-shared-open,
+  .wa-scheduled-add-btn,
+  .wa-call-history-redial,
+  .wa-details-actions button,
+  .wa-contact-detail-actions button,
+  .wa-group-member-actions button
+) {
+  color: #eef5fb !important;
+  -webkit-text-fill-color: #eef5fb !important;
+}
+
+/* Disabled controls: still visibly disabled, but never unreadable. */
+.wa-app[data-appearance="dark"] :where(button, input, textarea, select):disabled {
+  opacity: .72 !important;
+  color: #b8c6d4 !important;
+  -webkit-text-fill-color: #b8c6d4 !important;
+}
+
+/* Chat list and contacts */
+.wa-app[data-appearance="dark"] :where(.wa-room-card, .wa-user-card, .wa-contact-card) {
+  color: var(--dm14-text-primary) !important;
+}
+.wa-app[data-appearance="dark"] :where(.wa-room-card, .wa-user-card, .wa-contact-card) :where(.wa-room-title, strong) {
+  color: #ffffff !important;
+}
+.wa-app[data-appearance="dark"] :where(.wa-room-card, .wa-user-card, .wa-contact-card) :where(.wa-room-sub, small, p) {
+  color: #c3d0dc !important;
+  opacity: 1 !important;
+}
+
+/* Conversation metadata/timestamps/read receipts */
+.wa-app[data-appearance="dark"] :where(
+  .wa-meta, .wa-message-meta, .wa-message-time, .wa-edited-label,
+  .wa-receipt, .wa-expiry-meta, .wa-voice-time
+) {
+  color: #c1cfdb !important;
+  opacity: 1 !important;
+}
+.wa-app[data-appearance="dark"] .wa-receipt.seen,
+.wa-app[data-appearance="dark"] .wa-receipt.blue {
+  color: #67d4ff !important;
+}
+
+/* Message text and reply snippets */
+.wa-app[data-appearance="dark"] :where(
+  .wa-message-text, .wa-reply-card, .wa-reply-card div,
+  .wa-forward-label, .wa-message-flag, .wa-attachment-name
+) {
+  color: #f8fafc !important;
+  opacity: 1 !important;
+}
+.wa-app[data-appearance="dark"] .wa-reply-sender,
+.wa-app[data-appearance="dark"] .wa-sender-name-inside,
+.wa-app[data-appearance="dark"] .wa-group-text-sender {
+  color: var(--dm14-link) !important;
+  opacity: 1 !important;
+}
+
+/* Settings/privacy/group rows — common source of faint labels. */
+.wa-app[data-appearance="dark"] :where(
+  .wa-settings-row, .wa-privacy-row, .wa-blocked-row,
+  .wa-group-member-row, .wa-group-picker-row,
+  .wa-contact-detail-actions, .wa-group-member-actions
+) :where(span, small, label, p, div) {
+  color: #d9e4ee !important;
+  opacity: 1 !important;
+}
+
+/* Search results */
+.wa-app[data-appearance="dark"] .wa-search-result-card :where(strong, .wa-search-result-title) {
+  color: #ffffff !important;
+}
+.wa-app[data-appearance="dark"] .wa-search-result-card :where(small, span, p, .wa-search-result-meta, .wa-search-result-summary) {
+  color: #c2d0dc !important;
+  opacity: 1 !important;
+}
+
+/* Status / Updates */
+.wa-app[data-appearance="dark"] :where(.wa-status-my-card, .wa-status-contact-card) strong {
+  color: #ffffff !important;
+}
+.wa-app[data-appearance="dark"] :where(.wa-status-my-card, .wa-status-contact-card) small {
+  color: #c7d5e1 !important;
+  opacity: 1 !important;
+}
+.wa-app[data-appearance="dark"] .wa-status-composer :where(label, small, p, .wa-status-char-count) {
+  color: #c8d5e0 !important;
+  opacity: 1 !important;
+}
+.wa-app[data-appearance="dark"] .wa-status-composer textarea {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+/* Calls */
+.wa-app[data-appearance="dark"] :where(.wa-call-log-card, .wa-call-history-group) :where(strong, .wa-call-title) {
+  color: #ffffff !important;
+}
+.wa-app[data-appearance="dark"] :where(.wa-call-log-card, .wa-call-history-group) :where(small, span, p, .wa-call-history-meta, .wa-call-history-date) {
+  color: #c3d1dd !important;
+  opacity: 1 !important;
+}
+
+/* Details / media / links / docs */
+.wa-app[data-appearance="dark"] :where(.wa-media-item, .wa-shared-content-card, .wa-details-card) {
+  color: #eef5fb !important;
+}
+.wa-app[data-appearance="dark"] :where(.wa-media-item, .wa-shared-content-card, .wa-details-card) :where(small, p, span) {
+  color: #c4d1dc !important;
+  opacity: 1 !important;
+}
+
+/* Preserve semantic colours after broad contrast rules. */
+.wa-app[data-appearance="dark"] :where(a, .wa-link, .wa-shared-link) {
+  color: #7dd3fc !important;
+}
+.wa-app[data-appearance="dark"] :where(.danger, .wa-danger-text-btn, button.danger, .wa-status-delete) {
+  color: #fecdd3 !important;
+  -webkit-text-fill-color: #fecdd3 !important;
+}
+.wa-app[data-appearance="dark"] :where(.success, .wa-success) {
+  color: #bbf7d0 !important;
+}
+.wa-app[data-appearance="dark"] .wa-unread-badge {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  opacity: 1 !important;
+}
+
+/* Native autofill can otherwise restore light text/background combinations. */
+.wa-app[data-appearance="dark"] input:-webkit-autofill,
+.wa-app[data-appearance="dark"] input:-webkit-autofill:hover,
+.wa-app[data-appearance="dark"] input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #f8fafc !important;
+  -webkit-box-shadow: 0 0 0 1000px var(--dm14-field) inset !important;
+  caret-color: #ffffff !important;
+}
+
+@media (max-width: 900px) {
+  .wa-app[data-appearance="dark"] :where(.wa-room-sub, .wa-profile-sub, .wa-header-sub, small) {
+    color: #c6d3df !important;
+  }
+}
