@@ -1,0 +1,213 @@
+/* Int-Messager v4.10.17 — unified app theme system.
+   Theme dropdown controls the whole app. Appearance controls light/dark/system. */
+
+.wa-app {
+  background: var(--app-color) !important;
+  color: var(--theme-text) !important;
+}
+
+.wa-app .wa-sidebar-panel,
+.wa-app .wa-sidebar,
+.wa-app .wa-navigation-rail {
+  background: var(--theme-sidebar) !important;
+  color: var(--theme-text) !important;
+  border-color: var(--theme-border) !important;
+}
+
+.wa-app .wa-main,
+.wa-app .wa-chat-panel,
+.wa-app .wa-chat-shell,
+.wa-app .wa-details-page,
+.wa-app .wa-settings-page {
+  color: var(--theme-text) !important;
+}
+
+.wa-app .wa-settings-card,
+.wa-app .wa-details-card,
+.wa-app .wa-contact-card,
+.wa-app .wa-room-card,
+.wa-app .wa-user-card,
+.wa-app .wa-call-log-card,
+.wa-app .wa-search-result-card,
+.wa-app .wa-status-my-card,
+.wa-app .wa-status-contact-card,
+.wa-app .wa-profile-card {
+  background: var(--theme-surface) !important;
+  color: var(--theme-text) !important;
+  border: 1px solid var(--theme-border) !important;
+}
+
+.wa-app .wa-settings-title,
+.wa-app .wa-room-title,
+.wa-app .wa-user-name,
+.wa-app .wa-header-title,
+.wa-app .wa-brand,
+.wa-app .wa-brand span,
+.wa-app .wa-details-card-title,
+.wa-app .wa-contact-section-title,
+.wa-app .wa-section-label,
+.wa-app strong {
+  color: var(--theme-text) !important;
+  -webkit-text-fill-color: var(--theme-text) !important;
+  opacity: 1 !important;
+}
+
+.wa-app .wa-settings-note,
+.wa-app .wa-settings-label,
+.wa-app .wa-room-sub,
+.wa-app .wa-user-sub,
+.wa-app .wa-profile-sub,
+.wa-app small,
+.wa-app .wa-meta,
+.wa-app .wa-meta span,
+.wa-app .wa-message-time {
+  color: var(--theme-muted) !important;
+  -webkit-text-fill-color: var(--theme-muted) !important;
+  opacity: 1 !important;
+}
+
+/* App theme dropdown and all controls */
+.wa-app :where(input:not([type="checkbox"]):not([type="radio"]):not([type="color"]), textarea, select, .wa-input, .wa-search-input, .wa-select) {
+  background: var(--theme-surface-2) !important;
+  color: var(--theme-text) !important;
+  -webkit-text-fill-color: var(--theme-text) !important;
+  border: 1px solid var(--theme-border) !important;
+}
+.wa-app :where(input,textarea)::placeholder {
+  color: var(--theme-muted) !important;
+  -webkit-text-fill-color: var(--theme-muted) !important;
+  opacity: .92 !important;
+}
+.wa-app select option {
+  background: var(--theme-surface) !important;
+  color: var(--theme-text) !important;
+}
+
+/* Appearance control: no white card leaks in dark mode */
+.wa-app .wa-appearance-setting {
+  color: var(--theme-text) !important;
+}
+.wa-app .wa-appearance-segmented {
+  background: var(--theme-surface-2) !important;
+  border: 1px solid var(--theme-border) !important;
+  border-radius: 14px;
+  padding: 4px;
+  gap: 5px;
+}
+.wa-app .wa-appearance-segmented button {
+  background: transparent !important;
+  color: var(--theme-muted) !important;
+  -webkit-text-fill-color: var(--theme-muted) !important;
+  border: 1px solid transparent !important;
+  opacity: 1 !important;
+}
+.wa-app .wa-appearance-segmented button.active,
+.wa-app .wa-appearance-segmented button[aria-pressed="true"] {
+  background: var(--accent-color) !important;
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+  border-color: color-mix(in srgb, var(--accent-color) 70%, white 15%) !important;
+}
+
+/* Chat is themed as one coherent surface */
+.wa-app .wa-chat {
+  background-color: var(--chat-wallpaper) !important;
+  color: var(--theme-text) !important;
+}
+.wa-app .wa-bubble,
+.wa-app .wa-message-row:not(.own) .wa-bubble,
+.wa-app .wa-group-text-template {
+  background: var(--theme-incoming) !important;
+  color: var(--theme-text) !important;
+  border-color: var(--theme-border) !important;
+}
+.wa-app .wa-bubble.mine,
+.wa-app .wa-message-row.own .wa-bubble {
+  background: var(--theme-outgoing) !important;
+  color: var(--theme-text) !important;
+  border-color: color-mix(in srgb, var(--theme-outgoing) 72%, var(--theme-border)) !important;
+}
+.wa-app .wa-message-text,
+.wa-app .wa-group-text-body,
+.wa-app .wa-bubble .wa-message-text {
+  color: var(--theme-text) !important;
+  -webkit-text-fill-color: var(--theme-text) !important;
+  opacity: 1 !important;
+}
+.wa-app .wa-sender-name,
+.wa-app .wa-sender-name-inside,
+.wa-app .wa-group-text-sender,
+.wa-app .wa-reply-sender {
+  color: var(--accent-color) !important;
+  -webkit-text-fill-color: var(--accent-color) !important;
+  opacity: 1 !important;
+}
+
+/* Composer */
+.wa-app .wa-composer-wrap {
+  background: color-mix(in srgb, var(--theme-sidebar) 92%, transparent) !important;
+}
+.wa-app .wa-composer {
+  background: var(--theme-surface) !important;
+  border: 1px solid var(--theme-border) !important;
+}
+.wa-app .wa-composer .wa-input,
+.wa-app .wa-composer input,
+.wa-app .wa-composer textarea {
+  background: var(--theme-surface-2) !important;
+  color: var(--theme-text) !important;
+}
+
+/* Navigation glass follows the selected app theme */
+.wa-app .wa-side-switcher {
+  background: color-mix(in srgb, var(--theme-surface) 72%, transparent) !important;
+  border-color: var(--theme-border) !important;
+}
+.wa-app .wa-side-tab {
+  background: color-mix(in srgb, var(--theme-surface-2) 78%, transparent) !important;
+  border-color: color-mix(in srgb, var(--theme-border) 80%, transparent) !important;
+  color: var(--theme-text) !important;
+  -webkit-text-fill-color: var(--theme-text) !important;
+}
+.wa-app .wa-side-tab.active {
+  background: color-mix(in srgb, var(--accent-color) 78%, var(--theme-surface)) !important;
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+}
+
+/* Buttons and archive checkbox/card rows */
+.wa-app .wa-settings-card button:not(.danger),
+.wa-app .wa-contact-actions button,
+.wa-app .wa-contact-detail-actions button {
+  color: var(--theme-text) !important;
+  -webkit-text-fill-color: var(--theme-text) !important;
+  background: var(--theme-surface-2) !important;
+  border-color: var(--theme-border) !important;
+}
+.wa-app .wa-settings-btn,
+.wa-app .wa-send-btn,
+.wa-app button.primary {
+  background: var(--accent-color) !important;
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+}
+
+/* Remove old palette cards if stale markup ever remains cached. */
+.wa-app .theme-preview-grid { display: none !important; }
+
+@media (max-width: 900px) {
+  .wa-app .wa-sidebar-panel,
+  .wa-app .wa-settings-card,
+  .wa-app .wa-details-card,
+  .wa-app .wa-contact-card {
+    color: var(--theme-text) !important;
+  }
+  .wa-app .wa-settings-card {
+    background: var(--theme-surface) !important;
+  }
+  .wa-app .wa-settings-note,
+  .wa-app .wa-settings-label,
+  .wa-app .wa-settings-card small {
+    color: var(--theme-muted) !important;
+  }
+}

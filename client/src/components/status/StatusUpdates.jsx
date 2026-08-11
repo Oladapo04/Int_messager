@@ -2,8 +2,10 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch } from "../../services/api";
 import "../../styles/status-updates-v4111.css";
 import "../../styles/status-quick-composer-v4112.css";
+import "../../styles/status-autoplay-v4119.css";
 
 const STATUS_REFRESH_MS = 30000;
+const STATUS_VIEW_DURATION_MS = 30000;
 
 function StatusAvatar({ name = "User", src = "", unread = false, large = false }) {
   const initials = String(name || "User")
@@ -206,6 +208,25 @@ export default function StatusUpdates({ currentProfile }) {
     return () => { cancelled = true; };
   }, [activeViewerStatus?._id]);
 
+  useEffect(() => {
+    if (!activeViewerStatus) return undefined;
+
+    const timer = window.setTimeout(() => {
+      setViewerIndex((currentIndex) => {
+        const nextIndex = currentIndex + 1;
+        if (nextIndex < viewerItems.length) return nextIndex;
+
+        window.setTimeout(() => {
+          setViewerItems([]);
+          setViewerIndex(0);
+        }, 0);
+        return currentIndex;
+      });
+    }, STATUS_VIEW_DURATION_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [activeViewerStatus?._id, viewerItems.length]);
+
   async function deleteStatus(statusId) {
     if (!statusId) return;
     if (!window.confirm("Delete this status now?")) return;
@@ -350,7 +371,14 @@ export default function StatusUpdates({ currentProfile }) {
       {activeViewerStatus ? (
         <div className="wa-status-viewer" role="dialog" aria-modal="true" aria-label="Status viewer">
           <div className="wa-status-progress-row" aria-hidden="true">
-            {viewerItems.map((item, index) => <span key={item._id} className={index <= viewerIndex ? "active" : ""} />)}
+            {viewerItems.map((item, index) => (
+              <span
+                key={item._id}
+                className={index < viewerIndex ? "complete" : index === viewerIndex ? "current" : ""}
+              >
+                {index === viewerIndex ? <i key={activeViewerStatus?._id} /> : null}
+              </span>
+            ))}
           </div>
           <div className="wa-status-viewer-head">
             <StatusAvatar name={activeViewerStatus.owner?.displayName || currentProfile?.displayName || "User"} src={activeViewerStatus.owner?.avatarUrl || currentProfile?.avatarUrl || ""} large />

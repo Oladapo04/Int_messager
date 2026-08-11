@@ -50,6 +50,9 @@ import "./styles/dark-mode-visibility-v4113.css";
 import "./styles/dark-mode-contrast-v4114.css";
 import "./styles/dark-mode-critical-text-v4115.css";
 import "./styles/dark-mode-settings-chat-v4116.css";
+import "./styles/unified-theme-system-v4117.css";
+import "./styles/dark-mode-professional-v4120.css";
+import "./styles/dark-mode-premium-v4121.css";
 
 const API_BASE = "";
 const socket = io(API_BASE, { autoConnect: true });
@@ -74,6 +77,21 @@ const ACCOUNT_INSTALL_ID_KEY = "int_messager_account_install_id_v4";
 const DESKTOP_SIDEBAR_WIDTH_KEY = "int_messager_desktop_sidebar_width_v44";
 const APPEARANCE_MODE_KEY = "int_messager_appearance_mode_v491";
 const DRAFTS_STORAGE_PREFIX = "int_messager_drafts_v4109";
+
+const APP_THEME_PRESETS = {
+  "light-grey": { label: "Classic", light: { app: "#eef2f6", sidebar: "#f8fafc", surface: "#ffffff", surface2: "#f1f5f9", chat: "#eaf0f6", incoming: "#ffffff", outgoing: "#d9fdd3", text: "#0f172a", muted: "#64748b", border: "#d8e0e8", accent: "#1687d9" }, dark: { app: "#0b141a", sidebar: "#111b21", surface: "#17232c", surface2: "#202c33", chat: "#0b141a", incoming: "#202c33", outgoing: "#005c4b", text: "#f0f2f5", muted: "#aebac1", border: "#2a3942", accent: "#00a884" } },
+  "soft-blue": { label: "Ocean Blue", light: { app: "#edf5ff", sidebar: "#f7fbff", surface: "#ffffff", surface2: "#e7f1fb", chat: "#e8f3ff", incoming: "#ffffff", outgoing: "#d8ebff", text: "#10233f", muted: "#61758c", border: "#cbdced", accent: "#1677c8" }, dark: { app: "#091622", sidebar: "#0d1d2b", surface: "#132638", surface2: "#193149", chat: "#08131d", incoming: "#173047", outgoing: "#174f72", text: "#f2f8ff", muted: "#b4c8d9", border: "#29465f", accent: "#4ab3ff" } },
+  "emerald": { label: "Emerald", light: { app: "#edf8f3", sidebar: "#f7fcfa", surface: "#ffffff", surface2: "#e4f3ec", chat: "#e8f5ef", incoming: "#ffffff", outgoing: "#d3f3e2", text: "#123126", muted: "#627c72", border: "#c8ded4", accent: "#16835f" }, dark: { app: "#081713", sidebar: "#0d211a", surface: "#132b22", surface2: "#17372b", chat: "#081510", incoming: "#163529", outgoing: "#075e4b", text: "#effbf6", muted: "#b1cfc2", border: "#285242", accent: "#34d399" } },
+  "violet": { label: "Violet", light: { app: "#f3efff", sidebar: "#faf8ff", surface: "#ffffff", surface2: "#eee8ff", chat: "#f0ecfb", incoming: "#ffffff", outgoing: "#e6dcff", text: "#24173f", muted: "#75678d", border: "#d8cff0", accent: "#7357d4" }, dark: { app: "#100c1a", sidebar: "#171123", surface: "#21182f", surface2: "#2a1f3c", chat: "#0f0a18", incoming: "#261d36", outgoing: "#4f3a78", text: "#f7f3ff", muted: "#c8bce0", border: "#493960", accent: "#a78bfa" } },
+  "rose": { label: "Rose", light: { app: "#fff1f4", sidebar: "#fff9fa", surface: "#ffffff", surface2: "#fce7ec", chat: "#fff0f3", incoming: "#ffffff", outgoing: "#fbd8e0", text: "#3b1721", muted: "#8b6670", border: "#efd0d8", accent: "#d64a72" }, dark: { app: "#190d11", sidebar: "#221117", surface: "#301820", surface2: "#3b1d27", chat: "#170b0f", incoming: "#361c25", outgoing: "#6d2d42", text: "#fff3f6", muted: "#dfbdc7", border: "#613443", accent: "#fb7185" } },
+  "graphite": { label: "Graphite", light: { app: "#eceff1", sidebar: "#f7f8f9", surface: "#ffffff", surface2: "#e7eaed", chat: "#eef0f2", incoming: "#ffffff", outgoing: "#dce3e8", text: "#151a1e", muted: "#68727a", border: "#cfd5da", accent: "#4f6678" }, dark: { app: "#101214", sidebar: "#16191c", surface: "#1d2226", surface2: "#262c31", chat: "#0e1012", incoming: "#252b30", outgoing: "#35434c", text: "#f3f5f6", muted: "#bbc3c8", border: "#3a444b", accent: "#8ba4b5" } },
+  "midnight": { label: "Midnight", light: { app: "#eef2fb", sidebar: "#f7f9ff", surface: "#ffffff", surface2: "#e7edf8", chat: "#edf2fa", incoming: "#ffffff", outgoing: "#dbe6fa", text: "#101b33", muted: "#63718b", border: "#cdd7ea", accent: "#315fb3" }, dark: { app: "#070d18", sidebar: "#0c1424", surface: "#111d30", surface2: "#17253b", chat: "#060b14", incoming: "#18263b", outgoing: "#203d69", text: "#f2f6ff", muted: "#b7c5dc", border: "#2a4060", accent: "#60a5fa" } },
+};
+
+function getAppThemePalette(themeName, appearance) {
+  const preset = APP_THEME_PRESETS[themeName] || APP_THEME_PRESETS["light-grey"];
+  return preset[appearance === "dark" ? "dark" : "light"];
+}
 
 function draftStorageKey(profileId) {
   return `${DRAFTS_STORAGE_PREFIX}:${String(profileId || "guest")}`;
@@ -3515,6 +3533,7 @@ export default function App() {
   const resolvedAppearance = appearanceMode === "system"
     ? (systemPrefersDark ? "dark" : "light")
     : appearanceMode;
+  const activeAppTheme = getAppThemePalette(chatPrefs.theme || "light-grey", resolvedAppearance);
 
   useEffect(() => {
     localStorage.setItem(APPEARANCE_MODE_KEY, appearanceMode);
@@ -7235,7 +7254,7 @@ export default function App() {
 
       {showSidebar && !showAdminDashboard ? <div className="wa-mobile-overlay" onClick={() => setShowSidebar(false)} /> : null}
 
-      <div data-theme={chatPrefs.theme || "light-grey"} data-appearance={resolvedAppearance} className={`wa-app ${activeRoom ? "has-active-chat" : "no-active-chat"} bubble-${chatPrefs.bubbleShape} font-${chatPrefs.fontSize}`} style={{ "--app-color": chatPrefs.appColor, "--accent-color": chatPrefs.accentColor, "--chat-wallpaper": chatPrefs.wallpaper, "--chat-color": chatPrefs.chatColor, "--desktop-sidebar-width": `${desktopSidebarWidth}px` }}>
+      <div data-theme={chatPrefs.theme || "light-grey"} data-appearance={resolvedAppearance} className={`wa-app ${activeRoom ? "has-active-chat" : "no-active-chat"} bubble-${chatPrefs.bubbleShape} font-${chatPrefs.fontSize}`} style={{ "--app-color": activeAppTheme.app, "--accent-color": activeAppTheme.accent, "--chat-wallpaper": activeAppTheme.chat, "--chat-color": activeAppTheme.outgoing, "--theme-sidebar": activeAppTheme.sidebar, "--theme-surface": activeAppTheme.surface, "--theme-surface-2": activeAppTheme.surface2, "--theme-incoming": activeAppTheme.incoming, "--theme-outgoing": activeAppTheme.outgoing, "--theme-text": activeAppTheme.text, "--theme-muted": activeAppTheme.muted, "--theme-border": activeAppTheme.border, "--desktop-sidebar-width": `${desktopSidebarWidth}px` }}>
         <aside className={`wa-sidebar ${showSidebar ? "open" : ""}`}>
           <NavigationRail
             sidebarMode={sidebarMode}
@@ -7552,7 +7571,7 @@ export default function App() {
                         ? `${room.activeCallParticipants?.length || 1} in voice call`
                         : roomDraft.trim()
                           ? <><span className="wa-draft-label">Draft:</span> {compactDraftPreview(roomDraft)}</>
-                          : room.lastMessageText || (room.slug === "general" ? "Public room" : room.slug)}
+                          : room.lastMessageText || (room.slug === "general" ? "Public room" : room.isSaved ? "Private notes" : room.isDirect ? "No messages yet" : "No messages yet")}
                     </div>
                   </div>
                 </button>
@@ -7739,27 +7758,14 @@ export default function App() {
                     ))}
                   </div>
                 </div>
-                <label className="wa-settings-label">Chat palette
+                <label className="wa-settings-label">App theme
                   <select className="wa-select" value={chatPrefs.theme || "light-grey"} onChange={(e) => updateChatPref("theme", e.target.value)}>
-                    <option value="light-grey">Light Grey — recommended</option>
-                    <option value="bright-white">Bright White</option>
-                    <option value="soft-blue">Soft Blue</option>
-                    <option value="high-contrast">High Contrast</option>
+                    {Object.entries(APP_THEME_PRESETS).map(([value, preset]) => (
+                      <option key={value} value={value}>{preset.label}</option>
+                    ))}
                   </select>
+                  <span className="wa-settings-note">This theme now controls the entire app, including navigation, settings, chat background, cards, bubbles and accent colours.</span>
                 </label>
-                <div className="theme-preview-grid" aria-label="Theme previews">
-                  {[
-                    ["light-grey", "Light Grey", "#eef1f4", "#ffffff", "#111827"],
-                    ["bright-white", "Bright White", "#ffffff", "#f3f4f6", "#0b1220"],
-                    ["soft-blue", "Soft Blue", "#eaf2fb", "#ffffff", "#10233f"],
-                    ["high-contrast", "High Contrast", "#e5e7eb", "#ffffff", "#000000"],
-                  ].map(([value, label, page, card, text]) => (
-                    <button key={value} type="button" className={`theme-preview ${chatPrefs.theme === value ? "active" : ""}`} onClick={() => updateChatPref("theme", value)} aria-pressed={chatPrefs.theme === value}>
-                      <span className="theme-preview-swatch" style={{ background: page }}><i style={{ background: card, color: text }}>Aa</i></span>
-                      <strong>{label}</strong>
-                    </button>
-                  ))}
-                </div>
                 <label className="wa-settings-label">Bubble style <select className="wa-select" value={chatPrefs.bubbleShape} onChange={(e) => updateChatPref("bubbleShape", e.target.value)}><option value="rounded">Rounded</option><option value="soft">Soft</option><option value="square">Compact square</option></select></label>
                 <label className="wa-settings-label">Font size <select className="wa-select" value={chatPrefs.fontSize} onChange={(e) => updateChatPref("fontSize", e.target.value)}><option value="small">Small</option><option value="normal">Normal</option><option value="large">Large</option></select></label>
               </div>

@@ -1,0 +1,379 @@
+/* Int-Messager v4.10.20 — professional dark mode visibility fix */
+
+.wa-app[data-appearance="dark"] {
+  --dm-bg: #091420;
+  --dm-surface: #0f1c2c;
+  --dm-surface-2: #152538;
+  --dm-surface-3: #1b3249;
+  --dm-text: #f5f7fb;
+  --dm-muted: #c2cfdd;
+  --dm-soft: #9bb1c8;
+  --dm-border: #27445f;
+  --dm-accent: var(--accent-color, #4aa8ff);
+  --dm-danger: #ffb4bc;
+  --dm-danger-bg: #241720;
+  --dm-success: #89efb6;
+  --dm-success-bg: #113222;
+}
+
+.wa-app[data-appearance="dark"],
+.wa-app[data-appearance="dark"] .wa-sidebar,
+.wa-app[data-appearance="dark"] .wa-sidebar-panel,
+.wa-app[data-appearance="dark"] .wa-navigation-rail,
+.wa-app[data-appearance="dark"] .wa-main,
+.wa-app[data-appearance="dark"] .wa-settings-page,
+.wa-app[data-appearance="dark"] .wa-details-page,
+.wa-app[data-appearance="dark"] .wa-chat-panel,
+.wa-app[data-appearance="dark"] .wa-chat-shell,
+.wa-app[data-appearance="dark"] .wa-chat {
+  background: var(--dm-bg) !important;
+  color: var(--dm-text) !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-brand,
+.wa-app[data-appearance="dark"] .wa-brand *,
+.wa-app[data-appearance="dark"] .wa-profile-text .wa-room-title,
+.wa-app[data-appearance="dark"] .wa-profile-text .wa-profile-sub,
+.wa-app[data-appearance="dark"] .wa-room-title,
+.wa-app[data-appearance="dark"] .wa-user-name,
+.wa-app[data-appearance="dark"] .wa-user-content strong,
+.wa-app[data-appearance="dark"] .wa-header-title,
+.wa-app[data-appearance="dark"] .wa-section-label,
+.wa-app[data-appearance="dark"] .wa-settings-title,
+.wa-app[data-appearance="dark"] .wa-details-card-title,
+.wa-app[data-appearance="dark"] .wa-contact-section-title,
+.wa-app[data-appearance="dark"] .wa-status-section-title,
+.wa-app[data-appearance="dark"] .wa-status-heading strong,
+.wa-app[data-appearance="dark"] .wa-status-my-card strong,
+.wa-app[data-appearance="dark"] .wa-status-contact-copy strong,
+.wa-app[data-appearance="dark"] .wa-search-result-card .wa-room-title,
+.wa-app[data-appearance="dark"] .wa-privacy-row strong,
+.wa-app[data-appearance="dark"] .wa-privacy-toggle strong,
+.wa-app[data-appearance="dark"] .wa-blocked-row strong,
+.wa-app[data-appearance="dark"] .wa-shared-copy strong,
+.wa-app[data-appearance="dark"] .wa-disappearing-status strong,
+.wa-app[data-appearance="dark"] .wa-scheduled-item-copy strong,
+.wa-app[data-appearance="dark"] .wa-details-hero h2,
+.wa-app[data-appearance="dark"] .wa-details-topbar strong,
+.wa-app[data-appearance="dark"] .wa-details-topbar span,
+.wa-app[data-appearance="dark"] .wa-chat-header .wa-room-title,
+.wa-app[data-appearance="dark"] .wa-chat-header .wa-user-name,
+.wa-app[data-appearance="dark"] .wa-chat-header strong {
+  color: var(--dm-text) !important;
+  -webkit-text-fill-color: var(--dm-text) !important;
+  opacity: 1 !important;
+  text-shadow: none !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-room-sub,
+.wa-app[data-appearance="dark"] .wa-user-sub,
+.wa-app[data-appearance="dark"] .wa-profile-sub,
+.wa-app[data-appearance="dark"] .wa-settings-note,
+.wa-app[data-appearance="dark"] .wa-settings-label,
+.wa-app[data-appearance="dark"] .wa-settings-label span,
+.wa-app[data-appearance="dark"] .wa-settings-card small,
+.wa-app[data-appearance="dark"] .wa-contact-card small,
+.wa-app[data-appearance="dark"] .wa-status-heading small,
+.wa-app[data-appearance="dark"] .wa-status-my-card small,
+.wa-app[data-appearance="dark"] .wa-status-contact-copy small,
+.wa-app[data-appearance="dark"] .wa-search-result-summary,
+.wa-app[data-appearance="dark"] .wa-meta,
+.wa-app[data-appearance="dark"] .wa-meta span,
+.wa-app[data-appearance="dark"] .wa-message-time,
+.wa-app[data-appearance="dark"] .wa-details-hero p,
+.wa-app[data-appearance="dark"] .wa-details-hero small,
+.wa-app[data-appearance="dark"] .wa-chat-header .wa-room-sub,
+.wa-app[data-appearance="dark"] .wa-chat-header .wa-user-sub,
+.wa-app[data-appearance="dark"] .wa-privacy-row small,
+.wa-app[data-appearance="dark"] .wa-privacy-toggle small,
+.wa-app[data-appearance="dark"] .wa-blocked-row small,
+.wa-app[data-appearance="dark"] .wa-shared-copy small,
+.wa-app[data-appearance="dark"] .wa-shared-copy em,
+.wa-app[data-appearance="dark"] .wa-disappearing-copy,
+.wa-app[data-appearance="dark"] .wa-scheduled-empty,
+.wa-app[data-appearance="dark"] .wa-disappearing-status,
+.wa-app[data-appearance="dark"] .wa-scheduled-item-copy small,
+.wa-app[data-appearance="dark"] .wa-empty,
+.wa-app[data-appearance="dark"] .wa-empty.dark,
+.wa-app[data-appearance="dark"] .developer-status,
+.wa-app[data-appearance="dark"] .wa-contact-notice,
+.wa-app[data-appearance="dark"] .wa-privacy-notice {
+  color: var(--dm-muted) !important;
+  -webkit-text-fill-color: var(--dm-muted) !important;
+  opacity: 1 !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-profile-card,
+.wa-app[data-appearance="dark"] .wa-settings-card,
+.wa-app[data-appearance="dark"] .wa-contact-card,
+.wa-app[data-appearance="dark"] .wa-room-card,
+.wa-app[data-appearance="dark"] .wa-call-log-card,
+.wa-app[data-appearance="dark"] .wa-user-card,
+.wa-app[data-appearance="dark"] .wa-search-result-card,
+.wa-app[data-appearance="dark"] .wa-status-my-card,
+.wa-app[data-appearance="dark"] .wa-status-contact-card,
+.wa-app[data-appearance="dark"] .wa-details-card,
+.wa-app[data-appearance="dark"] .wa-details-hero,
+.wa-app[data-appearance="dark"] .wa-details-actions,
+.wa-app[data-appearance="dark"] .wa-appearance-setting,
+.wa-app[data-appearance="dark"] .wa-privacy-row,
+.wa-app[data-appearance="dark"] .wa-privacy-toggle,
+.wa-app[data-appearance="dark"] .archive-behaviour-setting,
+.wa-app[data-appearance="dark"] .wa-status-composer,
+.wa-app[data-appearance="dark"] .wa-search-filter-grid,
+.wa-app[data-appearance="dark"] .wa-global-search-results,
+.wa-app[data-appearance="dark"] .wa-disappearing-card,
+.wa-app[data-appearance="dark"] .wa-scheduled-card,
+.wa-app[data-appearance="dark"] .wa-shared-content-panel {
+  background: linear-gradient(180deg, var(--dm-surface) 0%, #0d1a29 100%) !important;
+  color: var(--dm-text) !important;
+  border: 1px solid var(--dm-border) !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.24) !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-details-page {
+  background: linear-gradient(180deg, #091420 0%, #0b1825 100%) !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-details-topbar,
+.wa-app[data-appearance="dark"] .wa-chat-header {
+  background: rgba(9, 20, 32, 0.96) !important;
+  color: var(--dm-text) !important;
+  border-bottom: 1px solid var(--dm-border) !important;
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+}
+
+.wa-app[data-appearance="dark"] .wa-details-back,
+.wa-app[data-appearance="dark"] .wa-chat-header button,
+.wa-app[data-appearance="dark"] .wa-chat-header .icon-btn,
+.wa-app[data-appearance="dark"] .wa-chat-header .wa-header-btn {
+  color: var(--dm-text) !important;
+  -webkit-text-fill-color: var(--dm-text) !important;
+  opacity: 1 !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-search-input,
+.wa-app[data-appearance="dark"] .wa-input,
+.wa-app[data-appearance="dark"] .wa-select,
+.wa-app[data-appearance="dark"] input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.wa-app[data-appearance="dark"] textarea,
+.wa-app[data-appearance="dark"] select {
+  background: var(--dm-surface-2) !important;
+  color: var(--dm-text) !important;
+  -webkit-text-fill-color: var(--dm-text) !important;
+  border: 1px solid var(--dm-border) !important;
+  box-shadow: none !important;
+}
+
+.wa-app[data-appearance="dark"] input::placeholder,
+.wa-app[data-appearance="dark"] textarea::placeholder {
+  color: var(--dm-soft) !important;
+  -webkit-text-fill-color: var(--dm-soft) !important;
+  opacity: 1 !important;
+}
+
+.wa-app[data-appearance="dark"] select option {
+  background: var(--dm-surface) !important;
+  color: var(--dm-text) !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-settings-btn,
+.wa-app[data-appearance="dark"] .wa-details-actions button,
+.wa-app[data-appearance="dark"] .wa-contact-actions button,
+.wa-app[data-appearance="dark"] .wa-contact-detail-actions button,
+.wa-app[data-appearance="dark"] .wa-group-member-actions button,
+.wa-app[data-appearance="dark"] .wa-group-inline-edit button,
+.wa-app[data-appearance="dark"] .wa-group-add-row button,
+.wa-app[data-appearance="dark"] .wa-status-add-btn,
+.wa-app[data-appearance="dark"] .wa-status-quick-btn,
+.wa-app[data-appearance="dark"] .wa-status-photo-empty,
+.wa-app[data-appearance="dark"] .wa-scheduled-add-btn,
+.wa-app[data-appearance="dark"] .wa-scheduled-item button,
+.wa-app[data-appearance="dark"] .wa-search-filter-tabs button,
+.wa-app[data-appearance="dark"] .wa-search-clear-filters,
+.wa-app[data-appearance="dark"] .wa-appearance-segmented button,
+.wa-app[data-appearance="dark"] .wa-side-tab,
+.wa-app[data-appearance="dark"] .wa-composer-btn,
+.wa-app[data-appearance="dark"] .wa-composer-icon-btn {
+  background: linear-gradient(180deg, var(--dm-surface-2) 0%, #102235 100%) !important;
+  color: var(--dm-text) !important;
+  -webkit-text-fill-color: var(--dm-text) !important;
+  border: 1px solid var(--dm-border) !important;
+  box-shadow: none !important;
+  opacity: 1 !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-send-btn,
+.wa-app[data-appearance="dark"] button.primary,
+.wa-app[data-appearance="dark"] .wa-status-add-btn,
+.wa-app[data-appearance="dark"] .wa-settings-btn.primary {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--dm-accent) 92%, white 8%) 0%, color-mix(in srgb, var(--dm-accent) 84%, black 16%) 100%) !important;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  border-color: color-mix(in srgb, var(--dm-accent) 70%, white 12%) !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-side-tab.active,
+.wa-app[data-appearance="dark"] .wa-search-filter-tabs button.active,
+.wa-app[data-appearance="dark"] .wa-appearance-segmented button.active,
+.wa-app[data-appearance="dark"] .wa-appearance-segmented button[aria-pressed="true"] {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--dm-accent) 92%, white 8%) 0%, color-mix(in srgb, var(--dm-accent) 84%, black 16%) 100%) !important;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  border-color: color-mix(in srgb, var(--dm-accent) 68%, white 16%) !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-side-switcher,
+.wa-app[data-appearance="dark"] .wa-appearance-segmented {
+  background: rgba(15, 28, 44, 0.88) !important;
+  border: 1px solid var(--dm-border) !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-status-notice,
+.wa-app[data-appearance="dark"] .wa-contact-notice,
+.wa-app[data-appearance="dark"] .wa-privacy-notice,
+.wa-app[data-appearance="dark"] .developer-status,
+.wa-app[data-appearance="dark"] .wa-disappearing-notice {
+  background: linear-gradient(180deg, rgba(16, 50, 34, 0.96) 0%, rgba(14, 42, 29, 0.96) 100%) !important;
+  color: var(--dm-success) !important;
+  -webkit-text-fill-color: var(--dm-success) !important;
+  border: 1px solid rgba(110, 225, 165, 0.32) !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-error {
+  background: rgba(66, 20, 28, 0.94) !important;
+  color: #ffd5db !important;
+  border: 1px solid rgba(255, 127, 143, 0.34) !important;
+}
+
+.wa-app[data-appearance="dark"] .danger-zone {
+  background: linear-gradient(180deg, #121a28 0%, #0d1623 100%) !important;
+  border: 1px solid rgba(255, 112, 132, 0.24) !important;
+}
+
+.wa-app[data-appearance="dark"] .danger-zone .wa-details-card-title,
+.wa-app[data-appearance="dark"] .wa-danger-text-btn {
+  color: var(--dm-danger) !important;
+  -webkit-text-fill-color: var(--dm-danger) !important;
+  opacity: 1 !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-danger-text-btn {
+  background: linear-gradient(180deg, #201722 0%, #18121b 100%) !important;
+  border: 1px solid rgba(255, 127, 143, 0.28) !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-danger-text-btn:hover {
+  background: linear-gradient(180deg, #2a1c28 0%, #201621 100%) !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-bubble,
+.wa-app[data-appearance="dark"] .wa-group-text-template,
+.wa-app[data-appearance="dark"] .wa-reply-preview {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--theme-incoming) 86%, #122235 14%) 0%, color-mix(in srgb, var(--theme-incoming) 76%, #0c1724 24%) 100%) !important;
+  color: var(--dm-text) !important;
+  border: 1px solid color-mix(in srgb, var(--dm-border) 78%, white 8%) !important;
+  box-shadow: 0 8px 18px rgba(0,0,0,0.20) !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-bubble.mine,
+.wa-app[data-appearance="dark"] .wa-message-row.own .wa-bubble {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--theme-outgoing) 84%, #15314a 16%) 0%, color-mix(in srgb, var(--theme-outgoing) 74%, #102032 26%) 100%) !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-bubble,
+.wa-app[data-appearance="dark"] .wa-bubble *,
+.wa-app[data-appearance="dark"] .wa-message-text,
+.wa-app[data-appearance="dark"] .wa-group-text-body,
+.wa-app[data-appearance="dark"] .wa-reply-preview,
+.wa-app[data-appearance="dark"] .wa-reply-preview * {
+  color: var(--dm-text) !important;
+  -webkit-text-fill-color: var(--dm-text) !important;
+  opacity: 1 !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-message-time,
+.wa-app[data-appearance="dark"] .wa-read-receipts,
+.wa-app[data-appearance="dark"] .wa-read-receipts *,
+.wa-app[data-appearance="dark"] .wa-shared-media-meta,
+.wa-app[data-appearance="dark"] .wa-shared-open {
+  color: var(--dm-soft) !important;
+  -webkit-text-fill-color: var(--dm-soft) !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-sender-name,
+.wa-app[data-appearance="dark"] .wa-sender-name-inside,
+.wa-app[data-appearance="dark"] .wa-group-text-sender,
+.wa-app[data-appearance="dark"] .wa-reply-sender,
+.wa-app[data-appearance="dark"] .wa-unread-badge,
+.wa-app[data-appearance="dark"] .wa-search-type-chip {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-status-heading,
+.wa-app[data-appearance="dark"] .wa-status-list,
+.wa-app[data-appearance="dark"] .wa-status-my-main,
+.wa-app[data-appearance="dark"] .wa-status-contact-card,
+.wa-app[data-appearance="dark"] .wa-status-quick-actions {
+  color: var(--dm-text) !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-composer-wrap {
+  background: rgba(9, 20, 32, 0.96) !important;
+  border-top: 1px solid var(--dm-border) !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-composer {
+  background: linear-gradient(180deg, var(--dm-surface) 0%, #0d1a29 100%) !important;
+  border: 1px solid var(--dm-border) !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-composer .wa-input,
+.wa-app[data-appearance="dark"] .wa-composer input,
+.wa-app[data-appearance="dark"] .wa-composer textarea {
+  background: #0a1725 !important;
+  color: var(--dm-text) !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-room-context-menu,
+.wa-app[data-appearance="dark"] .wa-message-context-menu,
+.wa-app[data-appearance="dark"] .wa-context-menu,
+.wa-app[data-appearance="dark"] .wa-modal,
+.wa-app[data-appearance="dark"] .wa-modal-card {
+  background: var(--dm-surface) !important;
+  color: var(--dm-text) !important;
+  border: 1px solid var(--dm-border) !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-room-context-menu *,
+.wa-app[data-appearance="dark"] .wa-message-context-menu *,
+.wa-app[data-appearance="dark"] .wa-context-menu * {
+  color: var(--dm-text) !important;
+  -webkit-text-fill-color: var(--dm-text) !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-welcome-screen,
+.wa-app[data-appearance="dark"] .wa-welcome-content {
+  background: var(--dm-bg) !important;
+  color: var(--dm-text) !important;
+}
+
+@media (max-width: 760px) {
+  .wa-app[data-appearance="dark"] .wa-details-topbar,
+  .wa-app[data-appearance="dark"] .wa-chat-header {
+    background: rgba(9, 20, 32, 0.98) !important;
+  }
+
+  .wa-app[data-appearance="dark"] .wa-details-actions {
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+
+  .wa-app[data-appearance="dark"] .wa-details-actions button {
+    min-height: 60px;
+  }
+}

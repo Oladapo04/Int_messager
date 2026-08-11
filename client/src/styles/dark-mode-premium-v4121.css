@@ -1,0 +1,484 @@
+/* Int-Messager v4.10.21 — premium dark mode.
+   A cohesive WhatsApp/Telegram-inspired dark visual system, not a visibility patch. */
+
+.wa-app[data-appearance="dark"] {
+  --p21-bg: #0b141a;
+  --p21-sidebar: #111b21;
+  --p21-surface: #17232c;
+  --p21-surface-2: #202c33;
+  --p21-surface-3: #263640;
+  --p21-line: #2a3942;
+  --p21-text: #e9edef;
+  --p21-muted: #aebac1;
+  --p21-soft: #8696a0;
+  --p21-green: #00a884;
+  --p21-danger: #ff7c8a;
+  --p21-shadow: 0 8px 26px rgba(0,0,0,.22);
+  background: var(--p21-bg) !important;
+  color: var(--p21-text) !important;
+}
+
+/* App shell */
+html[data-int-messager-appearance="dark"],
+html[data-int-messager-appearance="dark"] body {
+  background: #0b141a !important;
+  color: var(--p21-text) !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-sidebar,
+.wa-app[data-appearance="dark"] .wa-sidebar-panel,
+.wa-app[data-appearance="dark"] .wa-navigation-rail {
+  background: var(--p21-sidebar) !important;
+  border-color: var(--p21-line) !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-main,
+.wa-app[data-appearance="dark"] .wa-settings-page,
+.wa-app[data-appearance="dark"] .wa-chat-panel,
+.wa-app[data-appearance="dark"] .wa-chat-shell,
+.wa-app[data-appearance="dark"] .wa-details-page,
+.wa-app[data-appearance="dark"] .wa-welcome-screen,
+.wa-app[data-appearance="dark"] .wa-welcome-content {
+  background: var(--p21-bg) !important;
+  color: var(--p21-text) !important;
+}
+
+/* Brand header: never become a white slab */
+.wa-app[data-appearance="dark"] .wa-brand {
+  min-height: 54px !important;
+  margin: 0 0 12px !important;
+  padding: 8px 10px !important;
+  border-radius: 14px !important;
+  background: rgba(32,44,51,.78) !important;
+  border: 1px solid rgba(255,255,255,.045) !important;
+  box-shadow: none !important;
+  color: var(--p21-text) !important;
+}
+.wa-app[data-appearance="dark"] .wa-brand span {
+  color: var(--p21-text) !important;
+  -webkit-text-fill-color: var(--p21-text) !important;
+  font-weight: 780 !important;
+  opacity: 1 !important;
+}
+.wa-app[data-appearance="dark"] .wa-brand em {
+  margin-left: auto !important;
+  padding: 4px 7px !important;
+  border-radius: 999px !important;
+  background: rgba(0,168,132,.12) !important;
+  color: #66d7bf !important;
+  -webkit-text-fill-color: #66d7bf !important;
+  font-size: 10px !important;
+  font-style: normal !important;
+  font-weight: 800 !important;
+  letter-spacing: .08em !important;
+  text-transform: uppercase !important;
+  opacity: 1 !important;
+}
+
+/* Search */
+.wa-app[data-appearance="dark"] .wa-search-input {
+  min-height: 42px !important;
+  padding: 0 14px !important;
+  border-radius: 12px !important;
+  background: var(--p21-surface-2) !important;
+  border: 1px solid transparent !important;
+  color: var(--p21-text) !important;
+  -webkit-text-fill-color: var(--p21-text) !important;
+  box-shadow: none !important;
+}
+.wa-app[data-appearance="dark"] .wa-search-input:focus {
+  border-color: rgba(0,168,132,.55) !important;
+  box-shadow: 0 0 0 3px rgba(0,168,132,.10) !important;
+}
+.wa-app[data-appearance="dark"] .wa-search-input::placeholder {
+  color: var(--p21-soft) !important;
+  -webkit-text-fill-color: var(--p21-soft) !important;
+  opacity: 1 !important;
+}
+
+/* Chat list: flatter and more premium */
+.wa-app[data-appearance="dark"] .wa-chat-list-heading {
+  padding: 3px 2px 8px !important;
+}
+.wa-app[data-appearance="dark"] .wa-section-label {
+  color: var(--p21-muted) !important;
+  -webkit-text-fill-color: var(--p21-muted) !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  letter-spacing: .08em !important;
+  opacity: 1 !important;
+}
+.wa-app[data-appearance="dark"] .wa-archive-toggle {
+  background: transparent !important;
+  color: #7fdcca !important;
+  -webkit-text-fill-color: #7fdcca !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+.wa-app[data-appearance="dark"] .wa-room-card {
+  margin: 0 !important;
+  padding: 11px 8px !important;
+  border-radius: 0 !important;
+  border: 0 !important;
+  border-bottom: 1px solid rgba(255,255,255,.055) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  transition: background .16s ease !important;
+}
+.wa-app[data-appearance="dark"] .wa-room-card:hover,
+.wa-app[data-appearance="dark"] .wa-room-card.active {
+  background: rgba(255,255,255,.055) !important;
+}
+.wa-app[data-appearance="dark"] .wa-room-card.active {
+  box-shadow: inset 3px 0 0 var(--accent-color, var(--p21-green)) !important;
+}
+.wa-app[data-appearance="dark"] .wa-room-title {
+  color: var(--p21-text) !important;
+  -webkit-text-fill-color: var(--p21-text) !important;
+}
+.wa-app[data-appearance="dark"] .wa-room-sub {
+  color: var(--p21-muted) !important;
+  -webkit-text-fill-color: var(--p21-muted) !important;
+  opacity: 1 !important;
+}
+
+/* Message canvas + header */
+.wa-app[data-appearance="dark"] .wa-chat {
+  background:
+    radial-gradient(circle at 20% 10%, rgba(0,168,132,.035), transparent 32%),
+    var(--chat-wallpaper, #0b141a) !important;
+}
+.wa-app[data-appearance="dark"] .wa-chat-header,
+.wa-app[data-appearance="dark"] .wa-details-topbar {
+  background: rgba(17,27,33,.96) !important;
+  border-bottom: 1px solid var(--p21-line) !important;
+  box-shadow: 0 2px 10px rgba(0,0,0,.14) !important;
+  backdrop-filter: blur(14px) saturate(135%) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(135%) !important;
+}
+.wa-app[data-appearance="dark"] .wa-chat-header button,
+.wa-app[data-appearance="dark"] .wa-details-back {
+  color: var(--p21-text) !important;
+  -webkit-text-fill-color: var(--p21-text) !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  opacity: 1 !important;
+}
+
+/* Bubbles */
+.wa-app[data-appearance="dark"] .wa-bubble,
+.wa-app[data-appearance="dark"] .wa-group-text-template {
+  background: #202c33 !important;
+  border: 0 !important;
+  box-shadow: 0 1px 1px rgba(0,0,0,.18) !important;
+  color: var(--p21-text) !important;
+}
+.wa-app[data-appearance="dark"] .wa-bubble.mine,
+.wa-app[data-appearance="dark"] .wa-message-row.own .wa-bubble {
+  background: #005c4b !important;
+}
+.wa-app[data-appearance="dark"] .wa-message-text,
+.wa-app[data-appearance="dark"] .wa-group-text-body {
+  color: var(--p21-text) !important;
+  -webkit-text-fill-color: var(--p21-text) !important;
+  opacity: 1 !important;
+}
+.wa-app[data-appearance="dark"] .wa-meta,
+.wa-app[data-appearance="dark"] .wa-meta span,
+.wa-app[data-appearance="dark"] .wa-message-time,
+.wa-app[data-appearance="dark"] .wa-expiry-meta {
+  color: #b7c6ce !important;
+  -webkit-text-fill-color: #b7c6ce !important;
+  opacity: 1 !important;
+}
+.wa-app[data-appearance="dark"] .wa-sender-name,
+.wa-app[data-appearance="dark"] .wa-sender-name-inside,
+.wa-app[data-appearance="dark"] .wa-group-text-sender,
+.wa-app[data-appearance="dark"] .wa-reply-sender {
+  color: #53bdeb !important;
+  -webkit-text-fill-color: #53bdeb !important;
+}
+
+/* PDF/document cards */
+.wa-app[data-appearance="dark"] .wa10-pdf-card,
+.wa-app[data-appearance="dark"] .wa7-file-card,
+.wa-app[data-appearance="dark"] .wa7-audio-card {
+  background: rgba(11,20,26,.46) !important;
+  border: 1px solid rgba(255,255,255,.08) !important;
+  box-shadow: none !important;
+}
+.wa-app[data-appearance="dark"] .wa10-pdf-content,
+.wa-app[data-appearance="dark"] .wa7-file-main {
+  min-width: 0 !important;
+}
+.wa-app[data-appearance="dark"] .wa10-pdf-name,
+.wa-app[data-appearance="dark"] .wa7-file-name,
+.wa-app[data-appearance="dark"] .wa7-media-name {
+  color: var(--p21-text) !important;
+  -webkit-text-fill-color: var(--p21-text) !important;
+  opacity: 1 !important;
+}
+.wa-app[data-appearance="dark"] .wa10-pdf-meta,
+.wa-app[data-appearance="dark"] .wa7-file-meta,
+.wa-app[data-appearance="dark"] .wa7-media-size {
+  color: var(--p21-muted) !important;
+  -webkit-text-fill-color: var(--p21-muted) !important;
+  opacity: 1 !important;
+}
+.wa-app[data-appearance="dark"] .wa10-pdf-open,
+.wa-app[data-appearance="dark"] .wa10-pdf-download,
+.wa-app[data-appearance="dark"] .wa7-file-actions a {
+  background: rgba(0,168,132,.12) !important;
+  border: 1px solid rgba(0,168,132,.22) !important;
+  color: #6ee7ce !important;
+  -webkit-text-fill-color: #6ee7ce !important;
+}
+
+/* Settings grouped surfaces */
+.wa-app[data-appearance="dark"] .wa-settings-card,
+.wa-app[data-appearance="dark"] .wa-details-card,
+.wa-app[data-appearance="dark"] .wa-status-my-card,
+.wa-app[data-appearance="dark"] .wa-status-contact-card {
+  background: var(--p21-surface) !important;
+  border: 1px solid rgba(255,255,255,.055) !important;
+  box-shadow: none !important;
+}
+.wa-app[data-appearance="dark"] .wa-settings-title,
+.wa-app[data-appearance="dark"] .wa-details-card-title,
+.wa-app[data-appearance="dark"] .wa-settings-card strong,
+.wa-app[data-appearance="dark"] .wa-details-card strong {
+  color: var(--p21-text) !important;
+  -webkit-text-fill-color: var(--p21-text) !important;
+  opacity: 1 !important;
+}
+.wa-app[data-appearance="dark"] .wa-settings-note,
+.wa-app[data-appearance="dark"] .wa-settings-label,
+.wa-app[data-appearance="dark"] .wa-settings-card small,
+.wa-app[data-appearance="dark"] .wa-details-card small,
+.wa-app[data-appearance="dark"] .wa-details-card p {
+  color: var(--p21-muted) !important;
+  -webkit-text-fill-color: var(--p21-muted) !important;
+  opacity: 1 !important;
+}
+.wa-app[data-appearance="dark"] .wa-select,
+.wa-app[data-appearance="dark"] .wa-settings-card select,
+.wa-app[data-appearance="dark"] .wa-settings-card input:not([type="checkbox"]):not([type="radio"]),
+.wa-app[data-appearance="dark"] .wa-settings-card textarea {
+  background: var(--p21-surface-2) !important;
+  color: var(--p21-text) !important;
+  -webkit-text-fill-color: var(--p21-text) !important;
+  border: 1px solid var(--p21-line) !important;
+}
+
+/* Appearance and toggles */
+.wa-app[data-appearance="dark"] .wa-appearance-segmented {
+  background: #0f191f !important;
+  border: 1px solid var(--p21-line) !important;
+  box-shadow: none !important;
+}
+.wa-app[data-appearance="dark"] .wa-appearance-segmented button {
+  color: var(--p21-muted) !important;
+  -webkit-text-fill-color: var(--p21-muted) !important;
+  background: transparent !important;
+  border: 0 !important;
+}
+.wa-app[data-appearance="dark"] .wa-appearance-segmented button.active,
+.wa-app[data-appearance="dark"] .wa-appearance-segmented button[aria-pressed="true"] {
+  background: var(--p21-surface-3) !important;
+  color: var(--p21-text) !important;
+  -webkit-text-fill-color: var(--p21-text) !important;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.06) !important;
+}
+.wa-app[data-appearance="dark"] .archive-behaviour-setting {
+  background: transparent !important;
+  border: 0 !important;
+  border-top: 1px solid rgba(255,255,255,.055) !important;
+  border-bottom: 1px solid rgba(255,255,255,.055) !important;
+  padding: 12px 0 !important;
+  color: var(--p21-text) !important;
+  -webkit-text-fill-color: var(--p21-text) !important;
+}
+.wa-app[data-appearance="dark"] .archive-behaviour-setting span {
+  color: var(--p21-text) !important;
+  -webkit-text-fill-color: var(--p21-text) !important;
+}
+
+/* Devices: remove white cards and raw/debug feel */
+.wa-app[data-appearance="dark"] .v45-devices-card {
+  padding: 14px !important;
+}
+.wa-app[data-appearance="dark"] .v421-device-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.wa-app[data-appearance="dark"] .v421-device-count {
+  min-width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(0,168,132,.12);
+  color: #6ee7ce;
+  font-weight: 800;
+}
+.wa-app[data-appearance="dark"] .v45-device-list {
+  display: grid;
+  gap: 8px;
+}
+.wa-app[data-appearance="dark"] .v45-device-row {
+  display: grid !important;
+  grid-template-columns: 42px minmax(0,1fr) auto !important;
+  align-items: center !important;
+  gap: 10px !important;
+  padding: 11px 12px !important;
+  border-radius: 12px !important;
+  background: var(--p21-surface-2) !important;
+  border: 1px solid rgba(255,255,255,.055) !important;
+  color: var(--p21-text) !important;
+}
+.wa-app[data-appearance="dark"] .v45-device-row.current {
+  background: rgba(0,168,132,.07) !important;
+  border-color: rgba(0,168,132,.20) !important;
+}
+.wa-app[data-appearance="dark"] .v421-device-icon {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: #0f191f;
+  font-size: 18px;
+}
+.wa-app[data-appearance="dark"] .v421-device-copy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+.wa-app[data-appearance="dark"] .v421-device-title-row {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.wa-app[data-appearance="dark"] .v421-device-copy strong {
+  color: var(--p21-text) !important;
+  -webkit-text-fill-color: var(--p21-text) !important;
+}
+.wa-app[data-appearance="dark"] .v421-device-copy span,
+.wa-app[data-appearance="dark"] .v421-device-copy small {
+  color: var(--p21-muted) !important;
+  -webkit-text-fill-color: var(--p21-muted) !important;
+  opacity: 1 !important;
+}
+.wa-app[data-appearance="dark"] .v421-current-badge {
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(0,168,132,.14);
+  color: #6ee7ce !important;
+  -webkit-text-fill-color: #6ee7ce !important;
+  font-size: 10px;
+  font-weight: 800;
+}
+.wa-app[data-appearance="dark"] .v45-revoke-btn,
+.wa-app[data-appearance="dark"] .v45-revoke-all {
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 10px;
+  background: transparent !important;
+  color: #ff9da7 !important;
+  -webkit-text-fill-color: #ff9da7 !important;
+  border: 1px solid rgba(255,124,138,.24) !important;
+  box-shadow: none !important;
+  font-weight: 750;
+}
+.wa-app[data-appearance="dark"] .v45-revoke-all {
+  margin-top: 10px;
+  width: 100%;
+}
+
+/* Status notices */
+.wa-app[data-appearance="dark"] .wa-status-notice,
+.wa-app[data-appearance="dark"] .wa-contact-notice,
+.wa-app[data-appearance="dark"] .wa-privacy-notice,
+.wa-app[data-appearance="dark"] .wa-disappearing-notice {
+  background: rgba(0,168,132,.09) !important;
+  border: 1px solid rgba(0,168,132,.20) !important;
+  color: #80dfca !important;
+  -webkit-text-fill-color: #80dfca !important;
+  box-shadow: none !important;
+}
+
+/* Chat info */
+.wa-app[data-appearance="dark"] .wa-details-hero,
+.wa-app[data-appearance="dark"] .wa-details-actions,
+.wa-app[data-appearance="dark"] .danger-zone {
+  background: var(--p21-surface) !important;
+  border: 1px solid rgba(255,255,255,.055) !important;
+  box-shadow: none !important;
+}
+.wa-app[data-appearance="dark"] .wa-details-actions button {
+  background: var(--p21-surface-2) !important;
+  color: var(--p21-text) !important;
+  -webkit-text-fill-color: var(--p21-text) !important;
+  border: 1px solid rgba(255,255,255,.055) !important;
+  box-shadow: none !important;
+}
+.wa-app[data-appearance="dark"] .danger-zone {
+  border-color: rgba(255,124,138,.16) !important;
+}
+.wa-app[data-appearance="dark"] .wa-danger-text-btn {
+  background: transparent !important;
+  color: var(--p21-danger) !important;
+  -webkit-text-fill-color: var(--p21-danger) !important;
+  border: 0 !important;
+  border-top: 1px solid rgba(255,255,255,.055) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Composer */
+.wa-app[data-appearance="dark"] .wa-composer-wrap {
+  background: rgba(17,27,33,.97) !important;
+  border-top: 1px solid var(--p21-line) !important;
+}
+.wa-app[data-appearance="dark"] .wa-composer {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+.wa-app[data-appearance="dark"] .wa-composer input,
+.wa-app[data-appearance="dark"] .wa-composer textarea,
+.wa-app[data-appearance="dark"] .wa-composer .wa-input {
+  background: var(--p21-surface-2) !important;
+  border: 0 !important;
+  color: var(--p21-text) !important;
+  -webkit-text-fill-color: var(--p21-text) !important;
+}
+.wa-app[data-appearance="dark"] .wa-send-btn {
+  background: var(--accent-color, var(--p21-green)) !important;
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+@media (max-width: 760px) {
+  .wa-app[data-appearance="dark"] .wa-brand {
+    min-height: 48px !important;
+    border-radius: 12px !important;
+  }
+  .wa-app[data-appearance="dark"] .wa-room-card {
+    padding: 10px 6px !important;
+  }
+  .wa-app[data-appearance="dark"] .v45-device-row {
+    grid-template-columns: 38px minmax(0,1fr) !important;
+  }
+  .wa-app[data-appearance="dark"] .v45-revoke-btn {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+}

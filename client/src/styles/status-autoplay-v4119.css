@@ -1,0 +1,36 @@
+/* Int-Messager v4.10.19 — 30-second Status/Updates autoplay */
+
+.wa-status-progress-row span {
+  position: relative;
+  overflow: hidden;
+  background: rgba(255,255,255,0.26);
+}
+
+.wa-status-progress-row span.complete {
+  background: rgba(255,255,255,0.94);
+}
+
+.wa-status-progress-row span.current {
+  background: rgba(255,255,255,0.26);
+}
+
+.wa-status-progress-row span.current > i {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 0%;
+  background: rgba(255,255,255,0.96);
+  border-radius: inherit;
+  animation: wa-status-progress-30s 30s linear forwards;
+}
+
+@keyframes wa-status-progress-30s {
+  from { width: 0%; }
+  to { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wa-status-progress-row span.current > i {
+    animation-timing-function: steps(30, end);
+  }
+}
