@@ -81,6 +81,7 @@ export function MobileMessageActionSheet({
           {QUICK_REACTIONS.map((emoji) => (
             <button key={emoji} type="button" onClick={() => onReact(emoji)} aria-label={`React ${emoji}`}>{emoji}</button>
           ))}
+          <button type="button" className="v481-more-reactions" onClick={() => onReact("+")} aria-label="More reactions" title="More reactions">＋</button>
         </div>
         <div className="v481-action-list">
           <button type="button" onClick={onReply}><span>↩</span><strong>Reply</strong></button>

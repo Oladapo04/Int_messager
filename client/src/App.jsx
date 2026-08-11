@@ -55,6 +55,8 @@ import "./styles/dark-mode-professional-v4120.css";
 import "./styles/dark-mode-premium-v4121.css";
 import "./styles/mobile-conversation-premium-v4122.css";
 import "./styles/light-mode-premium-v4123.css";
+import "./styles/reactions-premium-v4124.css";
+import "./styles/premium-experience-v4110.css";
 
 const API_BASE = "";
 const socket = io(API_BASE, { autoConnect: true });
@@ -72,6 +74,7 @@ function urlBase64ToUint8Array(base64String) {
 const INSTALL_ID_KEY = "int_messager_install_id";
 const PLAYED_KEY = "wa_voice_played_map";
 const REACTION_OPTIONS = ["❤️", "👍", "😂", "😮", "😢", "🙏", "🔥", "🎉", "👏", "💯", "😆", "😎", "🤔", "😡", "💔", "✅", "👀", "🙌"];
+const QUICK_REACTION_OPTIONS = ["❤️", "👍", "😂", "😮", "😢", "🙏"];
 const CHAT_EMOJIS = ["😀", "😁", "😂", "🤣", "😍", "😘", "😊", "😎", "😭", "😢", "😮", "😡", "🤔", "🙏", "❤️", "💔", "👍", "👎", "👏", "🙌", "🔥", "🎉", "💯", "✅", "👀", "✨", "🚀", "🎤", "📎", "📞"];
 const CHAT_PREFS_KEY = "int_messager_chat_prefs_v1";
 const PWA_BEFORE_INSTALL_PROMPT = "beforeinstallprompt";
@@ -79,6 +82,7 @@ const ACCOUNT_INSTALL_ID_KEY = "int_messager_account_install_id_v4";
 const DESKTOP_SIDEBAR_WIDTH_KEY = "int_messager_desktop_sidebar_width_v44";
 const APPEARANCE_MODE_KEY = "int_messager_appearance_mode_v491";
 const DRAFTS_STORAGE_PREFIX = "int_messager_drafts_v4109";
+const CHAT_LIST_FILTER_KEY = "int_messager_chat_filter_v4110";
 
 const APP_THEME_PRESETS = {
   "light-grey": { label: "Classic", light: { app: "#eef2f6", sidebar: "#f8fafc", surface: "#ffffff", surface2: "#f1f5f9", chat: "#eaf0f6", incoming: "#ffffff", outgoing: "#d9fdd3", text: "#0f172a", muted: "#64748b", border: "#d8e0e8", accent: "#1687d9" }, dark: { app: "#0b141a", sidebar: "#111b21", surface: "#17232c", surface2: "#202c33", chat: "#0b141a", incoming: "#202c33", outgoing: "#005c4b", text: "#f0f2f5", muted: "#aebac1", border: "#2a3942", accent: "#00a884" } },
@@ -542,7 +546,7 @@ function AttachmentPreview({ item, pending = false }) {
   );
 }
 
-function ReactionBar({ reactions = {}, onReact }) {
+function ReactionBar({ reactions = {}, onReact, onShowDetails, currentProfileId }) {
   const normalized = normalizeReactions(reactions);
   const entries = Object.entries(normalized).filter(
     ([, users]) => Array.isArray(users) && users.length
@@ -551,13 +555,32 @@ function ReactionBar({ reactions = {}, onReact }) {
   if (!entries.length) return null;
 
   return (
-    <div className="wa-reactions-row">
-      {entries.map(([emoji, users]) => (
-        <button key={emoji} type="button" className="wa-reaction-pill" onClick={() => onReact(emoji)}>
-          <span>{emoji}</span>
-          <span>{users.length}</span>
-        </button>
-      ))}
+    <div className="wa-reactions-row" aria-label="Message reactions">
+      {entries.map(([emoji, users]) => {
+        const reactedByMe = users.some((id) => String(id) === String(currentProfileId || ""));
+        return (
+          <span key={emoji} className={`wa-reaction-pill ${reactedByMe ? "mine" : ""}`}>
+            <button
+              type="button"
+              className="wa-reaction-emoji-btn"
+              onClick={() => onReact(emoji)}
+              aria-label={`${reactedByMe ? "Remove" : "Add"} ${emoji} reaction`}
+              title={reactedByMe ? "Remove your reaction" : `React ${emoji}`}
+            >
+              <span>{emoji}</span>
+            </button>
+            <button
+              type="button"
+              className="wa-reaction-count-btn"
+              onClick={() => onShowDetails?.(emoji, users)}
+              aria-label={`See ${users.length} ${users.length === 1 ? "reaction" : "reactions"}`}
+              title="See who reacted"
+            >
+              {users.length}
+            </button>
+          </span>
+        );
+      })}
     </div>
   );
 }
@@ -3210,6 +3233,7 @@ function MessageBubble({
   onStartLongPressReaction,
   onCancelLongPressReaction,
   onReact,
+  onShowReactionDetails,
   onForward,
   onToggleStar,
   onTogglePin,
@@ -3277,7 +3301,12 @@ function MessageBubble({
         <div className={`wa-message-text ${useGroupTextTemplate ? "wa-group-text-body" : ""} ${message.isDeleted ? "deleted" : ""}`}>{message.content}</div>
       )}
 
-      <ReactionBar reactions={message.reactions} onReact={(emoji) => onReact(message._id, emoji)} />
+      <ReactionBar
+        reactions={message.reactions}
+        currentProfileId={currentProfileId}
+        onReact={(emoji) => onReact(message._id, emoji)}
+        onShowDetails={(emoji, userIds) => onShowReactionDetails?.(message, emoji, userIds)}
+      />
 
       <div className={`wa-meta ${useGroupTextTemplate ? "wa-group-text-meta" : ""}`}> 
         <span>{formatTime(message.createdAt)}</span>
@@ -3423,11 +3452,17 @@ export default function App() {
   const [isDragOver, setIsDragOver] = useState(false);
   const [listenedMap, setListenedMap] = useState(loadPlayedMap);
   const [reactionPicker, setReactionPicker] = useState(null);
+  const [reactionDetails, setReactionDetails] = useState(null);
   const [mobileMessageActions, setMobileMessageActions] = useState(null);
   const [desktopMessageActions, setDesktopMessageActions] = useState(null);
   const [chatEmojiPicker, setChatEmojiPicker] = useState(null);
   const [showSidebar, setShowSidebar] = useState(false);
   const [chatSearch, setChatSearch] = useState("");
+  const [chatListFilter, setChatListFilter] = useState(() => {
+    const saved = localStorage.getItem(CHAT_LIST_FILTER_KEY);
+    return ["all", "unread", "favourites", "groups"].includes(saved) ? saved : "all";
+  });
+  const chatSearchInputRef = useRef(null);
   const [globalMessageResults, setGlobalMessageResults] = useState([]);
   const [globalMessageSearchLoading, setGlobalMessageSearchLoading] = useState(false);
   const [globalMessageSearchError, setGlobalMessageSearchError] = useState("");
@@ -3483,6 +3518,50 @@ export default function App() {
   useEffect(() => {
     const timer = window.setInterval(() => setExpiryClock(Date.now()), 30000);
     return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(CHAT_LIST_FILTER_KEY, chatListFilter);
+  }, [chatListFilter]);
+
+  useEffect(() => {
+    const handlePremiumShortcuts = (event) => {
+      const key = String(event.key || "").toLowerCase();
+      const modifier = event.metaKey || event.ctrlKey;
+
+      if (modifier && key === "k") {
+        event.preventDefault();
+        setSidebarMode("chats");
+        setShowSidebar(true);
+        window.setTimeout(() => {
+          chatSearchInputRef.current?.focus();
+          chatSearchInputRef.current?.select?.();
+        }, 0);
+        return;
+      }
+
+      if (modifier && event.shiftKey && key === "n") {
+        event.preventDefault();
+        setSidebarMode("people");
+        setChatSearch("");
+        setShowSidebar(true);
+        window.setTimeout(() => chatSearchInputRef.current?.focus(), 0);
+        return;
+      }
+
+      if (event.key === "Escape") {
+        setRoomContextMenu(null);
+        setReactionPicker(null);
+        setReactionDetails(null);
+        setMobileMessageActions(null);
+        setDesktopMessageActions(null);
+        setChatEmojiPicker(null);
+        setShowMobileChatMenu(false);
+      }
+    };
+
+    window.addEventListener("keydown", handlePremiumShortcuts);
+    return () => window.removeEventListener("keydown", handlePremiumShortcuts);
   }, []);
 
   useEffect(() => {
@@ -4076,17 +4155,59 @@ export default function App() {
     setShowSidebar(false);
   }
 
-  const filteredRooms = useMemo(
-    () =>
-      roomsSorted.filter((room) => {
-        const archived = !room.isSaved && (chatOrgPrefs.archivedRooms || []).includes(room.slug);
-        if (showArchivedChats !== archived) return false;
-        return getRoomDisplayName(room, profile?.displayName, currentProfileId, profiles)
-          .toLowerCase()
-          .includes(chatSearch.toLowerCase());
-      }),
-    [roomsSorted, chatSearch, profile?.displayName, chatOrgPrefs.archivedRooms, showArchivedChats]
-  );
+  const savedContactIds = useMemo(() => new Set((profile?.savedContacts || []).map(String)), [profile?.savedContacts]);
+  const favoriteContactIds = useMemo(() => new Set((profile?.favoriteContacts || []).map(String)), [profile?.favoriteContacts]);
+  const blockedProfileIds = useMemo(() => new Set((profile?.blockedProfiles || []).map(String)), [profile?.blockedProfiles]);
+
+  const filteredRooms = useMemo(() => {
+    const manualUnread = new Set(chatOrgPrefs.manuallyUnreadRooms || []);
+    const query = chatSearch.trim().toLowerCase();
+
+    return roomsSorted.filter((room) => {
+      const archived = !room.isSaved && (chatOrgPrefs.archivedRooms || []).includes(room.slug);
+      if (showArchivedChats !== archived) return false;
+
+      const displayName = getRoomDisplayName(room, profile?.displayName, currentProfileId, profiles);
+      if (query && !displayName.toLowerCase().includes(query)) return false;
+
+      if (showArchivedChats) return true;
+
+      const unread = Number(unreadCounts[room.slug] || 0) > 0 || manualUnread.has(room.slug);
+      const isGroup = !room.isSaved && !room.isDirect;
+      const otherParticipantId = room.isDirect
+        ? (room.participants || []).map(String).find((id) => id !== String(currentProfileId || ""))
+        : "";
+      const favourite = Boolean(otherParticipantId && favoriteContactIds.has(String(otherParticipantId)));
+
+      if (chatListFilter === "unread") return unread;
+      if (chatListFilter === "favourites") return favourite;
+      if (chatListFilter === "groups") return isGroup;
+      return true;
+    });
+  }, [
+    roomsSorted, chatSearch, profile?.displayName, currentProfileId, profiles,
+    chatOrgPrefs.archivedRooms, chatOrgPrefs.manuallyUnreadRooms, showArchivedChats,
+    unreadCounts, favoriteContactIds, chatListFilter
+  ]);
+
+  const premiumChatFilterCounts = useMemo(() => {
+    const manualUnread = new Set(chatOrgPrefs.manuallyUnreadRooms || []);
+    let unread = 0;
+    let favourites = 0;
+    let groups = 0;
+
+    roomsSorted.forEach((room) => {
+      if (!room.isSaved && (chatOrgPrefs.archivedRooms || []).includes(room.slug)) return;
+      if (Number(unreadCounts[room.slug] || 0) > 0 || manualUnread.has(room.slug)) unread += 1;
+      if (!room.isSaved && !room.isDirect) groups += 1;
+      if (room.isDirect) {
+        const otherId = (room.participants || []).map(String).find((id) => id !== String(currentProfileId || ""));
+        if (otherId && favoriteContactIds.has(String(otherId))) favourites += 1;
+      }
+    });
+
+    return { all: roomsSorted.filter((room) => room.isSaved || !(chatOrgPrefs.archivedRooms || []).includes(room.slug)).length, unread, favourites, groups };
+  }, [roomsSorted, chatOrgPrefs.archivedRooms, chatOrgPrefs.manuallyUnreadRooms, unreadCounts, favoriteContactIds, currentProfileId]);
 
   const filteredProfiles = useMemo(
     () =>
@@ -4096,9 +4217,6 @@ export default function App() {
     [profiles, chatSearch]
   );
 
-  const savedContactIds = useMemo(() => new Set((profile?.savedContacts || []).map(String)), [profile?.savedContacts]);
-  const favoriteContactIds = useMemo(() => new Set((profile?.favoriteContacts || []).map(String)), [profile?.favoriteContacts]);
-  const blockedProfileIds = useMemo(() => new Set((profile?.blockedProfiles || []).map(String)), [profile?.blockedProfiles]);
   const favoriteProfiles = useMemo(() => filteredProfiles.filter((user) => favoriteContactIds.has(String(user._id)) && !blockedProfileIds.has(String(user._id))), [filteredProfiles, favoriteContactIds, blockedProfileIds]);
   const savedProfiles = useMemo(() => filteredProfiles.filter((user) => savedContactIds.has(String(user._id)) && !favoriteContactIds.has(String(user._id)) && !blockedProfileIds.has(String(user._id))), [filteredProfiles, savedContactIds, favoriteContactIds, blockedProfileIds]);
   const otherProfiles = useMemo(() => filteredProfiles.filter((user) => !savedContactIds.has(String(user._id)) && !blockedProfileIds.has(String(user._id))), [filteredProfiles, savedContactIds, blockedProfileIds]);
@@ -6981,12 +7099,23 @@ export default function App() {
     }
   }
 
+  function openReactionDetails(message, emoji, userIds = []) {
+    const uniqueUserIds = [...new Set((userIds || []).map((id) => String(id)).filter(Boolean))];
+    setReactionDetails({
+      messageId: String(message?._id || ""),
+      emoji,
+      userIds: uniqueUserIds,
+      preview: compactDraftPreview(message?.content || message?.fileName || "Message", 64),
+    });
+  }
+
   function openReactionPicker(message, position) {
     setReactionPicker({
       messageId: message._id,
       roomSlug: message.roomSlug,
       x: position.x,
       y: position.y,
+      expanded: false,
     });
   }
 
@@ -7347,6 +7476,7 @@ export default function App() {
 
           {sidebarMode !== "updates" ? (
             <input
+              ref={chatSearchInputRef}
               className="wa-search-input"
               value={chatSearch}
               onChange={(e) => setChatSearch(e.target.value)}
@@ -7501,12 +7631,48 @@ export default function App() {
 
           {sidebarMode === "chats" ? (
             <>
-              <div className="wa-chat-list-heading">
-                <div className="wa-section-label">{showArchivedChats ? "Archived chats" : "Chats"}</div>
-                <button type="button" className="wa-archive-toggle" onClick={() => setShowArchivedChats((value) => !value)}>
-                  {showArchivedChats ? "Back to chats" : `Archived (${(chatOrgPrefs.archivedRooms || []).length})`}
-                </button>
+              <div className="wa-chat-list-heading wa-premium-chat-heading">
+                <div>
+                  <div className="wa-section-label">{showArchivedChats ? "Archived chats" : "Chats"}</div>
+                  {!showArchivedChats ? <small className="wa-premium-chat-count">{premiumChatFilterCounts.all} conversations</small> : null}
+                </div>
+                <div className="wa-premium-chat-heading-actions">
+                  <button
+                    type="button"
+                    className="wa-premium-new-chat"
+                    onClick={() => { setSidebarMode("people"); setChatSearch(""); window.setTimeout(() => chatSearchInputRef.current?.focus(), 0); }}
+                    title="New chat"
+                    aria-label="New chat"
+                  >
+                    ✎
+                  </button>
+                  <button type="button" className="wa-archive-toggle" onClick={() => setShowArchivedChats((value) => !value)}>
+                    {showArchivedChats ? "Back" : `Archived (${(chatOrgPrefs.archivedRooms || []).length})`}
+                  </button>
+                </div>
               </div>
+              {!showArchivedChats ? (
+                <div className="wa-premium-chat-filters" role="tablist" aria-label="Filter chats">
+                  {[
+                    ["all", "All", premiumChatFilterCounts.all],
+                    ["unread", "Unread", premiumChatFilterCounts.unread],
+                    ["favourites", "Favourites", premiumChatFilterCounts.favourites],
+                    ["groups", "Groups", premiumChatFilterCounts.groups],
+                  ].map(([value, label, count]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      role="tab"
+                      aria-selected={chatListFilter === value}
+                      className={chatListFilter === value ? "active" : ""}
+                      onClick={() => setChatListFilter(value)}
+                    >
+                      <span>{label}</span>
+                      {Number(count) > 0 && value !== "all" ? <em>{count}</em> : null}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
               {filteredRooms.map((room) => {
                 const roomDraft = draftsByRoom[room.slug] || "";
                 const scheduledCount = scheduledMessages.filter((item) => item.roomSlug === room.slug && ["pending", "processing"].includes(item.status)).length;
@@ -7591,6 +7757,14 @@ export default function App() {
                 </button>
                 );
               })}
+              {!filteredRooms.length ? (
+                <div className="wa-premium-empty-state">
+                  <div className="wa-premium-empty-icon">{chatListFilter === "unread" ? "✓" : chatListFilter === "favourites" ? "★" : chatListFilter === "groups" ? "◉" : "💬"}</div>
+                  <strong>{chatSearch.trim() ? "No chats found" : chatListFilter === "unread" ? "You’re all caught up" : chatListFilter === "favourites" ? "No favourite chats yet" : chatListFilter === "groups" ? "No groups yet" : "No conversations yet"}</strong>
+                  <small>{chatSearch.trim() ? "Try a different search." : chatListFilter === "unread" ? "New unread conversations will appear here." : chatListFilter === "favourites" ? "Favourite a contact to keep important conversations close." : chatListFilter === "groups" ? "Create or join a group to see it here." : "Start a new conversation from Contacts."}</small>
+                  {!chatSearch.trim() && chatListFilter !== "unread" ? <button type="button" onClick={() => { setSidebarMode("people"); setChatSearch(""); }}>Start a chat</button> : null}
+                </div>
+              ) : null}
             </>
           ) : sidebarMode === "updates" ? (
             <StatusUpdates currentProfile={profile} />
@@ -8108,6 +8282,7 @@ export default function App() {
                   onStartLongPressReaction={startLongPressReaction}
                   onCancelLongPressReaction={cancelLongPressReaction}
                   onReact={reactToMessage}
+                  onShowReactionDetails={openReactionDetails}
                   onForward={forwardMessage}
                   onToggleStar={toggleStarMessage}
                   onTogglePin={togglePinMessage}
@@ -8699,8 +8874,21 @@ export default function App() {
           isPinned={Boolean(mobileMessageActions.message.pinned)}
           onClose={() => setMobileMessageActions(null)}
           onReact={(emoji) => {
-            reactToMessage(mobileMessageActions.message._id, emoji);
+            const message = mobileMessageActions.message;
             setMobileMessageActions(null);
+            if (emoji === "+") {
+              window.setTimeout(() => {
+                setReactionPicker({
+                  messageId: message._id,
+                  roomSlug: message.roomSlug || activeRoomSlug,
+                  x: window.innerWidth / 2,
+                  y: window.innerHeight - 96,
+                  expanded: true,
+                });
+              }, 0);
+              return;
+            }
+            reactToMessage(message._id, emoji);
           }}
           onReply={() => { setReplyTo(mobileMessageActions.message); setMobileMessageActions(null); }}
           onForward={() => { forwardMessage(mobileMessageActions.message); setMobileMessageActions(null); }}
@@ -8714,14 +8902,14 @@ export default function App() {
 
       {reactionPicker ? (
         <div
-          className="wa-reaction-picker"
+          className={`wa-reaction-picker ${reactionPicker.expanded ? "expanded" : "quick"}`}
           style={{
             left: Math.max(12, reactionPicker.x - 80),
             top: Math.max(12, reactionPicker.y - 56),
           }}
           onClick={(e) => e.stopPropagation()}
         >
-          {REACTION_OPTIONS.map((emoji) => (
+          {(reactionPicker.expanded ? REACTION_OPTIONS : QUICK_REACTION_OPTIONS).map((emoji) => (
             <button
               key={emoji}
               type="button"
@@ -8731,9 +8919,73 @@ export default function App() {
               {emoji}
             </button>
           ))}
+          {!reactionPicker.expanded ? (
+            <button
+              type="button"
+              className="wa-reaction-more"
+              onClick={() => setReactionPicker((current) => current ? { ...current, expanded: true } : current)}
+              aria-label="More reactions"
+              title="More reactions"
+            >
+              +
+            </button>
+          ) : null}
           <button type="button" className="wa-reaction-close" onClick={() => setReactionPicker(null)}>
             ×
           </button>
+        </div>
+      ) : null}
+
+      {reactionDetails ? (
+        <div
+          className="wa-reaction-details-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setReactionDetails(null);
+          }}
+        >
+          <section className="wa-reaction-details-sheet" role="dialog" aria-modal="true" aria-label="Reaction details">
+            <div className="wa-reaction-details-head">
+              <div>
+                <span className="wa-reaction-details-emoji" aria-hidden="true">{reactionDetails.emoji}</span>
+                <div>
+                  <strong>{reactionDetails.userIds.length} {reactionDetails.userIds.length === 1 ? "reaction" : "reactions"}</strong>
+                  <small>{reactionDetails.preview || "Message"}</small>
+                </div>
+              </div>
+              <button type="button" onClick={() => setReactionDetails(null)} aria-label="Close">×</button>
+            </div>
+
+            <div className="wa-reaction-people-list">
+              {reactionDetails.userIds.map((userId) => {
+                const isMe = String(userId) === String(currentProfileId || "");
+                const displayName = isMe ? "You" : getProfileNameById(userId, "User");
+                return (
+                  <div key={userId} className="wa-reaction-person-row">
+                    <Avatar label={displayName} src={getProfileAvatarById(userId)} />
+                    <div>
+                      <strong>{displayName}</strong>
+                      <small>{isMe ? "Your reaction" : `Reacted ${reactionDetails.emoji}`}</small>
+                    </div>
+                    <span className="wa-reaction-person-emoji" aria-hidden="true">{reactionDetails.emoji}</span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {reactionDetails.userIds.some((id) => String(id) === String(currentProfileId || "")) ? (
+              <button
+                type="button"
+                className="wa-reaction-remove-mine"
+                onClick={async () => {
+                  await reactToMessage(reactionDetails.messageId, reactionDetails.emoji);
+                  setReactionDetails(null);
+                }}
+              >
+                Remove my reaction
+              </button>
+            ) : null}
+          </section>
         </div>
       ) : null}
 
