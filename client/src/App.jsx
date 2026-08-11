@@ -53,6 +53,8 @@ import "./styles/dark-mode-settings-chat-v4116.css";
 import "./styles/unified-theme-system-v4117.css";
 import "./styles/dark-mode-professional-v4120.css";
 import "./styles/dark-mode-premium-v4121.css";
+import "./styles/mobile-conversation-premium-v4122.css";
+import "./styles/light-mode-premium-v4123.css";
 
 const API_BASE = "";
 const socket = io(API_BASE, { autoConnect: true });
@@ -3539,7 +3541,19 @@ export default function App() {
     localStorage.setItem(APPEARANCE_MODE_KEY, appearanceMode);
     document.documentElement.dataset.intMessagerAppearance = resolvedAppearance;
     document.documentElement.style.colorScheme = resolvedAppearance;
-  }, [appearanceMode, resolvedAppearance]);
+
+    const themeColor = resolvedAppearance === "dark"
+      ? (activeAppTheme.sidebar || activeAppTheme.app || "#0b141a")
+      : (activeAppTheme.sidebar || activeAppTheme.app || "#f8fafc");
+    let themeMeta = document.querySelector('meta[name="theme-color"]');
+    if (!themeMeta) {
+      themeMeta = document.createElement("meta");
+      themeMeta.setAttribute("name", "theme-color");
+      document.head.appendChild(themeMeta);
+    }
+    themeMeta.setAttribute("content", themeColor);
+    document.body.style.backgroundColor = themeColor;
+  }, [appearanceMode, resolvedAppearance, activeAppTheme.sidebar, activeAppTheme.app]);
 
   async function installPwaApp() {
     if (!pwaInstallPrompt) {

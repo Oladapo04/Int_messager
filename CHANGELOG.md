@@ -1,14 +1,16 @@
-# Changelog — v4.10.21
+# Changelog — v4.10.23
 
-## Premium dark mode redesign
-- Replaced patch-like dark surfaces with a cohesive deep charcoal messaging palette.
-- Flattened chat list rows and reduced heavy borders/cards.
-- Added polished active/hover states.
-- Improved dark chat bubbles, header, composer, and metadata.
-- Added native-looking dark PDF/document cards.
-- Redesigned device sessions and removed raw-looking browser strings.
-- Removed internal room IDs from empty chat previews.
-- Restyled status notices, Chat Info, settings groups, danger actions, and appearance controls.
+## Premium Light Mode
+- Redesigned the light app shell and sidebar.
+- Simplified navigation tabs and chat list styling.
+- Added premium light search/input styling.
+- Redesigned light conversation header, chat canvas, bubbles, date chips and reactions.
+- Redesigned the light composer to match the mobile dark-mode polish.
+- Improved document/PDF cards in light mode.
+- Redesigned Settings, Chat Info and device-session surfaces.
+- Improved light-mode Status/Updates notices.
+- Added a cleaner destructive-actions treatment.
+- Preserved the selected App Theme as the accent and outgoing-message colour source.
 
 ## Scope
-Light mode is not redesigned by this patch.
+UI only. No server/database migration required.
