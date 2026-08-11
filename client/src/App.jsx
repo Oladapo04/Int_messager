@@ -57,6 +57,9 @@ import "./styles/mobile-conversation-premium-v4122.css";
 import "./styles/light-mode-premium-v4123.css";
 import "./styles/reactions-premium-v4124.css";
 import "./styles/premium-experience-v4110.css";
+import "./styles/mobile-chats-premium-v4111.css";
+import "./styles/desktop-premium-v4112.css";
+import "./styles/desktop-chat-filters-v4112a.css";
 
 const API_BASE = "";
 const socket = io(API_BASE, { autoConnect: true });
@@ -8686,82 +8689,86 @@ export default function App() {
           ) : (
             <main className="wa-welcome-screen">
               <div className="wa-welcome-content">
-                <img src="/icons/icon-192.png" alt="Int-Messager" className="wa-welcome-logo" />
-                <h1>Int-Messager</h1>
-                <p className="wa-welcome-tagline">Connecting with love</p>
-                <div className="wa-welcome-intro">Choose a conversation, reconnect with someone, or open the General group when you are ready.</div>
+                <section className="wa-home-overview">
+                  <img src="/icons/icon-192.png" alt="Int-Messager" className="wa-welcome-logo" />
+                  <h1>Int-Messager</h1>
+                  <p className="wa-welcome-tagline">Connecting with love</p>
+                  <div className="wa-welcome-intro">Choose a conversation, reconnect with someone, or open the General group when you are ready.</div>
 
-                <div className="wa-home-profile">
-                  <Avatar label={profile?.displayName || "Me"} src={profile?.avatarUrl} />
-                  <div className="wa-home-profile-copy">
-                    <div className="wa-home-profile-name">{profile?.displayName || "Your profile"}</div>
-                    <div className="wa-home-profile-status">{profile?.profileStatus || "Available now"}</div>
+                  <div className="wa-home-profile">
+                    <Avatar label={profile?.displayName || "Me"} src={profile?.avatarUrl} />
+                    <div className="wa-home-profile-copy">
+                      <div className="wa-home-profile-name">{profile?.displayName || "Your profile"}</div>
+                      <div className="wa-home-profile-status">{profile?.profileStatus || "Available now"}</div>
+                    </div>
                   </div>
-                </div>
 
-                <div className="wa-home-actions">
-                  <button type="button" className="wa-home-action" onClick={() => { setSidebarMode("people"); setShowSidebar(true); }}>
-                    <span className="wa-home-action-icon">✚</span>
-                    New chat
-                  </button>
-                  <button type="button" className="wa-home-action" onClick={() => { setNewGroupName(""); setNewGroupMemberIds([]); setShowCreateGroup(true); }}>
-                    <span className="wa-home-action-icon">👥</span>
-                    New group
-                  </button>
-                  <button type="button" className="wa-home-action" onClick={() => {
-                    const savedRoom = roomsSorted.find((room) => room.isSaved);
-                    if (savedRoom) openHomeRoom(savedRoom.slug);
-                  }}>
-                    <span>⭐</span>
-                    <strong>Saved Messages</strong>
-                    <small>Keep notes, links and files for yourself</small>
-                  </button>
-                  <button type="button" className="wa-home-action" onClick={() => openHomeRoom("general")}>
-                    <span className="wa-home-action-icon">💬</span>
-                    Open General
-                  </button>
-                  <button type="button" className="wa-home-action" onClick={() => { setSidebarMode("chats"); setShowSidebar(true); }}>
-                    <span className="wa-home-action-icon">🔍</span>
-                    Find a chat
-                  </button>
-                </div>
+                  <div className="wa-home-actions">
+                    <button type="button" className="wa-home-action" onClick={() => { setSidebarMode("people"); setShowSidebar(true); }}>
+                      <span className="wa-home-action-icon">✚</span>
+                      New chat
+                    </button>
+                    <button type="button" className="wa-home-action" onClick={() => { setNewGroupName(""); setNewGroupMemberIds([]); setShowCreateGroup(true); }}>
+                      <span className="wa-home-action-icon">👥</span>
+                      New group
+                    </button>
+                    <button type="button" className="wa-home-action wa-home-action-saved" onClick={() => {
+                      const savedRoom = roomsSorted.find((room) => room.isSaved);
+                      if (savedRoom) openHomeRoom(savedRoom.slug);
+                    }}>
+                      <span>⭐</span>
+                      <strong>Saved Messages</strong>
+                      <small>Keep notes, links and files for yourself</small>
+                    </button>
+                    <button type="button" className="wa-home-action" onClick={() => openHomeRoom("general")}>
+                      <span className="wa-home-action-icon">💬</span>
+                      Open General
+                    </button>
+                    <button type="button" className="wa-home-action" onClick={() => { setSidebarMode("chats"); setShowSidebar(true); }}>
+                      <span className="wa-home-action-icon">🔍</span>
+                      Find a chat
+                    </button>
+                  </div>
+                </section>
 
-                {unreadRooms.length ? (
-                  <section className="wa-home-section">
-                    <div className="wa-home-section-title">
-                      <span>Unread conversations</span>
-                      <span className="wa-home-count">{totalUnreadCount}</span>
-                    </div>
-                    <div className="wa-home-room-list">
-                      {unreadRooms.map((room) => (
-                        <button key={room.slug} type="button" className="wa-home-room" onClick={() => openHomeRoom(room.slug)}>
-                          <Avatar label={getRoomDisplayName(room, profile?.displayName, currentProfileId, profiles)} src={getRoomAvatarSrc(room)} />
-                          <div className="wa-home-room-copy">
-                            <div className="wa-home-room-name">{getRoomDisplayName(room, profile?.displayName, currentProfileId, profiles)}</div>
-                            <div className="wa-home-room-preview">{room.lastMessageText || (room.slug === "general" ? "Public room" : "New conversation")}</div>
-                          </div>
-                          <span className="wa-home-room-unread">{unreadCounts[room.slug]}</span>
-                        </button>
-                      ))}
-                    </div>
+                <section className="wa-home-activity" aria-label="Conversation overview">
+                  {unreadRooms.length ? (
+                    <section className="wa-home-section wa-home-section-unread">
+                      <div className="wa-home-section-title">
+                        <span>Unread conversations</span>
+                        <span className="wa-home-count">{totalUnreadCount}</span>
+                      </div>
+                      <div className="wa-home-room-list">
+                        {unreadRooms.map((room) => (
+                          <button key={room.slug} type="button" className="wa-home-room" onClick={() => openHomeRoom(room.slug)}>
+                            <Avatar label={getRoomDisplayName(room, profile?.displayName, currentProfileId, profiles)} src={getRoomAvatarSrc(room)} />
+                            <div className="wa-home-room-copy">
+                              <div className="wa-home-room-name">{getRoomDisplayName(room, profile?.displayName, currentProfileId, profiles)}</div>
+                              <div className="wa-home-room-preview">{room.lastMessageText || (room.slug === "general" ? "Public room" : "New conversation")}</div>
+                            </div>
+                            <span className="wa-home-room-unread">{unreadCounts[room.slug]}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+                  ) : null}
+
+                  <section className="wa-home-section wa-home-section-recent">
+                    <div className="wa-home-section-title"><span>Recent chats</span></div>
+                    {recentRooms.length ? (
+                      <div className="wa-home-room-list">
+                        {recentRooms.map((room) => (
+                          <button key={room.slug} type="button" className="wa-home-room" onClick={() => openHomeRoom(room.slug)}>
+                            <Avatar label={getRoomDisplayName(room, profile?.displayName, currentProfileId, profiles)} src={getRoomAvatarSrc(room)} />
+                            <div className="wa-home-room-copy">
+                              <div className="wa-home-room-name">{getRoomDisplayName(room, profile?.displayName, currentProfileId, profiles)}</div>
+                              <div className="wa-home-room-preview">{room.lastMessageText || (room.slug === "general" ? "Public room" : "New conversation")}</div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    ) : <div className="wa-home-empty">Your recent conversations will appear here.</div>}
                   </section>
-                ) : null}
-
-                <section className="wa-home-section">
-                  <div className="wa-home-section-title"><span>Recent chats</span></div>
-                  {recentRooms.length ? (
-                    <div className="wa-home-room-list">
-                      {recentRooms.map((room) => (
-                        <button key={room.slug} type="button" className="wa-home-room" onClick={() => openHomeRoom(room.slug)}>
-                          <Avatar label={getRoomDisplayName(room, profile?.displayName, currentProfileId, profiles)} src={getRoomAvatarSrc(room)} />
-                          <div className="wa-home-room-copy">
-                            <div className="wa-home-room-name">{getRoomDisplayName(room, profile?.displayName, currentProfileId, profiles)}</div>
-                            <div className="wa-home-room-preview">{room.lastMessageText || (room.slug === "general" ? "Public room" : "New conversation")}</div>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  ) : <div className="wa-home-empty">Your recent conversations will appear here.</div>}
                 </section>
               </div>
             </main>

@@ -1,0 +1,107 @@
+/* Int-Messager v4.11.2a
+   Desktop chat-filter clipping fix.
+   Loaded after the desktop layout so normal browser zoom cannot collapse the chips. */
+
+@media (min-width: 901px) {
+  .wa-sidebar,
+  .wa-sidebar-panel {
+    min-height: 0 !important;
+  }
+
+  .wa-sidebar-panel {
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+  }
+
+  .wa-premium-chat-heading {
+    min-height: 48px !important;
+    height: auto !important;
+    max-height: none !important;
+    flex: 0 0 auto !important;
+    overflow: visible !important;
+    padding-bottom: 8px !important;
+  }
+
+  .wa-premium-chat-count {
+    display: block !important;
+    min-height: 14px !important;
+    line-height: 14px !important;
+    margin-top: 3px !important;
+    overflow: visible !important;
+  }
+
+  .wa-premium-chat-filters {
+    position: relative !important;
+    z-index: 3 !important;
+    display: flex !important;
+    align-items: center !important;
+    flex: 0 0 44px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+    margin: 0 0 10px !important;
+    padding: 5px 0 !important;
+    gap: 7px !important;
+    overflow-x: auto !important;
+    overflow-y: visible !important;
+    white-space: nowrap !important;
+    scrollbar-width: none !important;
+    -webkit-overflow-scrolling: touch !important;
+    clip-path: none !important;
+    contain: none !important;
+  }
+
+  .wa-premium-chat-filters::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .wa-premium-chat-filters button {
+    position: relative !important;
+    flex: 0 0 auto !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: auto !important;
+    height: 34px !important;
+    min-height: 34px !important;
+    max-height: 34px !important;
+    padding: 0 12px !important;
+    margin: 0 !important;
+    border-radius: 999px !important;
+    line-height: 1 !important;
+    overflow: visible !important;
+    transform: none !important;
+  }
+
+  .wa-premium-chat-filters button span {
+    display: inline-block !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+  }
+
+  .wa-premium-chat-filters button em {
+    flex: 0 0 auto !important;
+    min-width: 18px !important;
+    height: 18px !important;
+    line-height: 18px !important;
+  }
+
+  /* Keep the first conversation from colliding with the filter rail. */
+  .wa-premium-chat-filters + .wa-room-card,
+  .wa-premium-chat-filters + .wa-premium-empty-state {
+    margin-top: 0 !important;
+  }
+}
+
+/* On narrower laptops, allow horizontal chip scrolling rather than squeezing text. */
+@media (min-width: 901px) and (max-width: 1180px) {
+  .wa-premium-chat-filters {
+    padding-right: 8px !important;
+  }
+
+  .wa-premium-chat-filters button {
+    padding-inline: 11px !important;
+  }
+}

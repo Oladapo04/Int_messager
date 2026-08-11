@@ -1,0 +1,185 @@
+/* Int-Messager v4.11.2 — Premium Desktop Layout
+   Desktop-only proportional layout. Mobile v4.11.1 remains untouched. */
+
+@media (min-width: 901px) {
+  html, body, #root { width: 100%; max-width: none; }
+
+  .wa-app {
+    width: 100vw !important;
+    max-width: none !important;
+    margin: 0 !important;
+    grid-template-columns: clamp(340px, 27vw, 420px) minmax(0, 1fr) !important;
+  }
+
+  .wa-sidebar {
+    min-width: 0 !important;
+  }
+
+  .wa-sidebar-panel {
+    min-width: 0 !important;
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+
+  /* Let the home view use the desktop canvas rather than a phone-sized card. */
+  .wa-welcome-screen {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: clamp(24px, 3vw, 52px) !important;
+  }
+
+  .wa-welcome-content {
+    width: 94% !important;
+    max-width: none !important;
+    min-height: min(720px, calc(100dvh - 126px)) !important;
+    display: grid !important;
+    grid-template-columns: minmax(310px, .9fr) minmax(390px, 1.1fr) !important;
+    gap: clamp(28px, 4vw, 64px) !important;
+    align-items: stretch !important;
+    justify-content: stretch !important;
+    padding: clamp(30px, 4vw, 62px) !important;
+    text-align: left !important;
+  }
+
+  .wa-home-overview,
+  .wa-home-activity {
+    min-width: 0;
+  }
+
+  .wa-home-overview {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+  }
+
+  .wa-home-activity {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 22px;
+  }
+
+  .wa-welcome-logo {
+    width: 76px !important;
+    height: 76px !important;
+    margin: 0 0 18px !important;
+  }
+
+  .wa-welcome-screen h1 {
+    font-size: clamp(38px, 4vw, 62px) !important;
+    line-height: .98 !important;
+    max-width: 580px;
+  }
+
+  .wa-welcome-tagline {
+    margin-top: 14px !important;
+  }
+
+  .wa-welcome-intro {
+    max-width: 560px !important;
+    margin-top: 14px !important;
+    font-size: 14px !important;
+  }
+
+  .wa-home-profile,
+  .wa-home-actions,
+  .wa-home-section {
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  .wa-home-profile {
+    margin-top: 26px !important;
+    padding: 14px 16px !important;
+  }
+
+  .wa-home-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 11px !important;
+    margin-top: 14px !important;
+  }
+
+  .wa-home-action {
+    min-height: 64px !important;
+    text-align: left !important;
+    padding: 13px 14px !important;
+  }
+
+  .wa-home-action-saved {
+    grid-column: 1 / -1;
+  }
+
+  .wa-home-action:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .wa-home-section {
+    margin-top: 0 !important;
+    padding: 16px !important;
+    border: 1px solid color-mix(in srgb, var(--theme-border) 88%, transparent) !important;
+    border-radius: 20px !important;
+    background: color-mix(in srgb, var(--theme-surface) 86%, transparent) !important;
+    box-shadow: 0 14px 34px rgba(15, 23, 42, .07) !important;
+  }
+
+  .wa-home-section-title {
+    margin-bottom: 11px !important;
+  }
+
+  .wa-home-room-list {
+    gap: 6px !important;
+  }
+
+  .wa-home-room {
+    min-height: 58px !important;
+    border-radius: 14px !important;
+    padding: 10px 12px !important;
+  }
+
+  .wa-home-room .wa-avatar {
+    width: 42px !important;
+    height: 42px !important;
+  }
+
+  /* Keep content useful on ultrawide displays instead of drifting into the centre. */
+  @media (min-width: 1500px) {
+    .wa-app {
+      grid-template-columns: 420px minmax(0, 1fr) !important;
+    }
+
+    .wa-welcome-content {
+      width: 92% !important;
+      grid-template-columns: minmax(400px, .9fr) minmax(520px, 1.1fr) !important;
+      gap: 72px !important;
+      padding-inline: 72px !important;
+    }
+  }
+}
+
+/* Tablet bridge: avoid an abrupt desktop/mobile jump. */
+@media (min-width: 901px) and (max-width: 1100px) {
+  .wa-app {
+    grid-template-columns: 330px minmax(0, 1fr) !important;
+  }
+
+  .wa-welcome-content {
+    width: 96% !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 24px !important;
+    padding: 28px !important;
+  }
+
+  .wa-welcome-screen h1 {
+    font-size: 38px !important;
+  }
+}
+
+/* Mobile stays stacked and continues using v4.11.1. */
+@media (max-width: 900px) {
+  .wa-home-overview,
+  .wa-home-activity {
+    display: contents !important;
+  }
+}

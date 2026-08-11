@@ -1,3 +1,11 @@
-# v4.11.0 Premium Experience
+# Changelog — v4.11.2a
 
-Added chat filters, persistent filter choice, new-chat shortcut/action, desktop keyboard shortcuts, premium empty states, and polished chat-list/search interactions. Existing premium themes, 30-second Status autoplay, reactions, calls, scheduling, privacy and admin functionality are preserved.
+## Fixed
+- Desktop chat filter chips being partially hidden at normal browser zoom.
+- Filter rail height collapse.
+- Count/filter vertical collision in the Chats sidebar.
+
+## Preserved
+- v4.11.2 premium desktop layout.
+- v4.11.1 mobile Chats layout.
+- All chat filtering functionality.
