@@ -1,0 +1,336 @@
+/* Int-Messager v4.11.5 — Unified Theme Authority
+   Keep this as the LAST global stylesheet. Layout owns geometry; theme owns colour. */
+
+.wa-app {
+  --ui-app-bg: #f4f7fa;
+  --ui-sidebar-bg: #ffffff;
+  --ui-header-bg: rgba(255,255,255,.97);
+  --ui-panel: #ffffff;
+  --ui-panel-2: #f5f7fa;
+  --ui-panel-3: #eef3f7;
+  --ui-panel-glass: rgba(255,255,255,.90);
+  --ui-panel-glass-soft: rgba(255,255,255,.76);
+  --ui-hero-bg: linear-gradient(145deg, rgba(255,255,255,.92), rgba(247,250,252,.82));
+  --ui-text: #17212b;
+  --ui-text-strong: #0f172a;
+  --ui-muted: #667784;
+  --ui-soft: #8a9aa7;
+  --ui-border: #dfe6ec;
+  --ui-border-strong: #cbd5df;
+  --ui-control-bg: #edf2f6;
+  --ui-control-hover: #e4ebf1;
+  --ui-composer-bg: rgba(255,255,255,.97);
+  --ui-input-bg: #ffffff;
+  --ui-accent: var(--accent-color, #2563eb);
+  --ui-shadow: 0 12px 34px rgba(15,23,42,.09);
+  --ui-shadow-soft: 0 6px 20px rgba(15,23,42,.07);
+}
+
+.wa-app[data-appearance="dark"] {
+  --ui-app-bg: #0b141a;
+  --ui-sidebar-bg: #111b21;
+  --ui-header-bg: #111b21;
+  --ui-panel: #111b21;
+  --ui-panel-2: #17232c;
+  --ui-panel-3: #202c33;
+  --ui-panel-glass: rgba(23,35,44,.96);
+  --ui-panel-glass-soft: rgba(23,35,44,.84);
+  --ui-hero-bg: linear-gradient(145deg, rgba(17,27,33,.98), rgba(11,20,26,.96));
+  --ui-text: #e9edef;
+  --ui-text-strong: #f7fafc;
+  --ui-muted: #aebac1;
+  --ui-soft: #8696a0;
+  --ui-border: #273842;
+  --ui-border-strong: #35505f;
+  --ui-control-bg: #202c33;
+  --ui-control-hover: #293942;
+  --ui-composer-bg: #111b21;
+  --ui-input-bg: #202c33;
+  --ui-accent: var(--accent-color, #00a884);
+  --ui-shadow: 0 14px 34px rgba(0,0,0,.28);
+  --ui-shadow-soft: 0 7px 20px rgba(0,0,0,.22);
+  background: var(--ui-app-bg) !important;
+  color: var(--ui-text) !important;
+}
+
+/* App shell */
+.wa-app,
+.wa-app .wa-main,
+.wa-app .wa-chat-shell,
+.wa-app .wa-chat-panel,
+.wa-app .wa-welcome-screen {
+  background-color: var(--ui-app-bg) !important;
+  color: var(--ui-text) !important;
+}
+
+.wa-app .wa-sidebar,
+.wa-app .wa-sidebar-panel,
+.wa-app .wa-navigation-rail {
+  background: var(--ui-sidebar-bg) !important;
+  border-color: var(--ui-border) !important;
+  color: var(--ui-text) !important;
+}
+
+/* TOP conversation layout */
+.wa-app .wa-header,
+.wa-app .wa-chat-header,
+.wa-app .wa-details-topbar {
+  background: var(--ui-header-bg) !important;
+  border-bottom: 1px solid var(--ui-border) !important;
+  color: var(--ui-text) !important;
+  box-shadow: none !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-header,
+.wa-app[data-appearance="dark"] .wa-chat-header,
+.wa-app[data-appearance="dark"] .wa-details-topbar {
+  background: rgba(17,27,33,.98) !important;
+  border-bottom-color: #273842 !important;
+  box-shadow: 0 2px 12px rgba(0,0,0,.18) !important;
+  backdrop-filter: blur(16px) saturate(130%);
+  -webkit-backdrop-filter: blur(16px) saturate(130%);
+}
+
+.wa-app .wa-header-title,
+.wa-app .wa-header-title-wrap,
+.wa-app .wa-header-left {
+  color: var(--ui-text-strong) !important;
+  -webkit-text-fill-color: var(--ui-text-strong) !important;
+}
+
+.wa-app .wa-header-sub {
+  color: var(--ui-muted) !important;
+  -webkit-text-fill-color: var(--ui-muted) !important;
+  opacity: 1 !important;
+}
+
+.wa-app .wa-header-right .wa-icon-btn {
+  background: var(--ui-control-bg) !important;
+  color: var(--ui-text) !important;
+  -webkit-text-fill-color: var(--ui-text) !important;
+  border: 1px solid transparent !important;
+  box-shadow: none !important;
+}
+
+.wa-app .wa-header-right .wa-icon-btn:hover {
+  background: var(--ui-control-hover) !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-header-right .wa-icon-btn.call-action {
+  background: rgba(0,168,132,.14) !important;
+  color: #75ddc8 !important;
+  -webkit-text-fill-color: #75ddc8 !important;
+}
+
+.wa-app .wa-message-search-wrap {
+  background: var(--ui-header-bg) !important;
+  border-bottom: 1px solid var(--ui-border) !important;
+}
+
+/* BOTTOM conversation layout / composer */
+.wa-app .wa-conversation-composer-area,
+.wa-app .wa-composer-wrap {
+  background: var(--ui-composer-bg) !important;
+  border-top: 1px solid var(--ui-border) !important;
+  color: var(--ui-text) !important;
+}
+
+.wa-app .wa-composer {
+  background: var(--ui-panel-2) !important;
+  border: 1px solid var(--ui-border) !important;
+  color: var(--ui-text) !important;
+  box-shadow: var(--ui-shadow-soft) !important;
+}
+
+.wa-app .wa-input,
+.wa-app .wa-message-input,
+.wa-app .wa-composer input:not([type="file"]),
+.wa-app .wa-composer textarea {
+  background: var(--ui-input-bg) !important;
+  border: 1px solid var(--ui-border-strong) !important;
+  color: var(--ui-text) !important;
+  -webkit-text-fill-color: var(--ui-text) !important;
+  caret-color: var(--ui-accent) !important;
+}
+
+.wa-app .wa-input::placeholder,
+.wa-app .wa-message-input::placeholder,
+.wa-app .wa-composer input::placeholder,
+.wa-app .wa-composer textarea::placeholder {
+  color: var(--ui-soft) !important;
+  -webkit-text-fill-color: var(--ui-soft) !important;
+  opacity: 1 !important;
+}
+
+.wa-app .wa-composer .wa-icon-btn {
+  background: transparent !important;
+  color: var(--ui-muted) !important;
+  -webkit-text-fill-color: var(--ui-muted) !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.wa-app .wa-composer .wa-icon-btn:hover {
+  background: var(--ui-control-bg) !important;
+  color: var(--ui-text) !important;
+  -webkit-text-fill-color: var(--ui-text) !important;
+}
+
+.wa-app .wa-send-btn {
+  background: var(--ui-accent) !important;
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+  border: 0 !important;
+  box-shadow: 0 7px 18px color-mix(in srgb, var(--ui-accent) 24%, transparent) !important;
+  font-weight: 800 !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-conversation-composer-area,
+.wa-app[data-appearance="dark"] .wa-composer-wrap {
+  background: #111b21 !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-composer {
+  background: #202c33 !important;
+  border-color: #2b3d48 !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-input,
+.wa-app[data-appearance="dark"] .wa-message-input,
+.wa-app[data-appearance="dark"] .wa-composer input:not([type="file"]),
+.wa-app[data-appearance="dark"] .wa-composer textarea {
+  background: #18262f !important;
+  border-color: #30434f !important;
+  color: #eef3f5 !important;
+  -webkit-text-fill-color: #eef3f5 !important;
+}
+
+/* Home/title dashboard */
+.wa-app .wa-welcome-content {
+  background: var(--ui-hero-bg) !important;
+  border: 1px solid var(--ui-border) !important;
+  color: var(--ui-text) !important;
+  box-shadow: var(--ui-shadow) !important;
+}
+
+.wa-app .wa-welcome-screen h1,
+.wa-app .wa-home-profile-name,
+.wa-app .wa-home-room-name {
+  color: var(--ui-text-strong) !important;
+  -webkit-text-fill-color: var(--ui-text-strong) !important;
+  opacity: 1 !important;
+}
+
+.wa-app .wa-welcome-tagline {
+  color: var(--ui-accent) !important;
+  -webkit-text-fill-color: var(--ui-accent) !important;
+  opacity: 1 !important;
+}
+
+.wa-app .wa-welcome-intro,
+.wa-app .wa-home-profile-status,
+.wa-app .wa-home-room-preview {
+  color: var(--ui-muted) !important;
+  -webkit-text-fill-color: var(--ui-muted) !important;
+  opacity: 1 !important;
+}
+
+.wa-app .wa-home-profile,
+.wa-app .wa-home-section {
+  background: var(--ui-panel-glass) !important;
+  border-color: var(--ui-border) !important;
+  box-shadow: none !important;
+}
+
+.wa-app .wa-home-action,
+.wa-app .wa-home-room,
+.wa-app .wa-home-chat-card {
+  background: var(--ui-panel-2) !important;
+  border: 1px solid var(--ui-border) !important;
+  color: var(--ui-text) !important;
+  -webkit-text-fill-color: var(--ui-text) !important;
+  box-shadow: none !important;
+}
+
+.wa-app .wa-home-action:hover,
+.wa-app .wa-home-room:hover,
+.wa-app .wa-home-chat-card:hover {
+  background: var(--ui-panel-3) !important;
+  border-color: color-mix(in srgb, var(--ui-accent) 30%, var(--ui-border)) !important;
+}
+
+.wa-app .wa-home-section-title,
+.wa-app .wa-home-section-title span {
+  color: var(--ui-muted) !important;
+  -webkit-text-fill-color: var(--ui-muted) !important;
+}
+
+/* Settings readability */
+.wa-app .wa-settings-page,
+.wa-app .wa-settings-card,
+.wa-app .wa-details-page,
+.wa-app .wa-details-card {
+  color: var(--ui-text) !important;
+}
+
+.wa-app .wa-settings-card,
+.wa-app .wa-details-card {
+  background: var(--ui-panel-2) !important;
+  border-color: var(--ui-border) !important;
+}
+
+.wa-app .wa-settings-title,
+.wa-app .wa-settings-page h1,
+.wa-app .wa-settings-page h2,
+.wa-app .wa-settings-page h3,
+.wa-app .wa-settings-card strong,
+.wa-app .wa-details-card strong {
+  color: var(--ui-text-strong) !important;
+  -webkit-text-fill-color: var(--ui-text-strong) !important;
+  opacity: 1 !important;
+}
+
+.wa-app .wa-settings-note,
+.wa-app .wa-settings-label,
+.wa-app .wa-settings-card small,
+.wa-app .wa-details-card p,
+.wa-app .wa-details-card small {
+  color: var(--ui-muted) !important;
+  -webkit-text-fill-color: var(--ui-muted) !important;
+  opacity: 1 !important;
+}
+
+/* Dark safety: no light glass surfaces after responsive/layout CSS. */
+.wa-app[data-appearance="dark"] .wa-welcome-content,
+.wa-app[data-appearance="dark"] .wa-home-profile,
+.wa-app[data-appearance="dark"] .wa-home-section,
+.wa-app[data-appearance="dark"] .wa-home-action,
+.wa-app[data-appearance="dark"] .wa-home-room,
+.wa-app[data-appearance="dark"] .wa-home-chat-card {
+  background-image: none !important;
+}
+
+.wa-app[data-appearance="dark"] .wa-welcome-content {
+  background: var(--ui-hero-bg) !important;
+}
+
+@media (max-width: 900px) {
+  .wa-app .wa-header,
+  .wa-app .wa-chat-header {
+    min-height: 58px;
+  }
+
+  .wa-app .wa-conversation-composer-area,
+  .wa-app .wa-composer-wrap {
+    padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
+  }
+
+  .wa-app .wa-composer {
+    box-shadow: none !important;
+  }
+}
+
+/* Safety for stale cached markup. */
+.wa-close-chat-btn {
+  display: none !important;
+}

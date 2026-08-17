@@ -1,9 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import DeviceSessions from "./components/DeviceSessions";
-import AdminDashboard from "./components/admin/AdminDashboard";
+import React, { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch as authFetch, AUTH_TOKEN_KEY } from "./services/api";
 import { buildRtcConfig, safeSetRemoteDescription, safeRestartIce, replaceOutgoingVideoTrack } from "./call/webrtcUtils";
 import io from "socket.io-client";
+/* CSS architecture v4.11.4: foundation → features → theme → responsive polish. */
 import "./Version3.css";
 import "./styles/layout-v474.css";
 import "./styles/premium-v474.css";
@@ -19,13 +18,10 @@ import "./styles/fullscreen-chat-info-v4815.css";
 import "./styles/desktop-chat-info-pane-v4816.css";
 import "./styles/mobile-hamburger-remove-v4817.css";
 import "./styles/black-call-icon-v4818.css";
-import "./styles/admin-dashboard-v490.css";
 import "./styles/presence-receipts-v497.css";
 import "./styles/group-management-v499.css";
 import "./styles/contacts-blocking-v4100.css";
-import "./styles/dark-mode-v491.css";
 import "./styles/admin-access-v492.css";
-import "./styles/admin-dashboard-v493.css";
 import "./styles/composer-layout-v495.css";
 import "./styles/mobile-composer-overlap-v4101.css";
 import "./styles/shared-content-v4102.css";
@@ -39,27 +35,51 @@ import "./styles/drafts-scheduled-v4109.css";
 import "./styles/glass-navigation-v4110.css";
 import AuthScreen from "./components/auth/AuthScreen";
 import NavigationRail from "./components/layout/NavigationRail";
-import StatusUpdates from "./components/status/StatusUpdates";
 import MessageActions, { DesktopMessageContextMenu, MobileMessageActionSheet } from "./components/chat/MessageActions";
-import AttachmentRenderer from "./components/chat/AttachmentRenderer";
-import ConversationView from "./components/chat/ConversationView";
-import MessageList from "./components/chat/MessageList";
-import Composer from "./components/composer/Composer";
 import { editMessageRequest, deleteMessageRequest } from "./services/messageService";
-import "./styles/dark-mode-visibility-v4113.css";
-import "./styles/dark-mode-contrast-v4114.css";
-import "./styles/dark-mode-critical-text-v4115.css";
-import "./styles/dark-mode-settings-chat-v4116.css";
+/* Current theme stack. Do not re-add v4.9.1 / v4.10.13–16 dark-mode patches. */
 import "./styles/unified-theme-system-v4117.css";
 import "./styles/dark-mode-professional-v4120.css";
 import "./styles/dark-mode-premium-v4121.css";
 import "./styles/mobile-conversation-premium-v4122.css";
 import "./styles/light-mode-premium-v4123.css";
 import "./styles/reactions-premium-v4124.css";
+/* Premium/responsive product layer. */
 import "./styles/premium-experience-v4110.css";
 import "./styles/mobile-chats-premium-v4111.css";
 import "./styles/desktop-premium-v4112.css";
 import "./styles/desktop-chat-filters-v4112a.css";
+import "./styles/performance-loading-v4113.css";
+
+/* Final semantic colour authority. Keep this as the last global CSS import. */
+import "./styles/theme-authority-v4115.css";
+
+
+const AdminDashboard = lazy(() => import("./components/admin/AdminDashboard"));
+const DeviceSessions = lazy(() => import("./components/DeviceSessions"));
+const StatusUpdates = lazy(() => import("./components/status/StatusUpdates"));
+const AttachmentRenderer = lazy(() => import("./components/chat/AttachmentRenderer"));
+const ConversationView = lazy(() => import("./components/chat/ConversationView"));
+const MessageList = lazy(() => import("./components/chat/MessageList"));
+const Composer = lazy(() => import("./components/composer/Composer"));
+
+function FeatureLoader({ label = "Loading…" }) {
+  return (
+    <div className="wa-feature-loader" role="status" aria-live="polite">
+      <span className="wa-feature-loader-spinner" aria-hidden="true" />
+      <span>{label}</span>
+    </div>
+  );
+}
+
+function AttachmentLoader() {
+  return (
+    <div className="wa-attachment-loader" aria-label="Loading attachment">
+      <span className="wa-feature-loader-spinner" aria-hidden="true" />
+      <span>Loading attachment…</span>
+    </div>
+  );
+}
 
 const API_BASE = "";
 const socket = io(API_BASE, { autoConnect: true });
@@ -789,7 +809,7 @@ function StyleTag() {
       body {
         font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         background: #e5e7eb;
-        color: #0f172a;
+        color: var(--ui-text, #0f172a);
       }
 
       .wa-app {
@@ -833,7 +853,7 @@ function StyleTag() {
         align-items: center;
         gap: 8px;
         cursor: pointer;
-        color: #0f172a;
+        color: var(--ui-text, #0f172a);
         font-size: 13px;
         font-weight: 700;
       }
@@ -855,7 +875,7 @@ function StyleTag() {
 
       .wa-profile-modal {
         width: min(420px, 100%);
-        background: white;
+        background: var(--ui-composer-bg, white);
         border-radius: 20px;
         padding: 18px;
         box-shadow: 0 24px 70px rgba(15,23,42,0.3);
@@ -866,7 +886,7 @@ function StyleTag() {
       .wa-modal-title {
         font-size: 18px;
         font-weight: 900;
-        color: #0f172a;
+        color: var(--ui-text, #0f172a);
       }
 
       .wa-modal-actions {
@@ -903,13 +923,13 @@ function StyleTag() {
 
       .wa-search-input {
         width: 100%;
-        border: 1px solid #cbd5e1;
+        border: 1px solid var(--ui-border-strong, #cbd5e1);
         border-radius: 999px;
         padding: 10px 12px;
         outline: none;
         font-size: 14px;
-        background: white;
-        color: #0f172a;
+        background: var(--ui-composer-bg, white);
+        color: var(--ui-text, #0f172a);
         margin-bottom: 10px;
       }
 
@@ -933,7 +953,7 @@ function StyleTag() {
 
       .wa-side-tab.active {
         background: #0ea5e9;
-        border-color: #0ea5e9;
+        border-color: var(--ui-accent, #0ea5e9);
       }
 
       .wa-room-card,
@@ -1108,20 +1128,20 @@ function StyleTag() {
         margin: 0;
         font-size: 28px;
         font-weight: 900;
-        color: #0f172a;
+        color: var(--ui-text, #0f172a);
       }
 
       .wa-welcome-tagline {
         margin: 8px 0 0;
         font-size: 16px;
         font-weight: 700;
-        color: #0ea5e9;
+        color: var(--ui-accent, #0ea5e9);
       }
 
       .wa-welcome-intro {
         max-width: 430px;
         margin: 12px 0 0;
-        color: #64748b;
+        color: var(--ui-muted, #64748b);
         font-size: 14px;
         line-height: 1.5;
       }
@@ -1135,14 +1155,14 @@ function StyleTag() {
         padding: 12px 14px;
         border: 1px solid rgba(148, 163, 184, 0.22);
         border-radius: 18px;
-        background: rgba(255, 255, 255, 0.88);
+        background: var(--ui-panel-glass, rgba(255, 255, 255, 0.88));
         box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
         text-align: left;
       }
 
       .wa-home-profile-copy { min-width: 0; flex: 1; }
-      .wa-home-profile-name { font-weight: 900; color: #0f172a; }
-      .wa-home-profile-status { margin-top: 3px; color: #64748b; font-size: 13px; }
+      .wa-home-profile-name { font-weight: 900; color: var(--ui-text, #0f172a); }
+      .wa-home-profile-status { margin-top: 3px; color: var(--ui-muted, #64748b); font-size: 13px; }
 
       .wa-home-actions {
         width: min(100%, 540px);
@@ -1157,8 +1177,8 @@ function StyleTag() {
         border: 0;
         border-radius: 16px;
         padding: 12px 10px;
-        background: #ffffff;
-        color: #0f172a;
+        background: var(--ui-header-bg, #ffffff);
+        color: var(--ui-text, #0f172a);
         box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
         cursor: pointer;
         font-weight: 800;
@@ -1206,17 +1226,17 @@ function StyleTag() {
         border: 1px solid rgba(148, 163, 184, 0.20);
         border-radius: 16px;
         padding: 10px 12px;
-        background: rgba(255,255,255,0.9);
+        background: var(--ui-panel-glass, rgba(255,255,255,0.9));
         cursor: pointer;
         text-align: left;
       }
 
-      .wa-home-room:hover { background: #fff; }
+      .wa-home-room:hover { background: var(--ui-panel, #fff); }
       .wa-home-room-copy { min-width: 0; flex: 1; }
-      .wa-home-room-name { color: #0f172a; font-weight: 850; }
-      .wa-home-room-preview { margin-top: 3px; overflow: hidden; color: #64748b; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+      .wa-home-room-name { color: var(--ui-text, #0f172a); font-weight: 850; }
+      .wa-home-room-preview { margin-top: 3px; overflow: hidden; color: var(--ui-muted, #64748b); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
       .wa-home-room-unread { min-width: 24px; padding: 4px 7px; border-radius: 999px; background: var(--accent-color, #22c55e); color: white; font-size: 11px; font-weight: 900; text-align: center; }
-      .wa-home-empty { padding: 14px; border-radius: 16px; background: rgba(255,255,255,0.72); color: #64748b; font-size: 13px; text-align: center; }
+      .wa-home-empty { padding: 14px; border-radius: 16px; background: rgba(255,255,255,0.72); color: var(--ui-muted, #64748b); font-size: 13px; text-align: center; }
 
       @keyframes wa-welcome-arrive {
         from { opacity: 0; transform: translateY(-24px) scale(1.18); }
@@ -1246,7 +1266,7 @@ function StyleTag() {
         min-width: 0;
         height: 100vh;
         overflow: hidden;
-        background: #f8fafc;
+        background: var(--ui-app-bg, #f8fafc);
       }
 
       .wa-header {
@@ -1255,8 +1275,8 @@ function StyleTag() {
         justify-content: space-between;
         gap: 12px;
         padding: 14px 16px;
-        border-bottom: 1px solid #dbeafe;
-        background: #ffffff;
+        border-bottom: 1px solid var(--ui-border, #dbeafe);
+        background: var(--ui-header-bg, #ffffff);
       }
 
       .wa-header-left {
@@ -1283,14 +1303,14 @@ function StyleTag() {
 
       .wa-header-sub {
         font-size: 12px;
-        color: #64748b;
+        color: var(--ui-muted, #64748b);
         margin-top: 2px;
       }
 
       .wa-message-search-wrap {
         padding: 10px 16px;
-        background: #fff;
-        border-bottom: 1px solid #e2e8f0;
+        background: var(--ui-panel, #fff);
+        border-bottom: 1px solid var(--ui-border, #e2e8f0);
       }
 
       .wa-chat {
@@ -1385,7 +1405,7 @@ function StyleTag() {
         max-width: min(640px, 78vw);
         padding: 10px 12px 8px;
         border-radius: 16px;
-        background: white;
+        background: var(--ui-composer-bg, white);
         box-shadow: 0 4px 16px rgba(15,23,42,0.06);
       }
 
@@ -1400,7 +1420,7 @@ function StyleTag() {
       .wa-settings-card { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.10); border-radius: 16px; padding: 12px; margin-bottom: 12px; display: grid; gap: 10px; }
       .wa-settings-title { font-weight: 900; font-size: 14px; }
       .wa-settings-note { font-size: 12px; color: rgba(255,255,255,0.72); line-height: 1.35; }
-      .wa-search-input.light, .wa-select { width: 100%; border: none; border-radius: 12px; padding: 10px; background: rgba(255,255,255,0.92); color: #0f172a; }
+      .wa-search-input.light, .wa-select { width: 100%; border: none; border-radius: 12px; padding: 10px; background: rgba(255,255,255,0.92); color: var(--ui-text, #0f172a); }
       .wa-settings-btn { border: none; border-radius: 12px; padding: 10px 12px; background: #22c55e; color: white; font-weight: 900; cursor: pointer; }
       .wa-settings-label { display: grid; gap: 6px; font-size: 12px; font-weight: 800; color: rgba(255,255,255,0.84); }
       .wa-color-input { width: 100%; height: 38px; border: none; border-radius: 12px; background: transparent; }
@@ -1438,7 +1458,7 @@ function StyleTag() {
 
       .wa-message-text.deleted {
         font-style: italic;
-        color: #64748b;
+        color: var(--ui-muted, #64748b);
       }
 
       .wa-meta {
@@ -1447,7 +1467,7 @@ function StyleTag() {
         justify-content: flex-end;
         gap: 8px;
         font-size: 11px;
-        color: #64748b;
+        color: var(--ui-muted, #64748b);
         align-items: center;
         flex-wrap: wrap;
       }
@@ -1553,14 +1573,14 @@ function StyleTag() {
 
       .wa-voice-time {
         font-size: 11px;
-        color: #64748b;
+        color: var(--ui-muted, #64748b);
         user-select: none;
       }
 
       .wa-voice-speed-btn {
         border: none;
         background: transparent;
-        color: #0f172a;
+        color: var(--ui-text, #0f172a);
         font-size: 11px;
         font-weight: 700;
         padding: 0;
@@ -1589,7 +1609,7 @@ function StyleTag() {
         width: 100%;
         max-height: 280px;
         object-fit: cover;
-        background: #e2e8f0;
+        background: var(--ui-control-bg, #e2e8f0);
       }
 
       .wa-attachment-footer,
@@ -1646,7 +1666,7 @@ function StyleTag() {
       .wa-attachment-name {
         font-size: 13px;
         font-weight: 700;
-        color: #0f172a;
+        color: var(--ui-text, #0f172a);
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -1654,7 +1674,7 @@ function StyleTag() {
 
       .wa-attachment-subtext {
         font-size: 11px;
-        color: #64748b;
+        color: var(--ui-muted, #64748b);
         margin-top: 3px;
         white-space: nowrap;
         overflow: hidden;
@@ -1741,7 +1761,7 @@ function StyleTag() {
         gap: 6px;
         align-items: center;
         flex-wrap: wrap;
-        background: white;
+        background: var(--ui-composer-bg, white);
         border: 1px solid rgba(148,163,184,0.22);
         box-shadow: 0 16px 40px rgba(15,23,42,0.18);
         border-radius: 18px;
@@ -1772,7 +1792,7 @@ function StyleTag() {
       .wa-reaction-close,
       .wa-chat-emoji-close {
         font-size: 16px;
-        color: #64748b;
+        color: var(--ui-muted, #64748b);
       }
 
       .wa-composer {
@@ -1781,7 +1801,7 @@ function StyleTag() {
         gap: 8px;
         padding: 7px 10px;
         border-top: 1px solid #dbeafe;
-        background: white;
+        background: var(--ui-composer-bg, white);
         min-height: 52px;
         max-width: 100%;
       }
@@ -1793,7 +1813,7 @@ function StyleTag() {
 
       .wa-input {
         width: 100%;
-        border: 1px solid #cbd5e1;
+        border: 1px solid var(--ui-border-strong, #cbd5e1);
         border-radius: 999px;
         padding: 10px 12px;
         outline: none;
@@ -1810,7 +1830,7 @@ function StyleTag() {
       .wa-icon-btn {
         width: 38px;
         height: 38px;
-        background: #e2e8f0;
+        background: var(--ui-control-bg, #e2e8f0);
         font-size: 17px;
         display: inline-flex;
         align-items: center;
@@ -1878,8 +1898,8 @@ function StyleTag() {
         font-size: 12px;
         font-weight: 900;
         cursor: pointer;
-        background: #ffffff;
-        color: #0f172a;
+        background: var(--ui-header-bg, #ffffff);
+        color: var(--ui-text, #0f172a);
       }
 
       .wa-mini-btn.danger {
@@ -1921,7 +1941,7 @@ function StyleTag() {
       .wa-empty {
         padding: 24px;
         text-align: center;
-        color: #64748b;
+        color: var(--ui-muted, #64748b);
       }
 
       .wa-name-setup {
@@ -1929,7 +1949,7 @@ function StyleTag() {
         gap: 10px;
         max-width: 360px;
         margin: 48px auto;
-        background: white;
+        background: var(--ui-composer-bg, white);
         padding: 20px;
         border-radius: 18px;
         box-shadow: 0 10px 30px rgba(15,23,42,0.08);
@@ -2664,7 +2684,7 @@ function StyleTag() {
           position: sticky;
           right: 0;
           bottom: 0;
-          background: #fff;
+          background: var(--ui-panel, #fff);
           border-radius: 999px;
         }
       }
@@ -2841,21 +2861,21 @@ function StyleTag() {
 
 
       .wa-header-title-wrap.clickable { border: 0; background: transparent; text-align: left; padding: 0; cursor: pointer; color: inherit; }
-      .wa-room-context-menu { position: fixed; z-index: 10000; min-width: 190px; padding: 8px; border-radius: 14px; background: #fff; box-shadow: 0 18px 45px rgba(15,23,42,0.24); border: 1px solid rgba(148,163,184,0.22); }
-      .wa-room-context-menu button { width: 100%; border: 0; background: transparent; border-radius: 10px; padding: 10px 12px; text-align: left; cursor: pointer; font-weight: 700; color: #0f172a; }
+      .wa-room-context-menu { position: fixed; z-index: 10000; min-width: 190px; padding: 8px; border-radius: 14px; background: var(--ui-panel, #fff); box-shadow: 0 18px 45px rgba(15,23,42,0.24); border: 1px solid rgba(148,163,184,0.22); }
+      .wa-room-context-menu button { width: 100%; border: 0; background: transparent; border-radius: 10px; padding: 10px 12px; text-align: left; cursor: pointer; font-weight: 700; color: var(--ui-text, #0f172a); }
       .wa-room-context-menu button:hover { background: #f1f5f9; }
       .wa-room-context-menu button.danger { color: #dc2626; }
       .wa-details-page { flex: 1; overflow-y: auto; padding: 18px; background: var(--chat-wallpaper); }
       .wa-details-hero { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 18px; border-radius: 18px; background: rgba(255,255,255,0.82); box-shadow: 0 8px 24px rgba(15,23,42,0.08); }
       .wa-details-hero h2 { margin: 6px 0 0; font-size: 22px; }
-      .wa-details-hero p { margin: 0; color: #64748b; }
+      .wa-details-hero p { margin: 0; color: var(--ui-muted, #64748b); }
       .wa-avatar.details { width: 86px; height: 86px; font-size: 30px; }
       .wa-details-actions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 14px 0; }
-      .wa-details-actions button, .wa-danger-text-btn { border: 0; border-radius: 14px; padding: 12px; background: white; box-shadow: 0 8px 18px rgba(15,23,42,0.08); cursor: pointer; font-weight: 700; }
+      .wa-details-actions button, .wa-danger-text-btn { border: 0; border-radius: 14px; padding: 12px; background: var(--ui-composer-bg, white); box-shadow: 0 8px 18px rgba(15,23,42,0.08); cursor: pointer; font-weight: 700; }
       .wa-details-card { margin-top: 14px; padding: 14px; border-radius: 18px; background: rgba(255,255,255,0.88); box-shadow: 0 8px 24px rgba(15,23,42,0.08); }
       .wa-details-card-title { font-weight: 800; margin-bottom: 10px; }
       .wa-media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
-      .wa-media-item { min-height: 86px; border-radius: 14px; background: #f8fafc; color: #0f172a; text-decoration: none; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 8px; padding: 10px; text-align: center; overflow: hidden; }
+      .wa-media-item { min-height: 86px; border-radius: 14px; background: var(--ui-app-bg, #f8fafc); color: var(--ui-text, #0f172a); text-decoration: none; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 8px; padding: 10px; text-align: center; overflow: hidden; }
       .wa-media-item span { font-size: 24px; }
       .wa-media-item small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       .danger-zone { display: flex; flex-direction: column; gap: 8px; }
@@ -3071,7 +3091,7 @@ function StyleTag() {
         box-shadow: 0 4px 22px rgba(15,23,42,.045);
       }
       .wa-header-title { font-size: 16px; letter-spacing: -.018em; }
-      .wa-header-sub { color: #64748b; }
+      .wa-header-sub { color: var(--ui-muted, #64748b); }
       .wa-header-app-logo { border-radius: 12px; box-shadow: 0 7px 18px rgba(15,23,42,.13); }
 
       .wa-icon-btn {
@@ -3085,7 +3105,7 @@ function StyleTag() {
       }
       .wa-icon-btn:hover {
         transform: translateY(-1px);
-        background: #fff;
+        background: var(--ui-panel, #fff);
         box-shadow: 0 8px 18px rgba(15,23,42,.10);
       }
 
@@ -3143,7 +3163,7 @@ function StyleTag() {
         padding: clamp(24px, 4vw, 50px);
         border: 1px solid rgba(255,255,255,.75);
         border-radius: 32px;
-        background: linear-gradient(145deg, rgba(255,255,255,.75), rgba(255,255,255,.48));
+        background: var(--ui-hero-bg, linear-gradient(145deg, rgba(255,255,255,.75), rgba(255,255,255,.48)));
         box-shadow: 0 30px 80px rgba(15,23,42,.10), inset 0 1px rgba(255,255,255,.85);
         backdrop-filter: blur(22px) saturate(135%);
         -webkit-backdrop-filter: blur(22px) saturate(135%);
@@ -3157,10 +3177,10 @@ function StyleTag() {
       }
       .wa-welcome-screen h1 { font-size: clamp(30px, 5vw, 48px); letter-spacing: -.045em; }
       .wa-welcome-tagline { font-size: 16px; color: #475569; }
-      .wa-welcome-intro { max-width: 580px; color: #64748b; line-height: 1.65; }
+      .wa-welcome-intro { max-width: 580px; color: var(--ui-muted, #64748b); line-height: 1.65; }
       .wa-home-action, .wa-home-chat-card {
         border: 1px solid rgba(148,163,184,.18);
-        background: rgba(255,255,255,.70);
+        background: var(--ui-panel-glass-soft, rgba(255,255,255,.70));
         box-shadow: 0 8px 22px rgba(15,23,42,.055);
         transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
       }
@@ -3299,7 +3319,7 @@ function MessageBubble({
           />
         </div>
       ) : message.type === "file" && !message.isDeleted ? (
-        <AttachmentRenderer item={message} resolveMediaUrl={resolveMediaUrl} />
+        <Suspense fallback={<AttachmentLoader />}><AttachmentRenderer item={message} resolveMediaUrl={resolveMediaUrl} /></Suspense>
       ) : (
         <div className={`wa-message-text ${useGroupTextTemplate ? "wa-group-text-body" : ""} ${message.isDeleted ? "deleted" : ""}`}>{message.content}</div>
       )}
@@ -5464,12 +5484,6 @@ export default function App() {
     };
   }, []);
 
-  useEffect(() => {
-    const listEl = messageListRef.current;
-    if (!listEl) return;
-    listEl.scrollTop = listEl.scrollHeight;
-  }, [groupedMessages, pendingUploadsForRoom.length, typingName]);
-
   function scrollToMessage(messageId) {
     if (!messageId) return;
     const escapedId = typeof CSS !== "undefined" && CSS.escape
@@ -7326,15 +7340,19 @@ export default function App() {
     <>
       <StyleTag />
 
-      <AdminDashboard
-        open={showAdminDashboard}
-        appearance={resolvedAppearance}
-        onClose={() => {
-          setShowAdminDashboard(false);
-          setSidebarMode("settings");
-          setShowSidebar(true);
-        }}
-      />
+      {showAdminDashboard ? (
+        <Suspense fallback={<FeatureLoader label="Loading admin dashboard…" />}>
+          <AdminDashboard
+            open={showAdminDashboard}
+            appearance={resolvedAppearance}
+            onClose={() => {
+              setShowAdminDashboard(false);
+              setSidebarMode("settings");
+              setShowSidebar(true);
+            }}
+          />
+        </Suspense>
+      ) : null}
 
       {showScheduleMessage ? (
         <div className="wa-schedule-modal-backdrop" data-appearance={resolvedAppearance} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !scheduleBusy) setShowScheduleMessage(false); }}>
@@ -7649,6 +7667,19 @@ export default function App() {
                   >
                     ✎
                   </button>
+                  <button
+                    type="button"
+                    className="wa-premium-new-group"
+                    onClick={() => {
+                      setNewGroupName("");
+                      setNewGroupMemberIds([]);
+                      setShowCreateGroup(true);
+                    }}
+                    title="New group"
+                    aria-label="New group"
+                  >
+                    <span aria-hidden="true">👥</span>
+                  </button>
                   <button type="button" className="wa-archive-toggle" onClick={() => setShowArchivedChats((value) => !value)}>
                     {showArchivedChats ? "Back" : `Archived (${(chatOrgPrefs.archivedRooms || []).length})`}
                   </button>
@@ -7770,7 +7801,7 @@ export default function App() {
               ) : null}
             </>
           ) : sidebarMode === "updates" ? (
-            <StatusUpdates currentProfile={profile} />
+            <Suspense fallback={<FeatureLoader label="Loading updates…" />}><StatusUpdates currentProfile={profile} /></Suspense>
           ) : sidebarMode === "calls" ? (
             <>
               <div className="wa-section-label">Calls</div>
@@ -7865,7 +7896,7 @@ export default function App() {
                 </>
               ) : null}
               <div className="wa-section-label">Security</div>
-              <DeviceSessions />
+              <Suspense fallback={<FeatureLoader label="Loading signed-in devices…" />}><DeviceSessions /></Suspense>
               <div className="wa-section-label">Privacy</div>
               <div className="wa-settings-card wa-privacy-card">
                 <div className="wa-settings-title">Privacy</div>
@@ -8110,15 +8141,6 @@ export default function App() {
 
               <button
                 type="button"
-                className="wa-icon-btn wa-header-export-btn"
-                onClick={() => exportChat("txt")}
-                title="Export chat as text"
-              >
-                ⬇
-              </button>
-
-              <button
-                type="button"
                 className="wa-icon-btn wa-header-search-btn"
                 onClick={() => setShowMessageSearch((v) => !v)}
                 title="Search messages"
@@ -8126,23 +8148,7 @@ export default function App() {
                 🔍
               </button>
 
-              <button
-                type="button"
-                className="wa-icon-btn wa-close-chat-btn"
-                onClick={() => {
-                  setActiveRoomSlug("");
-                  setReplyTo(null);
-                  setShowChatDetails(false);
-                  setShowMessageSearch(false);
-                  setShowMobileChatMenu(false);
-                  setSidebarMode("chats");
-                  setShowSidebar(false);
-                }}
-                title="Close chat"
-                aria-label="Close chat"
-              >
-                ✕
-              </button>
+              
 
               <button
                 type="button"
@@ -8172,9 +8178,6 @@ export default function App() {
                     </button>
                     <button type="button" role="menuitem" onClick={openScheduleMessageDialog}>
                       Schedule message
-                    </button>
-                    <button type="button" role="menuitem" onClick={() => { setShowMobileChatMenu(false); exportChat("txt"); }}>
-                      Export chat
                     </button>
                     <button type="button" role="menuitem" className="danger" onClick={() => {
                       setShowMobileChatMenu(false);
@@ -8211,6 +8214,7 @@ export default function App() {
           {callError ? <div className="wa-error">{callError}</div> : null}
 
           {activeRoom ? (
+            <Suspense fallback={<FeatureLoader label="Opening conversation…" />}>
             <>
             <ConversationView
               messageArea={(
@@ -8686,6 +8690,7 @@ export default function App() {
                 </>
               ) : null}
             </>
+            </Suspense>
           ) : (
             <main className="wa-welcome-screen">
               <div className="wa-welcome-content">
@@ -9260,6 +9265,414 @@ export default function App() {
           </div>
         </div>
       ) : null}
+
+      <style>{`
+        /* v4.11.5b — true final runtime dark-mode guard.
+           This style element is deliberately rendered after legacy App.jsx runtime styles. */
+
+        .wa-app[data-appearance="dark"] {
+          background: #0b141a !important;
+          color: #e9edef !important;
+        }
+
+        /* HOME / TITLE */
+        .wa-app[data-appearance="dark"] .wa-welcome-screen {
+          background: #0b141a !important;
+          color: #e9edef !important;
+        }
+
+        .wa-app[data-appearance="dark"] .wa-welcome-content {
+          background: linear-gradient(145deg, #111b21, #0b141a) !important;
+          border-color: #2a3942 !important;
+          box-shadow: 0 18px 44px rgba(0,0,0,.30) !important;
+        }
+
+        .wa-app[data-appearance="dark"] .wa-welcome-screen h1,
+        .wa-app[data-appearance="dark"] .wa-home-profile-name,
+        .wa-app[data-appearance="dark"] .wa-home-room-name {
+          color: #f5f7f8 !important;
+          -webkit-text-fill-color: #f5f7f8 !important;
+          opacity: 1 !important;
+        }
+
+        .wa-app[data-appearance="dark"] .wa-welcome-tagline {
+          color: #53bdeb !important;
+          -webkit-text-fill-color: #53bdeb !important;
+          opacity: 1 !important;
+        }
+
+        .wa-app[data-appearance="dark"] .wa-welcome-intro,
+        .wa-app[data-appearance="dark"] .wa-home-profile-status,
+        .wa-app[data-appearance="dark"] .wa-home-room-preview {
+          color: #aebac1 !important;
+          -webkit-text-fill-color: #aebac1 !important;
+          opacity: 1 !important;
+        }
+
+        .wa-app[data-appearance="dark"] .wa-home-profile {
+          background: #17232c !important;
+          border-color: #2a3942 !important;
+          box-shadow: none !important;
+        }
+
+        .wa-app[data-appearance="dark"] .wa-home-actions .wa-home-action,
+        .wa-app[data-appearance="dark"] button.wa-home-action,
+        .wa-app[data-appearance="dark"] .wa-home-action-saved {
+          background: #17232c !important;
+          background-image: none !important;
+          border: 1px solid #2a3942 !important;
+          color: #e9edef !important;
+          -webkit-text-fill-color: #e9edef !important;
+          box-shadow: none !important;
+        }
+
+        .wa-app[data-appearance="dark"] .wa-home-actions .wa-home-action *,
+        .wa-app[data-appearance="dark"] button.wa-home-action *,
+        .wa-app[data-appearance="dark"] .wa-home-action-saved * {
+          color: #e9edef !important;
+          -webkit-text-fill-color: #e9edef !important;
+          opacity: 1 !important;
+        }
+
+        .wa-app[data-appearance="dark"] .wa-home-actions .wa-home-action:hover,
+        .wa-app[data-appearance="dark"] button.wa-home-action:hover {
+          background: #202c33 !important;
+          border-color: #3a5260 !important;
+        }
+
+        .wa-app[data-appearance="dark"] .wa-home-section {
+          background: #111b21 !important;
+          border-color: #2a3942 !important;
+          box-shadow: none !important;
+        }
+
+        .wa-app[data-appearance="dark"] .wa-home-section-title,
+        .wa-app[data-appearance="dark"] .wa-home-section-title span {
+          color: #8696a0 !important;
+          -webkit-text-fill-color: #8696a0 !important;
+          opacity: 1 !important;
+        }
+
+        .wa-app[data-appearance="dark"] .wa-home-room {
+          background: #17232c !important;
+          background-image: none !important;
+          border-color: #2a3942 !important;
+          color: #e9edef !important;
+          box-shadow: none !important;
+        }
+
+        .wa-app[data-appearance="dark"] .wa-home-room:hover {
+          background: #202c33 !important;
+        }
+
+        /* TOP CHAT HEADER */
+        .wa-app[data-appearance="dark"] .wa-main > .wa-header,
+        .wa-app[data-appearance="dark"] header.wa-header,
+        .wa-app[data-appearance="dark"] .wa-chat-header {
+          background: #111b21 !important;
+          background-image: none !important;
+          border-bottom: 1px solid #2a3942 !important;
+          color: #e9edef !important;
+          box-shadow: 0 2px 10px rgba(0,0,0,.16) !important;
+        }
+
+        .wa-app[data-appearance="dark"] .wa-header-title,
+        .wa-app[data-appearance="dark"] .wa-header-title-wrap,
+        .wa-app[data-appearance="dark"] .wa-header-left {
+          color: #f1f4f5 !important;
+          -webkit-text-fill-color: #f1f4f5 !important;
+          opacity: 1 !important;
+        }
+
+        .wa-app[data-appearance="dark"] .wa-header-sub {
+          color: #aebac1 !important;
+          -webkit-text-fill-color: #aebac1 !important;
+          opacity: 1 !important;
+        }
+
+        .wa-app[data-appearance="dark"] .wa-header-right .wa-icon-btn,
+        .wa-app[data-appearance="dark"] .wa-mobile-back-btn {
+          background: transparent !important;
+          color: #d8e0e5 !important;
+          -webkit-text-fill-color: #d8e0e5 !important;
+          border-color: transparent !important;
+          box-shadow: none !important;
+        }
+
+        /* BOTTOM CHAT / COMPOSER */
+        .wa-app[data-appearance="dark"] .wa-conversation-composer-area,
+        .wa-app[data-appearance="dark"] .wa-composer-wrap {
+          background: #111b21 !important;
+          background-image: none !important;
+          border-top: 1px solid #2a3942 !important;
+          box-shadow: none !important;
+        }
+
+        .wa-app[data-appearance="dark"] .wa-composer {
+          background: #202c33 !important;
+          background-image: none !important;
+          border: 1px solid #30434f !important;
+          box-shadow: none !important;
+        }
+
+        .wa-app[data-appearance="dark"] .wa-message-input,
+        .wa-app[data-appearance="dark"] .wa-input,
+        .wa-app[data-appearance="dark"] .wa-composer input:not([type="file"]),
+        .wa-app[data-appearance="dark"] .wa-composer textarea {
+          background: #18262f !important;
+          background-image: none !important;
+          border-color: #30434f !important;
+          color: #f1f4f5 !important;
+          -webkit-text-fill-color: #f1f4f5 !important;
+          caret-color: #53bdeb !important;
+          box-shadow: none !important;
+        }
+
+        .wa-app[data-appearance="dark"] .wa-message-input::placeholder,
+        .wa-app[data-appearance="dark"] .wa-input::placeholder,
+        .wa-app[data-appearance="dark"] .wa-composer input::placeholder,
+        .wa-app[data-appearance="dark"] .wa-composer textarea::placeholder {
+          color: #8696a0 !important;
+          -webkit-text-fill-color: #8696a0 !important;
+          opacity: 1 !important;
+        }
+
+        .wa-app[data-appearance="dark"] .wa-composer .wa-icon-btn,
+        .wa-app[data-appearance="dark"] .wa-composer button:not(.wa-send-btn) {
+          background: transparent !important;
+          color: #aebac1 !important;
+          -webkit-text-fill-color: #aebac1 !important;
+          border-color: transparent !important;
+          box-shadow: none !important;
+        }
+
+        .wa-app[data-appearance="dark"] .wa-send-btn {
+          background: var(--accent-color, #00a884) !important;
+          background-image: none !important;
+          color: #ffffff !important;
+          -webkit-text-fill-color: #ffffff !important;
+          border: 0 !important;
+          box-shadow: none !important;
+          opacity: 1 !important;
+        }
+
+        /* SETTINGS critical readability */
+        .wa-app[data-appearance="dark"] .wa-settings-card,
+        .wa-app[data-appearance="dark"] .wa-details-card {
+          background: #17232c !important;
+          border-color: #2a3942 !important;
+        }
+
+        .wa-app[data-appearance="dark"] .wa-settings-title,
+        .wa-app[data-appearance="dark"] .wa-settings-card strong,
+        .wa-app[data-appearance="dark"] .wa-details-card strong {
+          color: #f1f4f5 !important;
+          -webkit-text-fill-color: #f1f4f5 !important;
+          opacity: 1 !important;
+        }
+
+        .wa-app[data-appearance="dark"] .wa-settings-note,
+        .wa-app[data-appearance="dark"] .wa-settings-label,
+        .wa-app[data-appearance="dark"] .wa-settings-card small,
+        .wa-app[data-appearance="dark"] .wa-details-card p,
+        .wa-app[data-appearance="dark"] .wa-details-card small {
+          color: #aebac1 !important;
+          -webkit-text-fill-color: #aebac1 !important;
+          opacity: 1 !important;
+        }
+
+        /* The user requested no chat-header X control. */
+        .wa-close-chat-btn {
+          display: none !important;
+        }
+
+        /* v4.11.6 — LEFT NAVIGATION BAND
+           Actual component selector is .wa-nav-rail (not .wa-navigation-rail). */
+        .wa-app[data-appearance="dark"] .wa-nav-rail,
+        html[data-int-messager-appearance="dark"] .wa-nav-rail {
+          background: #111b21 !important;
+          background-image: none !important;
+          border-color: #273842 !important;
+          color: #aebac1 !important;
+          box-shadow: none !important;
+        }
+
+        .wa-app[data-appearance="dark"] .wa-rail-nav,
+        html[data-int-messager-appearance="dark"] .wa-rail-nav {
+          background: transparent !important;
+        }
+
+        .wa-app[data-appearance="dark"] .wa-rail-logo,
+        .wa-app[data-appearance="dark"] .wa-rail-profile,
+        html[data-int-messager-appearance="dark"] .wa-rail-logo,
+        html[data-int-messager-appearance="dark"] .wa-rail-profile {
+          background: #17232c !important;
+          border-color: #2a3942 !important;
+          color: #d8e0e5 !important;
+          box-shadow: none !important;
+        }
+
+        .wa-app[data-appearance="dark"] .wa-rail-btn,
+        html[data-int-messager-appearance="dark"] .wa-rail-btn {
+          background: transparent !important;
+          background-image: none !important;
+          border-color: transparent !important;
+          color: #93a4ad !important;
+          -webkit-text-fill-color: #93a4ad !important;
+          box-shadow: none !important;
+        }
+
+        .wa-app[data-appearance="dark"] .wa-rail-btn small,
+        .wa-app[data-appearance="dark"] .wa-rail-btn .wa-rail-icon,
+        html[data-int-messager-appearance="dark"] .wa-rail-btn small,
+        html[data-int-messager-appearance="dark"] .wa-rail-btn .wa-rail-icon {
+          color: inherit !important;
+          -webkit-text-fill-color: currentColor !important;
+          opacity: 1 !important;
+        }
+
+        .wa-app[data-appearance="dark"] .wa-rail-btn:hover,
+        html[data-int-messager-appearance="dark"] .wa-rail-btn:hover {
+          background: #17232c !important;
+          color: #dce5ea !important;
+          -webkit-text-fill-color: #dce5ea !important;
+        }
+
+        .wa-app[data-appearance="dark"] .wa-rail-btn.active,
+        html[data-int-messager-appearance="dark"] .wa-rail-btn.active {
+          background: color-mix(in srgb, var(--accent-color, #00a884) 18%, #17232c) !important;
+          color: #eaf8f5 !important;
+          -webkit-text-fill-color: #eaf8f5 !important;
+          border-color: color-mix(in srgb, var(--accent-color, #00a884) 35%, #2a3942) !important;
+        }
+
+        .wa-app[data-appearance="dark"] .wa-rail-btn.active::before,
+        html[data-int-messager-appearance="dark"] .wa-rail-btn.active::before {
+          background: color-mix(in srgb, var(--accent-color, #00a884) 18%, transparent) !important;
+        }
+
+        /* On desktop, integrate the full vertical band with the dark shell. */
+        @media (min-width: 901px) {
+          .wa-app[data-appearance="dark"] .wa-nav-rail,
+          html[data-int-messager-appearance="dark"] .wa-nav-rail {
+            border-right: 1px solid #273842 !important;
+          }
+        }
+
+        /* v4.11.6 — MESSAGE OPTIONS DOTS
+           Dark desktop: invisible until the message is hovered/focused.
+           Touch/mobile remains unchanged because there is no cursor hover. */
+        @media (hover: hover) and (pointer: fine) {
+          .wa-app[data-appearance="dark"] .v482-message-menu-trigger,
+          html[data-int-messager-appearance="dark"] .v482-message-menu-trigger,
+          .wa-app[data-appearance="dark"] .wa-room-menu-trigger,
+          .wa-app[data-appearance="dark"] .wa-room-more-btn {
+            opacity: 0 !important;
+            visibility: hidden !important;
+            pointer-events: none !important;
+            transform: translateY(1px) !important;
+            transition:
+              opacity .14s ease,
+              visibility .14s ease,
+              transform .14s ease !important;
+          }
+
+          .wa-app[data-appearance="dark"] .wa-message-row:hover .v482-message-menu-trigger,
+          .wa-app[data-appearance="dark"] .wa-message-row:focus-within .v482-message-menu-trigger,
+          html[data-int-messager-appearance="dark"] .wa-message-row:hover .v482-message-menu-trigger,
+          html[data-int-messager-appearance="dark"] .wa-message-row:focus-within .v482-message-menu-trigger,
+          .wa-app[data-appearance="dark"] .wa-room-card:hover .wa-room-menu-trigger,
+          .wa-app[data-appearance="dark"] .wa-room-card:focus-within .wa-room-menu-trigger,
+          .wa-app[data-appearance="dark"] .wa-room-card:hover .wa-room-more-btn,
+          .wa-app[data-appearance="dark"] .wa-room-card:focus-within .wa-room-more-btn {
+            opacity: 1 !important;
+            visibility: visible !important;
+            pointer-events: auto !important;
+            transform: none !important;
+          }
+        }
+
+        /* Dropdown itself must remain legible when opened in dark mode. */
+        .wa-app[data-appearance="dark"] .v482-desktop-menu,
+        .wa-app[data-appearance="dark"] .wa-room-context-menu,
+        html[data-int-messager-appearance="dark"] .v482-desktop-menu,
+        html[data-int-messager-appearance="dark"] .wa-room-context-menu {
+          background: #202c33 !important;
+          border-color: #344853 !important;
+          color: #e9edef !important;
+          box-shadow: 0 18px 45px rgba(0,0,0,.34) !important;
+        }
+
+        .wa-app[data-appearance="dark"] .v482-desktop-menu button,
+        .wa-app[data-appearance="dark"] .wa-room-context-menu button,
+        html[data-int-messager-appearance="dark"] .v482-desktop-menu button,
+        html[data-int-messager-appearance="dark"] .wa-room-context-menu button {
+          color: #e9edef !important;
+          -webkit-text-fill-color: #e9edef !important;
+        }
+
+        .wa-app[data-appearance="dark"] .v482-desktop-menu button:hover,
+        .wa-app[data-appearance="dark"] .wa-room-context-menu button:hover,
+        html[data-int-messager-appearance="dark"] .v482-desktop-menu button:hover,
+        html[data-int-messager-appearance="dark"] .wa-room-context-menu button:hover {
+          background: #293942 !important;
+        }
+
+        /* v4.11.7 — mobile New Group entry point */
+        .wa-premium-new-group {
+          display: none;
+        }
+
+        @media (max-width: 900px) {
+          .wa-premium-chat-heading-actions {
+            display: flex !important;
+            align-items: center !important;
+            gap: 8px !important;
+          }
+
+          .wa-premium-new-chat,
+          .wa-premium-new-group {
+            width: 42px !important;
+            height: 42px !important;
+            min-width: 42px !important;
+            min-height: 42px !important;
+            padding: 0 !important;
+            display: inline-grid !important;
+            place-items: center !important;
+            border-radius: 13px !important;
+            background: var(--ui-control-bg, #edf2f6) !important;
+            border: 1px solid var(--ui-border, #dfe6ec) !important;
+            color: var(--ui-text, #17212b) !important;
+            -webkit-text-fill-color: var(--ui-text, #17212b) !important;
+            box-shadow: none !important;
+            font-size: 18px !important;
+          }
+
+          .wa-premium-new-group span {
+            line-height: 1 !important;
+          }
+
+          .wa-app[data-appearance="dark"] .wa-premium-new-chat,
+          .wa-app[data-appearance="dark"] .wa-premium-new-group {
+            background: #17232c !important;
+            border-color: #2a3942 !important;
+            color: #dce5ea !important;
+            -webkit-text-fill-color: #dce5ea !important;
+          }
+
+          .wa-app[data-appearance="dark"] .wa-premium-new-chat:active,
+          .wa-app[data-appearance="dark"] .wa-premium-new-group:active {
+            background: #202c33 !important;
+          }
+
+          /* Keep Archived usable without squeezing the two action buttons. */
+          .wa-premium-chat-heading-actions .wa-archive-toggle {
+            min-width: 0 !important;
+            padding-inline: 10px !important;
+          }
+        }
+      `}</style>
+
     </>
   );
 }

@@ -1,0 +1,75 @@
+/* Int-Messager v4.11.3 — lazy feature loading states */
+
+.wa-feature-loader {
+  width: min(420px, calc(100% - 32px));
+  min-height: 84px;
+  margin: 24px auto;
+  padding: 18px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border-radius: 18px;
+  background: var(--theme-surface, #ffffff);
+  color: var(--theme-text, #0f172a);
+  border: 1px solid var(--theme-border, #d8e0e8);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, .08);
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.wa-feature-loader-spinner {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--theme-muted, #94a3b8) 42%, transparent);
+  border-top-color: var(--accent-color, #1687d9);
+  animation: wa-feature-loader-spin .72s linear infinite;
+}
+
+.wa-attachment-loader {
+  min-width: 190px;
+  min-height: 62px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--theme-surface-2, #f1f5f9) 86%, transparent);
+  color: var(--theme-muted, #64748b);
+  border: 1px solid var(--theme-border, #d8e0e8);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.wa-app[data-appearance="dark"] .wa-feature-loader {
+  background: #111d28;
+  color: #f3f6f9;
+  border-color: #2a3c4d;
+  box-shadow: 0 12px 30px rgba(0,0,0,.24);
+}
+
+.wa-app[data-appearance="dark"] .wa-attachment-loader {
+  background: #152536;
+  color: #c5d2df;
+  border-color: #2a455e;
+}
+
+@keyframes wa-feature-loader-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wa-feature-loader-spinner {
+    animation-duration: 1.6s;
+  }
+}
+
+@media (max-width: 760px) {
+  .wa-feature-loader {
+    min-height: 70px;
+    margin: 16px auto;
+    border-radius: 15px;
+  }
+}
