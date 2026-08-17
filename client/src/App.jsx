@@ -3500,6 +3500,9 @@ export default function App() {
   const [sharedContentTab, setSharedContentTab] = useState("media");
   const [showMobileChatMenu, setShowMobileChatMenu] = useState(false);
   const [unreadCounts, setUnreadCounts] = useState({});
+  const [isChatNearBottom, setIsChatNearBottom] = useState(true);
+  const [newMessagesBelow, setNewMessagesBelow] = useState(0);
+  const [firstNewMessageId, setFirstNewMessageId] = useState("");
   const [sidebarMode, setSidebarMode] = useState("chats");
   const [developerStatus, setDeveloperStatus] = useState("");
   const [desktopSidebarWidth, setDesktopSidebarWidth] = useState(() => {
@@ -3696,6 +3699,9 @@ export default function App() {
   const fileInputRef = useRef(null);
   const messageInputRef = useRef(null);
   const messageListRef = useRef(null);
+  const isChatNearBottomRef = useRef(true);
+  const restoredScrollRoomRef = useRef("");
+  const scrollPositionSaveTimerRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const remoteTypingTimeoutRef = useRef(null);
   const recordingTimeoutRef = useRef(null);
@@ -4825,6 +4831,43 @@ export default function App() {
   }, [canChat, sidebarMode, chatSearch, installId, globalSearchType, globalSearchSender, globalSearchDateFrom, globalSearchDateTo]);
 
   useEffect(() => {
+    restoredScrollRoomRef.current = "";
+    clearNewMessageNavigation();
+    isChatNearBottomRef.current = true;
+    setIsChatNearBottom(true);
+  }, [activeRoomSlug]);
+
+  useEffect(() => {
+    if (!activeRoomSlug || restoredScrollRoomRef.current === activeRoomSlug) return;
+    const roomMessages = messagesByRoom[activeRoomSlug] || [];
+    if (!roomMessages.length) return;
+
+    const timer = window.setTimeout(() => {
+      const listEl = messageListRef.current;
+      if (!listEl) return;
+
+      const storageKey = getChatScrollStorageKey(activeRoomSlug);
+      let savedPosition = 0;
+
+      if (storageKey) {
+        try {
+          const parsed = Number(window.localStorage.getItem(storageKey));
+          if (Number.isFinite(parsed) && parsed >= 0) savedPosition = parsed;
+        } catch {
+          savedPosition = 0;
+        }
+      }
+
+      const maximumScrollTop = Math.max(0, listEl.scrollHeight - listEl.clientHeight);
+      listEl.scrollTop = Math.min(savedPosition, maximumScrollTop);
+      restoredScrollRoomRef.current = activeRoomSlug;
+      updateChatBottomState(listEl);
+    }, 100);
+
+    return () => window.clearTimeout(timer);
+  }, [activeRoomSlug, messagesByRoom, currentProfileId]);
+
+  useEffect(() => {
     if (!highlightedSearchMessageId || !activeRoomSlug) return;
     const currentMessages = messagesByRoom[activeRoomSlug] || [];
     const hasMessage = currentMessages.some((message) => String(message._id || "") === String(highlightedSearchMessageId));
@@ -4878,7 +4921,16 @@ export default function App() {
       const isOwnMessage =
         String(displayMessage.senderProfileId || "") === String(currentProfileId || "");
       const isActiveRoom = displayMessage.roomSlug === activeRoomSlug;
-      const canMarkSeenNow = isActiveRoom && !document.hidden && document.hasFocus();
+      const canMarkSeenNow =
+        isActiveRoom &&
+        !document.hidden &&
+        document.hasFocus() &&
+        isChatNearBottomRef.current;
+
+      if (!isOwnMessage && isActiveRoom && !isChatNearBottomRef.current) {
+        setNewMessagesBelow((current) => current + 1);
+        setFirstNewMessageId((current) => current || String(displayMessage._id || ""));
+      }
 
       if (!isOwnMessage && !canMarkSeenNow) {
         setUnreadCounts((current) => ({
@@ -4888,6 +4940,20 @@ export default function App() {
       }
 
       notifyNewMessage(displayMessage);
+
+      if (!isOwnMessage && isActiveRoom && isChatNearBottomRef.current) {
+        window.requestAnimationFrame(() => {
+          window.requestAnimationFrame(() => {
+            const listEl = messageListRef.current;
+            if (!listEl) return;
+            const stillNearBottom = updateChatBottomState(listEl);
+            if (!stillNearBottom) {
+              setNewMessagesBelow((current) => current + 1);
+              setFirstNewMessageId((current) => current || String(displayMessage._id || ""));
+            }
+          });
+        });
+      }
 
       if (canMarkSeenNow) {
         socket.emit("mark_seen", { roomSlug: activeRoomSlug, installId });
@@ -5107,9 +5173,10 @@ export default function App() {
     if (!canChat || !activeRoomSlug || !installId) return;
 
     const markActiveRoomSeenIfVisible = () => {
-      if (document.hidden || !document.hasFocus()) return;
+      if (document.hidden || !document.hasFocus() || !isChatNearBottomRef.current) return;
       socket.emit("mark_seen", { roomSlug: activeRoomSlug, installId });
       setUnreadCounts((current) => ({ ...current, [activeRoomSlug]: 0 }));
+      clearNewMessageNavigation();
     };
 
     window.addEventListener("focus", markActiveRoomSeenIfVisible);
@@ -5483,6 +5550,82 @@ export default function App() {
       socket.off("call:ended", handleCallEnded);
     };
   }, []);
+
+  function getChatScrollStorageKey(roomSlug = activeRoomSlug) {
+    if (!roomSlug) return "";
+    return `int_messager_chat_scroll_v4118:${String(currentProfileId || "guest")}:${roomSlug}`;
+  }
+
+  function getChatBottomGap(listEl = messageListRef.current) {
+    if (!listEl) return 0;
+    return Math.max(0, listEl.scrollHeight - listEl.clientHeight - listEl.scrollTop);
+  }
+
+  function updateChatBottomState(listEl = messageListRef.current) {
+    if (!listEl) return true;
+    const nearBottom = getChatBottomGap(listEl) <= 96;
+    isChatNearBottomRef.current = nearBottom;
+    setIsChatNearBottom(nearBottom);
+    return nearBottom;
+  }
+
+  function clearNewMessageNavigation() {
+    setNewMessagesBelow(0);
+    setFirstNewMessageId("");
+  }
+
+  function markActiveRoomSeenFromScroll() {
+    if (!activeRoomSlug || !installId || document.hidden || !document.hasFocus()) return;
+    socket.emit("mark_seen", { roomSlug: activeRoomSlug, installId });
+    setUnreadCounts((current) => ({ ...current, [activeRoomSlug]: 0 }));
+  }
+
+  function handleChatScroll(event) {
+    const listEl = event.currentTarget;
+    const nearBottom = updateChatBottomState(listEl);
+
+    if (nearBottom) {
+      clearNewMessageNavigation();
+      markActiveRoomSeenFromScroll();
+    }
+
+    const storageKey = getChatScrollStorageKey();
+    if (!storageKey) return;
+
+    window.clearTimeout(scrollPositionSaveTimerRef.current);
+    scrollPositionSaveTimerRef.current = window.setTimeout(() => {
+      try {
+        window.localStorage.setItem(storageKey, String(Math.max(0, Math.round(listEl.scrollTop))));
+      } catch {
+        // Scroll-position persistence is an optional enhancement.
+      }
+    }, 120);
+  }
+
+  function jumpToLatestMessages() {
+    const listEl = messageListRef.current;
+    if (!listEl) return;
+
+    listEl.scrollTo({
+      top: listEl.scrollHeight,
+      behavior: "smooth",
+    });
+
+    window.setTimeout(() => {
+      updateChatBottomState(listEl);
+      clearNewMessageNavigation();
+      markActiveRoomSeenFromScroll();
+
+      const storageKey = getChatScrollStorageKey();
+      if (storageKey) {
+        try {
+          window.localStorage.setItem(storageKey, String(Math.max(0, Math.round(listEl.scrollTop))));
+        } catch {
+          // Ignore storage failures.
+        }
+      }
+    }, 360);
+  }
 
   function scrollToMessage(messageId) {
     if (!messageId) return;
@@ -8221,6 +8364,7 @@ export default function App() {
           <main
             ref={messageListRef}
             className={`wa-chat ${isDragOver ? "drag-over" : ""}`}
+            onScroll={handleChatScroll}
             onDragEnter={(e) => {
               if (e.dataTransfer?.types?.includes("Files")) {
                 e.preventDefault();
@@ -8262,6 +8406,21 @@ export default function App() {
               </div>
             ) : null}
 
+            {!isChatNearBottom ? (
+              <button
+                type="button"
+                className={`wa-smart-scroll-btn ${newMessagesBelow > 0 ? "has-new" : ""}`}
+                onClick={jumpToLatestMessages}
+                aria-label={newMessagesBelow > 0 ? `${newMessagesBelow} new messages. Jump to latest.` : "Jump to latest message"}
+                title={newMessagesBelow > 0 ? `${newMessagesBelow} new messages` : "Jump to latest"}
+              >
+                <span aria-hidden="true">↓</span>
+                {newMessagesBelow > 0 ? (
+                  <strong>{newMessagesBelow === 1 ? "1 new message" : `${newMessagesBelow} new messages`}</strong>
+                ) : null}
+              </button>
+            ) : null}
+
             {isDragOver ? <div className="wa-drop-overlay">Drop files to upload</div> : null}
 
             {!groupedMessages.length && !pendingUploadsForRoom.length ? (
@@ -8271,8 +8430,13 @@ export default function App() {
             <MessageList
               groupedMessages={groupedMessages}
               renderMessage={(message, index, sequence) => (
+                <React.Fragment key={message._id || `${message.createdAt}-${index}`}>
+                  {firstNewMessageId && String(message._id || "") === String(firstNewMessageId) ? (
+                    <div className="wa-new-message-divider" role="separator" aria-label={`${newMessagesBelow || 1} unread messages`}>
+                      <span>{newMessagesBelow === 1 ? "1 new message" : `${Math.max(newMessagesBelow, 1)} new messages`}</span>
+                    </div>
+                  ) : null}
                 <MessageBubble
-                  key={message._id || `${message.createdAt}-${index}`}
                   message={message}
                   highlightedMessageId={highlightedSearchMessageId}
                   currentProfileId={currentProfileId}
@@ -8299,6 +8463,7 @@ export default function App() {
                   getProfileNameById={getProfileNameById}
                   getProfileAvatarById={getProfileAvatarById}
                 />
+                </React.Fragment>
               )}
             />
 
@@ -9623,7 +9788,119 @@ export default function App() {
           display: none;
         }
 
+        /* v4.11.8 — Smart Message Navigation */
+        .wa-smart-scroll-btn {
+          position: fixed !important;
+          right: 24px !important;
+          bottom: calc(var(--wa-live-composer-height, 74px) + 24px) !important;
+          z-index: 58 !important;
+          min-width: 44px !important;
+          min-height: 44px !important;
+          padding: 0 13px !important;
+          display: inline-flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          gap: 8px !important;
+          border-radius: 999px !important;
+          border: 1px solid var(--ui-border, #dfe6ec) !important;
+          background: var(--ui-panel, #fff) !important;
+          color: var(--ui-text, #17212b) !important;
+          -webkit-text-fill-color: var(--ui-text, #17212b) !important;
+          box-shadow: 0 10px 28px rgba(15,23,42,.16) !important;
+          cursor: pointer !important;
+          font-weight: 800 !important;
+          white-space: nowrap !important;
+        }
+
+        .wa-smart-scroll-btn > span {
+          font-size: 21px !important;
+          line-height: 1 !important;
+        }
+
+        .wa-smart-scroll-btn strong {
+          color: inherit !important;
+          -webkit-text-fill-color: currentColor !important;
+          font-size: 12px !important;
+          font-weight: 850 !important;
+        }
+
+        .wa-smart-scroll-btn.has-new {
+          border-color: color-mix(in srgb, var(--ui-accent, #2563eb) 38%, var(--ui-border, #dfe6ec)) !important;
+        }
+
+        .wa-app[data-appearance="dark"] .wa-smart-scroll-btn {
+          background: #202c33 !important;
+          border-color: #344853 !important;
+          color: #e9edef !important;
+          -webkit-text-fill-color: #e9edef !important;
+          box-shadow: 0 12px 32px rgba(0,0,0,.34) !important;
+        }
+
+        .wa-app[data-appearance="dark"] .wa-smart-scroll-btn.has-new {
+          background: color-mix(in srgb, var(--accent-color, #00a884) 16%, #202c33) !important;
+          border-color: color-mix(in srgb, var(--accent-color, #00a884) 42%, #344853) !important;
+        }
+
+        .wa-new-message-divider {
+          width: 100% !important;
+          display: flex !important;
+          align-items: center !important;
+          gap: 10px !important;
+          margin: 12px 0 !important;
+          color: var(--ui-muted, #667784) !important;
+          -webkit-text-fill-color: var(--ui-muted, #667784) !important;
+          font-size: 11px !important;
+          font-weight: 850 !important;
+          letter-spacing: .025em !important;
+          text-transform: uppercase !important;
+        }
+
+        .wa-new-message-divider::before,
+        .wa-new-message-divider::after {
+          content: "" !important;
+          height: 1px !important;
+          flex: 1 !important;
+          background: var(--ui-border, #dfe6ec) !important;
+        }
+
+        .wa-new-message-divider span {
+          flex: 0 0 auto !important;
+          padding: 5px 9px !important;
+          border-radius: 999px !important;
+          background: var(--ui-panel-2, #f5f7fa) !important;
+          color: inherit !important;
+          -webkit-text-fill-color: currentColor !important;
+        }
+
+        .wa-app[data-appearance="dark"] .wa-new-message-divider {
+          color: #8fa3ad !important;
+          -webkit-text-fill-color: #8fa3ad !important;
+        }
+
+        .wa-app[data-appearance="dark"] .wa-new-message-divider::before,
+        .wa-app[data-appearance="dark"] .wa-new-message-divider::after {
+          background: #2a3942 !important;
+        }
+
+        .wa-app[data-appearance="dark"] .wa-new-message-divider span {
+          background: #17232c !important;
+        }
+
         @media (max-width: 900px) {
+          .wa-smart-scroll-btn {
+            right: 14px !important;
+            bottom: calc(var(--wa-live-composer-height, 74px) + max(16px, env(safe-area-inset-bottom))) !important;
+            min-height: 42px !important;
+            min-width: 42px !important;
+            padding-inline: 11px !important;
+          }
+
+          .wa-smart-scroll-btn strong {
+            max-width: 130px !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+          }
+
           .wa-premium-chat-heading-actions {
             display: flex !important;
             align-items: center !important;
