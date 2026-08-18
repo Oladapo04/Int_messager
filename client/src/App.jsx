@@ -3700,8 +3700,7 @@ export default function App() {
   const messageInputRef = useRef(null);
   const messageListRef = useRef(null);
   const isChatNearBottomRef = useRef(true);
-  const restoredScrollRoomRef = useRef("");
-  const scrollPositionSaveTimerRef = useRef(null);
+  const openedAtLatestRoomRef = useRef("");
   const typingTimeoutRef = useRef(null);
   const remoteTypingTimeoutRef = useRef(null);
   const recordingTimeoutRef = useRef(null);
@@ -4249,6 +4248,33 @@ export default function App() {
   const favoriteProfiles = useMemo(() => filteredProfiles.filter((user) => favoriteContactIds.has(String(user._id)) && !blockedProfileIds.has(String(user._id))), [filteredProfiles, favoriteContactIds, blockedProfileIds]);
   const savedProfiles = useMemo(() => filteredProfiles.filter((user) => savedContactIds.has(String(user._id)) && !favoriteContactIds.has(String(user._id)) && !blockedProfileIds.has(String(user._id))), [filteredProfiles, savedContactIds, favoriteContactIds, blockedProfileIds]);
   const otherProfiles = useMemo(() => filteredProfiles.filter((user) => !savedContactIds.has(String(user._id)) && !blockedProfileIds.has(String(user._id))), [filteredProfiles, savedContactIds, blockedProfileIds]);
+
+  const recentContactProfiles = useMemo(() => {
+    const seen = new Set();
+    const query = chatSearch.trim().toLowerCase();
+    const recent = [];
+
+    for (const room of roomsSorted) {
+      if (!room?.isDirect || room?.isSaved) continue;
+
+      const otherId = (room.participants || [])
+        .map(String)
+        .find((id) => id !== String(currentProfileId || ""));
+
+      if (!otherId || seen.has(otherId) || blockedProfileIds.has(otherId)) continue;
+
+      const contact = profiles.find((user) => String(user._id || user.profileId || "") === otherId);
+      if (!contact) continue;
+      if (query && !String(contact.displayName || "").toLowerCase().includes(query)) continue;
+
+      seen.add(otherId);
+      recent.push(contact);
+      if (recent.length >= 5) break;
+    }
+
+    return recent;
+  }, [roomsSorted, profiles, currentProfileId, blockedProfileIds, chatSearch]);
+
   const blockedProfiles = useMemo(() => profiles.filter((user) => blockedProfileIds.has(String(user._id))), [profiles, blockedProfileIds]);
 
   const rawMessages = (messagesByRoom[activeRoomSlug] || []).filter((message) => !message.expiresAt || new Date(message.expiresAt).getTime() > expiryClock);
@@ -4831,14 +4857,14 @@ export default function App() {
   }, [canChat, sidebarMode, chatSearch, installId, globalSearchType, globalSearchSender, globalSearchDateFrom, globalSearchDateTo]);
 
   useEffect(() => {
-    restoredScrollRoomRef.current = "";
+    openedAtLatestRoomRef.current = "";
     clearNewMessageNavigation();
     isChatNearBottomRef.current = true;
     setIsChatNearBottom(true);
   }, [activeRoomSlug]);
 
   useEffect(() => {
-    if (!activeRoomSlug || restoredScrollRoomRef.current === activeRoomSlug) return;
+    if (!activeRoomSlug || openedAtLatestRoomRef.current === activeRoomSlug) return;
     const roomMessages = messagesByRoom[activeRoomSlug] || [];
     if (!roomMessages.length) return;
 
@@ -4846,26 +4872,18 @@ export default function App() {
       const listEl = messageListRef.current;
       if (!listEl) return;
 
-      const storageKey = getChatScrollStorageKey(activeRoomSlug);
-      let savedPosition = 0;
-
-      if (storageKey) {
-        try {
-          const parsed = Number(window.localStorage.getItem(storageKey));
-          if (Number.isFinite(parsed) && parsed >= 0) savedPosition = parsed;
-        } catch {
-          savedPosition = 0;
-        }
-      }
-
-      const maximumScrollTop = Math.max(0, listEl.scrollHeight - listEl.clientHeight);
-      listEl.scrollTop = Math.min(savedPosition, maximumScrollTop);
-      restoredScrollRoomRef.current = activeRoomSlug;
+      // v4.11.10: opening a conversation always starts at the newest message.
+      // This runs once per room open only. It does NOT run again when new
+      // messages, uploads or typing indicators change.
+      listEl.scrollTop = listEl.scrollHeight;
+      openedAtLatestRoomRef.current = activeRoomSlug;
       updateChatBottomState(listEl);
+      clearNewMessageNavigation();
+      markActiveRoomSeenFromScroll();
     }, 100);
 
     return () => window.clearTimeout(timer);
-  }, [activeRoomSlug, messagesByRoom, currentProfileId]);
+  }, [activeRoomSlug, messagesByRoom]);
 
   useEffect(() => {
     if (!highlightedSearchMessageId || !activeRoomSlug) return;
@@ -5551,11 +5569,6 @@ export default function App() {
     };
   }, []);
 
-  function getChatScrollStorageKey(roomSlug = activeRoomSlug) {
-    if (!roomSlug) return "";
-    return `int_messager_chat_scroll_v4118:${String(currentProfileId || "guest")}:${roomSlug}`;
-  }
-
   function getChatBottomGap(listEl = messageListRef.current) {
     if (!listEl) return 0;
     return Math.max(0, listEl.scrollHeight - listEl.clientHeight - listEl.scrollTop);
@@ -5588,18 +5601,6 @@ export default function App() {
       clearNewMessageNavigation();
       markActiveRoomSeenFromScroll();
     }
-
-    const storageKey = getChatScrollStorageKey();
-    if (!storageKey) return;
-
-    window.clearTimeout(scrollPositionSaveTimerRef.current);
-    scrollPositionSaveTimerRef.current = window.setTimeout(() => {
-      try {
-        window.localStorage.setItem(storageKey, String(Math.max(0, Math.round(listEl.scrollTop))));
-      } catch {
-        // Scroll-position persistence is an optional enhancement.
-      }
-    }, 120);
   }
 
   function jumpToLatestMessages() {
@@ -5615,15 +5616,6 @@ export default function App() {
       updateChatBottomState(listEl);
       clearNewMessageNavigation();
       markActiveRoomSeenFromScroll();
-
-      const storageKey = getChatScrollStorageKey();
-      if (storageKey) {
-        try {
-          window.localStorage.setItem(storageKey, String(Math.max(0, Math.round(listEl.scrollTop))));
-        } catch {
-          // Ignore storage failures.
-        }
-      }
     }, 360);
   }
 
@@ -8146,10 +8138,83 @@ export default function App() {
             </>
           ) : (
             <>
-              <div className="wa-contacts-heading">
-                <div><div className="wa-section-label">Contacts</div><small>{savedContactIds.size} saved · {favoriteContactIds.size} favourites</small></div>
+              <div className="wa-contacts-heading wa-new-chat-heading">
+                <div className="wa-new-chat-heading-copy">
+                  <button
+                    type="button"
+                    className="wa-new-chat-back"
+                    onClick={() => {
+                      setSidebarMode("chats");
+                      setChatSearch("");
+                    }}
+                    aria-label="Back to chats"
+                    title="Back to chats"
+                  >
+                    ‹
+                  </button>
+                  <div>
+                    <div className="wa-section-label">New chat</div>
+                    <small>{savedContactIds.size} saved · {favoriteContactIds.size} favourites</small>
+                  </div>
+                </div>
               </div>
+
+              <div className="wa-new-chat-quick-actions">
+                <button
+                  type="button"
+                  className="wa-new-chat-quick-action primary"
+                  onClick={() => {
+                    setNewGroupName("");
+                    setNewGroupMemberIds([]);
+                    setShowCreateGroup(true);
+                  }}
+                >
+                  <span className="wa-new-chat-quick-icon" aria-hidden="true">👥</span>
+                  <span><strong>New group</strong><small>Create a conversation with several people</small></span>
+                  <span className="wa-new-chat-chevron" aria-hidden="true">›</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="wa-new-chat-quick-action"
+                  onClick={() => {
+                    const savedRoom = rooms.find((room) => room.isSaved || String(room.slug || "").startsWith("saved:"));
+                    if (savedRoom?.slug) {
+                      setActiveRoomSlug(savedRoom.slug);
+                      setSidebarMode("chats");
+                      setShowChatDetails(false);
+                      setShowSidebar(false);
+                    }
+                  }}
+                >
+                  <span className="wa-new-chat-quick-icon saved" aria-hidden="true">★</span>
+                  <span><strong>Saved Messages</strong><small>Keep notes and messages for yourself</small></span>
+                  <span className="wa-new-chat-chevron" aria-hidden="true">›</span>
+                </button>
+              </div>
+
               {contactManageNotice ? <div className="wa-contact-notice">{contactManageNotice}</div> : null}
+
+              {recentContactProfiles.length ? (
+                <section className="wa-contact-section wa-recent-contact-section">
+                  <div className="wa-contact-section-title">Recent</div>
+                  <div className="wa-recent-contact-strip">
+                    {recentContactProfiles.map((user) => (
+                      <button
+                        key={user._id || user.profileId}
+                        type="button"
+                        className="wa-recent-contact"
+                        onClick={() => startDirectRoom(user._id || user.profileId)}
+                      >
+                        <Avatar label={user.displayName} src={user.avatarUrl} />
+                        <span>{user.displayName || "Contact"}</span>
+                        <small>{user.online ? "Online" : "Recent"}</small>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+
               {[
                 ["Favourites", favoriteProfiles],
                 ["Saved contacts", savedProfiles],
@@ -8176,7 +8241,7 @@ export default function App() {
                   })}
                 </section>
               ) : null)}
-              {!favoriteProfiles.length && !savedProfiles.length && !otherProfiles.length ? <div className="wa-empty dark">No contacts match your search.</div> : null}
+              {!favoriteProfiles.length && !savedProfiles.length && !otherProfiles.length ? <div className="wa-empty dark wa-new-chat-empty">No matching contacts. Try another name.</div> : null}
             </>
           )}
           </div>
@@ -9783,12 +9848,237 @@ export default function App() {
           background: #293942 !important;
         }
 
+        /* v4.11.9 — Premium mobile New Chat flow */
+        .wa-new-chat-back {
+          display: none;
+        }
+
+        .wa-new-chat-heading-copy {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          min-width: 0;
+        }
+
+        .wa-new-chat-quick-actions {
+          display: grid;
+          gap: 8px;
+          margin: 8px 0 14px;
+        }
+
+        .wa-new-chat-quick-action {
+          width: 100%;
+          min-height: 62px;
+          padding: 10px 12px;
+          display: grid;
+          grid-template-columns: 42px minmax(0, 1fr) 20px;
+          align-items: center;
+          gap: 10px;
+          text-align: left;
+          border-radius: 15px;
+          background: var(--ui-panel-2, #f5f7fa);
+          border: 1px solid var(--ui-border, #dfe6ec);
+          color: var(--ui-text, #17212b);
+          -webkit-text-fill-color: var(--ui-text, #17212b);
+          box-shadow: none;
+        }
+
+        .wa-new-chat-quick-action:hover {
+          background: var(--ui-panel-3, #eef3f7);
+        }
+
+        .wa-new-chat-quick-action > span:nth-child(2) {
+          min-width: 0;
+          display: grid;
+          gap: 3px;
+        }
+
+        .wa-new-chat-quick-action strong {
+          color: var(--ui-text-strong, #0f172a);
+          -webkit-text-fill-color: var(--ui-text-strong, #0f172a);
+          font-size: 14px;
+        }
+
+        .wa-new-chat-quick-action small {
+          color: var(--ui-muted, #667784);
+          -webkit-text-fill-color: var(--ui-muted, #667784);
+          font-size: 11px;
+          line-height: 1.25;
+        }
+
+        .wa-new-chat-quick-icon {
+          width: 40px;
+          height: 40px;
+          display: grid;
+          place-items: center;
+          border-radius: 13px;
+          background: color-mix(in srgb, var(--ui-accent, #2563eb) 14%, transparent);
+          color: var(--ui-accent, #2563eb);
+          -webkit-text-fill-color: var(--ui-accent, #2563eb);
+          font-size: 19px;
+        }
+
+        .wa-new-chat-quick-icon.saved {
+          color: #d79b15;
+          -webkit-text-fill-color: #d79b15;
+          background: rgba(215,155,21,.12);
+        }
+
+        .wa-new-chat-chevron {
+          color: var(--ui-soft, #8a9aa7);
+          -webkit-text-fill-color: var(--ui-soft, #8a9aa7);
+          font-size: 24px;
+          line-height: 1;
+        }
+
+        .wa-recent-contact-section {
+          margin-bottom: 12px;
+        }
+
+        .wa-recent-contact-strip {
+          display: grid;
+          grid-auto-flow: column;
+          grid-auto-columns: 78px;
+          gap: 9px;
+          overflow-x: auto;
+          overflow-y: hidden;
+          padding: 2px 1px 8px;
+          scrollbar-width: none;
+          -webkit-overflow-scrolling: touch;
+        }
+
+        .wa-recent-contact-strip::-webkit-scrollbar {
+          display: none;
+        }
+
+        .wa-recent-contact {
+          min-width: 0;
+          padding: 8px 5px;
+          display: grid;
+          justify-items: center;
+          gap: 4px;
+          border: 0;
+          border-radius: 13px;
+          background: transparent;
+          color: var(--ui-text, #17212b);
+          -webkit-text-fill-color: var(--ui-text, #17212b);
+          text-align: center;
+        }
+
+        .wa-recent-contact:hover {
+          background: var(--ui-panel-2, #f5f7fa);
+        }
+
+        .wa-recent-contact .wa-avatar {
+          width: 48px !important;
+          height: 48px !important;
+        }
+
+        .wa-recent-contact > span {
+          max-width: 72px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          font-size: 11px;
+          font-weight: 800;
+        }
+
+        .wa-recent-contact small {
+          color: var(--ui-muted, #667784);
+          -webkit-text-fill-color: var(--ui-muted, #667784);
+          font-size: 9px;
+        }
+
+        .wa-app[data-appearance="dark"] .wa-new-chat-quick-action {
+          background: #17232c !important;
+          border-color: #2a3942 !important;
+          color: #e9edef !important;
+          -webkit-text-fill-color: #e9edef !important;
+        }
+
+        .wa-app[data-appearance="dark"] .wa-new-chat-quick-action:hover {
+          background: #202c33 !important;
+        }
+
+        .wa-app[data-appearance="dark"] .wa-new-chat-quick-action strong {
+          color: #f1f4f5 !important;
+          -webkit-text-fill-color: #f1f4f5 !important;
+        }
+
+        .wa-app[data-appearance="dark"] .wa-new-chat-quick-action small,
+        .wa-app[data-appearance="dark"] .wa-recent-contact small {
+          color: #aebac1 !important;
+          -webkit-text-fill-color: #aebac1 !important;
+        }
+
+        .wa-app[data-appearance="dark"] .wa-recent-contact {
+          color: #e9edef !important;
+          -webkit-text-fill-color: #e9edef !important;
+        }
+
+        .wa-app[data-appearance="dark"] .wa-recent-contact:hover {
+          background: #17232c !important;
+        }
+
+        @media (max-width: 900px) {
+          .wa-new-chat-back {
+            width: 38px;
+            height: 38px;
+            display: grid !important;
+            place-items: center;
+            flex: 0 0 38px;
+            padding: 0;
+            border-radius: 12px;
+            background: var(--ui-control-bg, #edf2f6);
+            border: 1px solid var(--ui-border, #dfe6ec);
+            color: var(--ui-text, #17212b);
+            -webkit-text-fill-color: var(--ui-text, #17212b);
+            font-size: 28px;
+            line-height: 1;
+          }
+
+          .wa-app[data-appearance="dark"] .wa-new-chat-back {
+            background: #17232c !important;
+            border-color: #2a3942 !important;
+            color: #dce5ea !important;
+            -webkit-text-fill-color: #dce5ea !important;
+          }
+
+          .wa-new-chat-heading {
+            padding-block: 5px !important;
+          }
+
+          .wa-new-chat-quick-actions {
+            margin-top: 5px;
+          }
+
+          .wa-new-chat-quick-action {
+            min-height: 60px;
+          }
+
+          .wa-contact-card {
+            border-radius: 14px !important;
+          }
+
+          .wa-contact-section-title {
+            position: sticky;
+            top: 0;
+            z-index: 3;
+            padding-block: 7px;
+            background: var(--ui-sidebar-bg, #fff);
+          }
+
+          .wa-app[data-appearance="dark"] .wa-contact-section-title {
+            background: #111b21 !important;
+          }
+        }
+
         /* v4.11.7 — mobile New Group entry point */
         .wa-premium-new-group {
           display: none;
         }
 
-        /* v4.11.8 — Smart Message Navigation */
+        /* v4.11.8+ — Smart Message Navigation; v4.11.10 opens chats at latest */
         .wa-smart-scroll-btn {
           position: fixed !important;
           right: 24px !important;
@@ -9946,6 +10236,199 @@ export default function App() {
           .wa-premium-chat-heading-actions .wa-archive-toggle {
             min-width: 0 !important;
             padding-inline: 10px !important;
+          }
+
+          /* v4.11.10a — iPhone document-card layout.
+             Prevent Open/Download from collapsing into a narrow vertical column. */
+          .wa7-file-card {
+            width: min(100%, 330px) !important;
+            min-width: 0 !important;
+            max-width: calc(100vw - 56px) !important;
+            display: grid !important;
+            grid-template-columns: 48px minmax(0, 1fr) auto !important;
+            align-items: center !important;
+            column-gap: 10px !important;
+            padding: 10px !important;
+            box-sizing: border-box !important;
+            overflow: hidden !important;
+          }
+
+          .wa7-file-icon {
+            width: 48px !important;
+            height: 48px !important;
+            min-width: 48px !important;
+            flex: 0 0 48px !important;
+          }
+
+          .wa7-file-main {
+            min-width: 0 !important;
+            width: 100% !important;
+            overflow: hidden !important;
+          }
+
+          .wa7-file-name,
+          .wa7-file-meta {
+            min-width: 0 !important;
+            max-width: 100% !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            white-space: nowrap !important;
+          }
+
+          .wa7-file-actions {
+            min-width: max-content !important;
+            width: max-content !important;
+            display: flex !important;
+            flex: 0 0 auto !important;
+            align-items: center !important;
+            justify-content: flex-end !important;
+            gap: 6px !important;
+            overflow: visible !important;
+          }
+
+          .wa7-file-actions a {
+            width: auto !important;
+            min-width: 38px !important;
+            height: 38px !important;
+            padding: 0 10px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            flex: 0 0 auto !important;
+            white-space: nowrap !important;
+            word-break: keep-all !important;
+            overflow-wrap: normal !important;
+            line-height: 1 !important;
+          }
+
+          .wa7-file-actions a:first-child {
+            min-width: 54px !important;
+          }
+
+          /* PDF cards receive the same anti-collapse protection. */
+          .wa10-pdf-card {
+            width: min(100%, 340px) !important;
+            max-width: calc(100vw - 56px) !important;
+            grid-template-columns: 48px minmax(0, 1fr) auto !important;
+            box-sizing: border-box !important;
+          }
+
+          .wa10-pdf-actions,
+          .wa10-pdf-open,
+          .wa10-pdf-download {
+            flex-shrink: 0 !important;
+          }
+
+          .wa10-pdf-open {
+            min-width: 54px !important;
+            white-space: nowrap !important;
+            word-break: keep-all !important;
+          }
+
+          /* v4.11.10a — true iOS dark composer.
+             Target both app and HTML resolved appearance so System mode cannot
+             leave the mobile composer tray white. */
+          .wa-app[data-appearance="dark"] .wa-conversation-composer-area,
+          .wa-app[data-appearance="dark"] .wa-composer-wrap,
+          html[data-int-messager-appearance="dark"] .wa-conversation-composer-area,
+          html[data-int-messager-appearance="dark"] .wa-composer-wrap {
+            background: #0b141a !important;
+            background-image: none !important;
+            border-top-color: #273842 !important;
+            box-shadow: none !important;
+          }
+
+          .wa-app[data-appearance="dark"] .wa-composer,
+          html[data-int-messager-appearance="dark"] .wa-composer {
+            background: #111b21 !important;
+            background-image: none !important;
+            border: 1px solid #2a3942 !important;
+            box-shadow: none !important;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+          }
+
+          .wa-app[data-appearance="dark"] .wa-input-wrap,
+          html[data-int-messager-appearance="dark"] .wa-input-wrap {
+            background: transparent !important;
+          }
+
+          .wa-app[data-appearance="dark"] .wa-input,
+          .wa-app[data-appearance="dark"] .wa-message-input,
+          html[data-int-messager-appearance="dark"] .wa-input,
+          html[data-int-messager-appearance="dark"] .wa-message-input {
+            background: #18262f !important;
+            background-image: none !important;
+            border: 1px solid #30434f !important;
+            color: #f1f4f5 !important;
+            -webkit-text-fill-color: #f1f4f5 !important;
+            box-shadow: none !important;
+          }
+
+          .wa-app[data-appearance="dark"] .wa-composer .wa-icon-btn,
+          html[data-int-messager-appearance="dark"] .wa-composer .wa-icon-btn {
+            background: transparent !important;
+            border: 0 !important;
+            color: #b6c3ca !important;
+            -webkit-text-fill-color: #b6c3ca !important;
+            box-shadow: none !important;
+          }
+
+          .wa-app[data-appearance="dark"] .wa-send-btn,
+          html[data-int-messager-appearance="dark"] .wa-send-btn {
+            background: var(--accent-color, #00a884) !important;
+            background-image: none !important;
+            color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
+            border: 0 !important;
+            box-shadow: none !important;
+          }
+        }
+
+        @media (max-width: 430px) {
+          /* Give file name space before sacrificing the action controls. */
+          .wa7-file-card {
+            max-width: calc(100vw - 40px) !important;
+            grid-template-columns: 44px minmax(0, 1fr) auto !important;
+            column-gap: 8px !important;
+            padding: 9px !important;
+          }
+
+          .wa7-file-icon {
+            width: 44px !important;
+            height: 44px !important;
+            min-width: 44px !important;
+          }
+
+          .wa7-file-actions {
+            gap: 4px !important;
+          }
+
+          .wa7-file-actions a {
+            height: 36px !important;
+            min-width: 36px !important;
+            padding-inline: 8px !important;
+          }
+
+          .wa7-file-actions a:first-child {
+            min-width: 50px !important;
+          }
+
+          .wa-composer-wrap {
+            padding-left: 6px !important;
+            padding-right: 6px !important;
+          }
+
+          .wa-app[data-appearance="dark"] .wa-composer,
+          html[data-int-messager-appearance="dark"] .wa-composer {
+            border-radius: 18px !important;
+            padding: 7px !important;
+            gap: 5px !important;
+          }
+
+          .wa-app[data-appearance="dark"] .wa-input,
+          html[data-int-messager-appearance="dark"] .wa-input {
+            min-height: 42px !important;
           }
         }
       `}</style>
